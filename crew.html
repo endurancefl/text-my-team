@@ -1,0 +1,2701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Crew Dashboard — Endurance Services</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" type="image/png" href="images/icon.png">
+  <link rel="apple-touch-icon" href="images/icon.png">
+  <style>
+    :root {
+      --green-dark: #2D4A3E;
+      --green-primary: #3A5F4B;
+      --green-light: #4A7C5C;
+      --green-accent: #6B9E7A;
+      --green-pale: #E8F0EB;
+      --cream: #F7FAF8;
+      --text-dark: #1A2E24;
+      --text-medium: #3D5A4A;
+      --text-light: #6B8A78;
+      --white: #FFFFFF;
+      --shadow-sm: 0 1px 3px rgba(45, 74, 62, 0.12);
+      --shadow-md: 0 4px 12px rgba(45, 74, 62, 0.15);
+      --radius: 12px;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--cream);
+      color: var(--text-dark);
+      min-height: 100vh;
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+      overscroll-behavior-y: contain;
+    }
+
+    .header {
+      background: var(--green-primary);
+      color: white;
+      padding: 20px;
+      text-align: center;
+      box-shadow: var(--shadow-md);
+    }
+
+    .header h1 {
+      font-size: 20px;
+      font-weight: 600;
+    }
+
+    .header-subtitle {
+      font-size: 14px;
+      opacity: 0.8;
+      margin-top: 4px;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    /* Login Screen */
+    .login-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 70vh;
+      text-align: center;
+    }
+
+    .login-icon {
+      width: 64px;
+      height: 64px;
+      color: var(--green-primary);
+      margin-bottom: 20px;
+    }
+
+    .login-title {
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+
+    .login-subtitle {
+      color: var(--text-medium);
+      margin-bottom: 24px;
+    }
+
+    .form-input {
+      width: 100%;
+      max-width: 280px;
+      padding: 16px;
+      font-size: 18px;
+      text-align: center;
+      border: 2px solid var(--green-pale);
+      border-radius: var(--radius);
+      margin-bottom: 16px;
+      outline: none;
+    }
+
+    .form-input:focus {
+      border-color: var(--green-primary);
+    }
+
+    .btn {
+      padding: 16px 32px;
+      font-size: 16px;
+      font-weight: 600;
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      min-height: 44px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--green-primary), var(--green-light));
+      color: white;
+      box-shadow: var(--shadow-md);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.5;
+    }
+
+    /* Dashboard */
+    .dashboard {
+      display: none;
+    }
+
+    .dashboard.active {
+      display: block;
+    }
+
+    .stats-row {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      flex: 1;
+      background: var(--white);
+      border-radius: var(--radius);
+      padding: 16px;
+      text-align: center;
+      box-shadow: var(--shadow-sm);
+      cursor: pointer;
+      transition: all 0.15s;
+      border: 2px solid transparent;
+    }
+
+    .stat-card.filter-btn:active {
+      transform: scale(0.98);
+    }
+
+    .stat-card.filter-btn.active {
+      border-color: var(--green-primary);
+      background: var(--green-pale);
+    }
+
+    .stat-number {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--green-primary);
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: var(--text-light);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-light);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+    }
+
+    .request-card {
+      background: var(--white);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: var(--shadow-sm);
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    .request-card:active {
+      transform: scale(0.98);
+    }
+
+    .request-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 8px;
+    }
+
+    .request-property {
+      font-weight: 600;
+      font-size: 15px;
+      color: var(--text-dark);
+    }
+
+    .request-date {
+      font-size: 12px;
+      color: var(--text-light);
+    }
+
+    .request-message {
+      font-size: 14px;
+      color: var(--text-medium);
+      margin-bottom: 12px;
+      line-height: 1.4;
+    }
+
+    .request-customer {
+      font-size: 13px;
+      color: var(--text-light);
+    }
+
+    .request-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--green-pale);
+    }
+
+    .status-badge {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 20px;
+    }
+
+    .status-badge.open {
+      background: #FEF3C7;
+      color: #92400E;
+    }
+
+    .status-badge.in-progress {
+      background: #DBEAFE;
+      color: #1E40AF;
+    }
+
+    .status-badge.completed {
+      background: #D1FAE5;
+      color: #065F46;
+    }
+
+    .photo-indicator {
+      font-size: 13px;
+      color: var(--green-primary);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text-light);
+    }
+
+    .empty-state svg {
+      width: 48px;
+      height: 48px;
+      margin-bottom: 12px;
+      opacity: 0.5;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 100;
+      align-items: flex-end;
+      justify-content: center;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--white);
+      border-radius: 20px 20px 0 0;
+      width: 100%;
+      max-width: 500px;
+      max-height: 80vh;
+      overflow-y: auto;
+      padding: 24px;
+      padding-bottom: calc(24px + env(safe-area-inset-bottom));
+    }
+
+    .modal-handle {
+      width: 40px;
+      height: 4px;
+      background: var(--green-pale);
+      border-radius: 2px;
+      margin: 0 auto 20px;
+    }
+
+    .modal-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+
+    .modal-section {
+      margin-bottom: 16px;
+    }
+
+    .modal-label {
+      font-size: 12px;
+      color: var(--text-light);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+
+    .modal-value {
+      font-size: 15px;
+      color: var(--text-dark);
+    }
+
+    .status-options {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .status-btn {
+      flex: 1;
+      padding: 14px 12px;
+      font-size: 14px;
+      font-weight: 600;
+      border: 2px solid var(--green-pale);
+      border-radius: var(--radius);
+      background: var(--white);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .status-btn.selected {
+      border-color: var(--green-primary);
+      background: var(--green-pale);
+      color: var(--green-primary);
+    }
+
+    .save-btn {
+      width: 100%;
+      margin-top: 20px;
+      padding: 18px;
+      font-size: 17px;
+    }
+
+    .logout-link {
+      display: block;
+      text-align: center;
+      margin-top: 30px;
+      color: var(--text-light);
+      font-size: 14px;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    .refresh-btn {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+      opacity: 0.8;
+    }
+
+    .refresh-btn:hover {
+      opacity: 1;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: var(--text-light);
+    }
+
+    .error-msg {
+      background: #FEE2E2;
+      color: #991B1B;
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      margin-bottom: 16px;
+      font-size: 14px;
+    }
+
+    /* Property search autocomplete */
+    .search-container {
+      position: relative;
+      width: 100%;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 20px;
+      height: 20px;
+      color: var(--text-light);
+      pointer-events: none;
+    }
+
+    .search-input {
+      padding-left: 48px;
+    }
+
+    .autocomplete-list {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: var(--white);
+      border: 2px solid var(--green-primary);
+      border-top: none;
+      border-radius: 0 0 var(--radius) var(--radius);
+      max-height: 200px;
+      overflow-y: auto;
+      z-index: 10;
+      display: none;
+      box-shadow: var(--shadow-md);
+    }
+
+    .autocomplete-list.active {
+      display: block;
+    }
+
+    .autocomplete-item {
+      padding: 14px 16px;
+      cursor: pointer;
+      font-size: 15px;
+      color: var(--text-dark);
+      border-bottom: 1px solid var(--green-pale);
+      text-align: left;
+    }
+
+    .autocomplete-item:last-child {
+      border-bottom: none;
+    }
+
+    .autocomplete-item:hover,
+    .autocomplete-item:active {
+      background: var(--green-pale);
+    }
+
+    .autocomplete-item .highlight {
+      font-weight: 700;
+      color: var(--green-primary);
+    }
+
+    .property-card {
+      position: relative;
+      width: 100%;
+      background: var(--white);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-top: 8px;
+      box-shadow: var(--shadow-sm);
+      border-left: 4px solid var(--green-primary);
+      text-align: left;
+    }
+
+    .property-card .property-address {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-dark);
+    }
+
+    .property-card .crew-info {
+      font-size: 13px;
+      color: var(--text-medium);
+      margin-top: 4px;
+    }
+
+    /* Site Report Wizard */
+    .site-report-wizard {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: var(--cream);
+      z-index: 200;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .site-report-wizard.active {
+      display: flex;
+    }
+    .site-report-topbar {
+      background: var(--green-primary);
+      color: white;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      height: 56px;
+      flex-shrink: 0;
+      gap: 8px;
+    }
+    .site-report-topbar button {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+      padding: 8px;
+      min-width: 44px;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .site-report-topbar .sr-title {
+      flex: 1;
+      font-size: 17px;
+      font-weight: 600;
+      text-align: center;
+    }
+    .site-report-steps {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 0;
+      flex-shrink: 0;
+      background: var(--white);
+      border-bottom: 1px solid var(--green-pale);
+    }
+    .site-report-steps .sr-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--green-pale);
+      transition: background 0.2s;
+    }
+    .site-report-steps .sr-dot.active {
+      background: var(--green-primary);
+    }
+    .site-report-steps .sr-dot.done {
+      background: var(--green-accent);
+    }
+    .site-report-panel {
+      display: none;
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .site-report-panel.active {
+      display: block;
+    }
+    .site-report-panel .sr-field-label {
+      font-size: 12px;
+      color: var(--text-light);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+      margin-top: 16px;
+    }
+    .site-report-panel .sr-field-label:first-child {
+      margin-top: 0;
+    }
+    .site-report-photo-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .site-report-photo-grid .sr-thumb {
+      position: relative;
+      aspect-ratio: 1;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .site-report-photo-grid .sr-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .site-report-photo-grid .sr-thumb .sr-remove {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: rgba(220,50,50,0.85);
+      border: none;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .site-report-thumbstrip {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding: 8px 0;
+      -webkit-overflow-scrolling: touch;
+      flex-shrink: 0;
+    }
+    .site-report-thumbstrip .sr-strip-thumb {
+      width: 56px;
+      height: 56px;
+      border-radius: 6px;
+      overflow: hidden;
+      flex-shrink: 0;
+      border: 2px solid transparent;
+      cursor: pointer;
+    }
+    .site-report-thumbstrip .sr-strip-thumb.active {
+      border-color: var(--green-primary);
+    }
+    .site-report-thumbstrip .sr-strip-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .site-report-canvas-wrap {
+      background: #1a1a1a;
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .site-report-canvas-wrap canvas {
+      display: block;
+      width: 100%;
+    }
+    .site-report-annotate-controls {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .site-report-annotate-controls button {
+      flex: 1;
+      padding: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      border: 2px solid var(--green-pale);
+      border-radius: var(--radius);
+      background: var(--white);
+      color: var(--text-dark);
+      cursor: pointer;
+    }
+    .sr-next-btn, .sr-generate-btn {
+      width: 100%;
+      margin-top: 20px;
+      padding: 16px;
+      font-size: 16px;
+      font-weight: 600;
+      border: none;
+      border-radius: var(--radius);
+      background: linear-gradient(135deg, var(--green-primary), var(--green-light));
+      color: white;
+      box-shadow: var(--shadow-md);
+      cursor: pointer;
+    }
+    .sr-next-btn:disabled, .sr-generate-btn:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+    .sr-summary-card {
+      background: var(--white);
+      border-radius: var(--radius);
+      padding: 16px;
+      box-shadow: var(--shadow-sm);
+      border-left: 4px solid var(--green-primary);
+    }
+    .sr-summary-card .sr-sum-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      font-size: 14px;
+    }
+    .sr-summary-card .sr-sum-label {
+      color: var(--text-light);
+    }
+    .sr-summary-card .sr-sum-value {
+      color: var(--text-dark);
+      font-weight: 600;
+    }
+    .sr-progress-wrap {
+      display: none;
+      margin-top: 16px;
+    }
+    .sr-progress-wrap .sr-progress-bar-outer {
+      background: var(--green-pale);
+      border-radius: 4px;
+      height: 8px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    .sr-progress-wrap .sr-progress-bar-inner {
+      background: var(--green-primary);
+      height: 100%;
+      width: 0%;
+      transition: width 0.3s;
+    }
+    .sr-upload-drive-btn {
+      display: none;
+      width: 100%;
+      margin-top: 12px;
+      padding: 14px;
+      font-size: 15px;
+      font-weight: 600;
+      border: 2px solid var(--green-primary);
+      border-radius: var(--radius);
+      background: var(--white);
+      color: var(--green-primary);
+      cursor: pointer;
+    }
+
+    /* Dark mode */
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --green-pale: #1E3328;
+        --cream: #0D1410;
+        --text-dark: #E8F0EB;
+        --text-medium: #A8C4B0;
+        --text-light: #6B8A78;
+        --white: #151F1A;
+      }
+
+      .form-input {
+        background: var(--white);
+        color: var(--text-dark);
+      }
+
+      .status-badge.open {
+        background: #422006;
+        color: #FCD34D;
+      }
+
+      .status-badge.in-progress {
+        background: #1E3A5F;
+        color: #60A5FA;
+      }
+
+      .status-badge.completed {
+        background: #064E3B;
+        color: #6EE7B7;
+      }
+
+      .error-msg {
+        background: #450A0A;
+        color: #FCA5A5;
+      }
+
+      .site-report-steps {
+        background: var(--white);
+        border-color: var(--green-pale);
+      }
+
+      .site-report-annotate-controls button {
+        background: var(--white);
+        color: var(--text-dark);
+        border-color: var(--green-pale);
+      }
+    }
+
+    /* Mode selection buttons (Step 2) */
+    .sr-mode-choice {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-top: 12px;
+    }
+    .sr-mode-btn {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: var(--white);
+      border: 2px solid var(--green-pale);
+      border-radius: var(--radius);
+      padding: 20px;
+      cursor: pointer;
+      text-align: left;
+      transition: border-color 0.15s, background 0.15s;
+      min-height: 80px;
+    }
+    .sr-mode-btn:active {
+      border-color: var(--green-primary);
+      background: var(--green-pale);
+    }
+    .sr-mode-btn .sr-mode-icon {
+      font-size: 32px;
+      flex-shrink: 0;
+      width: 48px;
+      text-align: center;
+    }
+    .sr-mode-btn .sr-mode-label {
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--text-dark);
+    }
+    .sr-mode-btn .sr-mode-desc {
+      font-size: 13px;
+      color: var(--text-light);
+      margin-top: 2px;
+    }
+
+    /* Thumbstrip delete button */
+    .sr-strip-thumb-wrap {
+      position: relative;
+      flex-shrink: 0;
+    }
+    .sr-strip-delete {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: rgba(220,50,50,0.9);
+      border: none;
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2;
+      line-height: 1;
+      padding: 0;
+    }
+
+    /* Step 3 empty state */
+    #sr-no-photos {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text-light);
+    }
+    #sr-no-photos .sr-empty-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+      opacity: 0.5;
+    }
+    #sr-no-photos p {
+      font-size: 15px;
+    }
+
+    /* Step 3 action buttons */
+    .sr-step3-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .sr-step3-actions button {
+      flex: 1;
+      padding: 14px 12px;
+      font-size: 14px;
+      font-weight: 600;
+      border: 2px solid var(--green-primary);
+      border-radius: var(--radius);
+      background: var(--white);
+      color: var(--green-primary);
+      cursor: pointer;
+    }
+    .sr-step3-actions button:active {
+      background: var(--green-pale);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Login Screen -->
+  <div id="login-screen" class="login-screen">
+    <svg class="login-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/>
+    </svg>
+    <h1 class="login-title">Crew Dashboard</h1>
+    <p class="login-subtitle">Enter your phone number to view requests</p>
+    <div id="login-error" class="error-msg" style="display:none;"></div>
+    <input type="tel" id="phone-input" class="form-input" placeholder="(407) 555-1234">
+    <button id="login-btn" class="btn btn-primary" disabled>View My Requests</button>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="dashboard" class="dashboard">
+    <header class="header">
+      <h1>Crew Dashboard</h1>
+      <p class="header-subtitle" id="crew-name"></p>
+    </header>
+
+    <div class="container">
+      <div class="stats-row">
+        <div class="stat-card filter-btn active" data-filter="open">
+          <div class="stat-number" id="stat-open">0</div>
+          <div class="stat-label">Open</div>
+        </div>
+        <div class="stat-card filter-btn" data-filter="all">
+          <div class="stat-number" id="stat-all">0</div>
+          <div class="stat-label">All</div>
+        </div>
+        <div class="stat-card filter-btn" data-filter="completed">
+          <div class="stat-number" id="stat-completed">0</div>
+          <div class="stat-label">Completed</div>
+        </div>
+      </div>
+
+      <button id="submit-ticket-btn" class="btn btn-primary" style="width:100%;margin-bottom:8px;">+ Submit Internal Ticket</button>
+      <button id="inspection-btn" class="btn btn-primary" style="width:100%;margin-bottom:8px;background:linear-gradient(135deg, #1E40AF, #3B82F6);">📋 Inspection Report</button>
+      <button id="site-report-btn" class="btn btn-primary" style="width:100%;margin-bottom:20px;background:linear-gradient(135deg, #92400E, #D97706);">📸 Site Report</button>
+
+      <h2 class="section-title" id="section-title">Open Requests</h2>
+      <div id="requests-list"></div>
+
+      <span class="logout-link" id="logout-btn">Sign Out</span>
+    </div>
+  </div>
+
+  <!-- Request Detail Modal -->
+  <div id="modal-overlay" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <h2 class="modal-title">Request Details</h2>
+
+      <div class="modal-section">
+        <div class="modal-label">Property</div>
+        <div class="modal-value" id="modal-property"></div>
+      </div>
+
+      <div class="modal-section">
+        <div class="modal-label">Customer</div>
+        <div class="modal-value" id="modal-customer"></div>
+      </div>
+
+      <div class="modal-section">
+        <div class="modal-label">Date</div>
+        <div class="modal-value" id="modal-date"></div>
+      </div>
+
+      <div class="modal-section">
+        <div class="modal-label">Request</div>
+        <div class="modal-value" id="modal-message"></div>
+      </div>
+
+      <div class="modal-section" id="modal-photo-section" style="display:none;">
+        <div class="modal-label">Photo</div>
+        <a id="modal-photo-link" href="#" target="_blank" style="color:var(--green-primary);font-size:15px;">View Photo</a>
+      </div>
+
+      <div class="modal-section">
+        <div class="modal-label">Update Status</div>
+        <div class="status-options">
+          <button class="status-btn" data-status="Open">Open</button>
+          <button class="status-btn" data-status="Completed">Completed</button>
+        </div>
+      </div>
+
+      <button id="save-btn" class="btn btn-primary save-btn">Save Changes</button>
+    </div>
+  </div>
+
+  <!-- Submit Ticket Modal -->
+  <div id="ticket-overlay" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <h2 class="modal-title">Submit Internal Ticket</h2>
+
+      <div class="modal-section">
+        <div class="modal-label">Property</div>
+        <div class="search-container">
+          <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35" stroke-linecap="round"/>
+          </svg>
+          <input type="text" id="ticket-property" class="form-input search-input" style="max-width:100%;text-align:left;" placeholder="Search your address..." autocomplete="off">
+          <div id="ticket-autocomplete-list" class="autocomplete-list"></div>
+        </div>
+        <div id="ticket-property-card" class="property-card" style="display:none;">
+          <button type="button" id="ticket-property-clear" style="position:absolute;top:8px;right:8px;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,0.15);border:none;color:var(--text-medium);font-size:16px;cursor:pointer;">&times;</button>
+          <div class="property-address" id="ticket-card-address"></div>
+          <div class="crew-info">Crew: <strong id="ticket-card-crew"></strong></div>
+        </div>
+      </div>
+
+      <div class="modal-section">
+        <div class="modal-label">Description</div>
+        <textarea id="ticket-message" class="form-input" style="max-width:100%;text-align:left;min-height:100px;resize:vertical;" placeholder="Describe the issue..."></textarea>
+      </div>
+
+      <div class="modal-section">
+        <div class="modal-label">Photo (Optional)</div>
+        <input type="file" id="ticket-photo-input" accept="image/*" capture="environment" style="display:none;">
+        <button id="ticket-photo-btn" class="btn btn-secondary" style="width:100%;">📷 Take/Choose Photo</button>
+        <div id="ticket-photo-preview" style="display:none;margin-top:12px;position:relative;">
+          <img id="ticket-preview-img" src="" style="width:100%;border-radius:8px;">
+          <button id="ticket-photo-remove" style="position:absolute;top:8px;right:8px;width:32px;height:32px;border-radius:50%;background:rgba(0,0,0,0.6);border:none;color:white;font-size:18px;cursor:pointer;">&times;</button>
+        </div>
+      </div>
+
+      <button id="submit-ticket-save-btn" class="btn btn-primary save-btn" disabled>Submit Ticket</button>
+      <button id="cancel-ticket-btn" class="btn btn-secondary" style="width:100%;margin-top:8px;">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Inspection Report Modal -->
+  <div id="inspection-overlay" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <h2 class="modal-title">📋 Inspection Report</h2>
+
+      <div class="modal-section">
+        <div class="modal-label">Property</div>
+        <div class="search-container">
+          <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35" stroke-linecap="round"/>
+          </svg>
+          <input type="text" id="inspection-property" class="form-input search-input" style="max-width:100%;text-align:left;" placeholder="Search your address..." autocomplete="off">
+          <div id="inspection-autocomplete-list" class="autocomplete-list"></div>
+        </div>
+        <div id="inspection-property-card" class="property-card" style="display:none;">
+          <button type="button" id="inspection-property-clear" style="position:absolute;top:8px;right:8px;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,0.15);border:none;color:var(--text-medium);font-size:16px;cursor:pointer;">&times;</button>
+          <div class="property-address" id="inspection-card-address"></div>
+          <div class="crew-info">Crew: <strong id="inspection-card-crew"></strong></div>
+        </div>
+      </div>
+
+      <div class="modal-section">
+        <div class="modal-label">Photos (<span id="inspection-photo-count">0</span> added)</div>
+        <input type="file" id="inspection-photo-input" accept="image/*" capture="environment" multiple style="display:none;">
+        <button id="inspection-photo-btn" class="btn btn-secondary" style="width:100%;">📷 Add Photos</button>
+        <div id="inspection-photos-grid" style="display:flex;flex-direction:column;gap:12px;margin-top:12px;"></div>
+      </div>
+
+      <div id="inspection-progress" style="display:none;margin-top:16px;">
+        <div class="modal-label">Uploading... <span id="inspection-upload-status">0/0</span></div>
+        <div style="background:var(--green-pale);border-radius:4px;height:8px;overflow:hidden;">
+          <div id="inspection-progress-bar" style="background:var(--green-primary);height:100%;width:0%;transition:width 0.3s;"></div>
+        </div>
+      </div>
+
+      <button id="inspection-upload-btn" class="btn btn-primary save-btn" disabled>Upload Inspection Report</button>
+      <button id="cancel-inspection-btn" class="btn btn-secondary" style="width:100%;margin-top:8px;">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Site Report Wizard -->
+  <div id="site-report-wizard" class="site-report-wizard">
+    <div class="site-report-topbar">
+      <button id="sr-back-btn" style="display:none;">&#8592;</button>
+      <span class="sr-title">Site Report</span>
+      <button id="sr-close-btn">&times;</button>
+    </div>
+    <div class="site-report-steps">
+      <div class="sr-dot active" data-step="1"></div>
+      <div class="sr-dot" data-step="2"></div>
+      <div class="sr-dot" data-step="3"></div>
+      <div class="sr-dot" data-step="4"></div>
+    </div>
+
+    <input type="file" id="sr-camera-input" accept="image/*" capture="environment" style="display:none;">
+    <input type="file" id="sr-upload-input" accept="image/*" multiple style="display:none;">
+
+    <!-- Step 1: Report Details -->
+    <div id="sr-step-1" class="site-report-panel active">
+      <div class="sr-field-label">Property</div>
+      <div class="search-container">
+        <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35" stroke-linecap="round"/>
+        </svg>
+        <input type="text" id="sr-property" class="form-input search-input" style="max-width:100%;text-align:left;" placeholder="Search your address..." autocomplete="off">
+        <div id="sr-autocomplete-list" class="autocomplete-list"></div>
+      </div>
+      <div id="sr-property-card" class="property-card" style="display:none;">
+        <button type="button" id="sr-property-clear" style="position:absolute;top:8px;right:8px;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,0.15);border:none;color:var(--text-medium);font-size:16px;cursor:pointer;">&times;</button>
+        <div class="property-address" id="sr-card-address"></div>
+        <div class="crew-info">Crew: <strong id="sr-card-crew"></strong></div>
+      </div>
+
+      <div class="sr-field-label">Inspector Name</div>
+      <input type="text" id="sr-inspector" class="form-input" style="max-width:100%;text-align:left;" placeholder="Your name">
+
+      <div class="sr-field-label">Date</div>
+      <input type="date" id="sr-date" class="form-input" style="max-width:100%;text-align:left;">
+
+      <button id="sr-step1-next" class="sr-next-btn" disabled>Next</button>
+    </div>
+
+    <!-- Step 2: Choose Mode -->
+    <div id="sr-step-2" class="site-report-panel">
+      <div class="sr-field-label">How would you like to add photos?</div>
+      <div class="sr-mode-choice">
+        <button id="sr-mode-camera" class="sr-mode-btn">
+          <span class="sr-mode-icon">📷</span>
+          <div>
+            <div class="sr-mode-label">Take Photos</div>
+            <div class="sr-mode-desc">Open camera and annotate each photo on-site</div>
+          </div>
+        </button>
+        <button id="sr-mode-upload" class="sr-mode-btn">
+          <span class="sr-mode-icon">📁</span>
+          <div>
+            <div class="sr-mode-label">Upload Photos</div>
+            <div class="sr-mode-desc">Select multiple photos from your gallery</div>
+          </div>
+        </button>
+      </div>
+    </div>
+
+    <!-- Step 3: Annotate Photos -->
+    <div id="sr-step-3" class="site-report-panel">
+      <div id="sr-no-photos">
+        <div class="sr-empty-icon">📷</div>
+        <p>No photos yet. Use the buttons below to add photos.</p>
+      </div>
+      <div id="sr-annotate-area" style="display:none;">
+        <div class="sr-field-label">Select photo to annotate (<span id="sr-photo-counter">1/0</span>)</div>
+        <div id="sr-thumbstrip" class="site-report-thumbstrip"></div>
+        <div id="sr-canvas-wrap" class="site-report-canvas-wrap">
+          <canvas id="sr-canvas"></canvas>
+        </div>
+        <div class="site-report-annotate-controls">
+          <button id="sr-undo-btn">Undo</button>
+          <button id="sr-clear-btn">Clear All</button>
+        </div>
+        <div class="sr-field-label">Category</div>
+        <input type="text" id="sr-category" class="form-input" list="sr-category-list" style="max-width:100%;text-align:left;" placeholder="e.g. Shrub Health" autocomplete="off">
+        <datalist id="sr-category-list">
+          <option value="Shrub Health">
+          <option value="Tree Health">
+          <option value="Turf Health">
+          <option value="Irrigation">
+          <option value="Drainage and/or Erosion">
+          <option value="Priority Areas">
+          <option value="Hardscape">
+          <option value="Miscellaneous">
+        </datalist>
+
+        <div class="sr-field-label">Note for this photo</div>
+        <textarea id="sr-photo-note" class="form-input" style="max-width:100%;text-align:left;min-height:70px;resize:vertical;" placeholder="Describe the issue..."></textarea>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <button id="sr-prev-photo" class="btn" style="flex:1;background:var(--green-pale);color:var(--text-dark);">&#8592; Prev</button>
+          <button id="sr-next-photo" class="btn" style="flex:1;background:var(--green-pale);color:var(--text-dark);">Next &#8594;</button>
+        </div>
+      </div>
+      <div class="sr-step3-actions">
+        <button id="sr-add-another-btn">📷 Take Photo</button>
+        <button id="sr-upload-more-btn">📁 Upload Photos</button>
+      </div>
+      <button id="sr-step3-next" class="sr-next-btn" disabled>Done — Generate Report</button>
+    </div>
+
+    <!-- Step 4: Generate & Upload -->
+    <div id="sr-step-4" class="site-report-panel">
+      <div class="sr-field-label">Report Summary</div>
+      <div id="sr-summary" class="sr-summary-card"></div>
+      <div id="sr-progress-wrap" class="sr-progress-wrap">
+        <div class="sr-field-label" id="sr-progress-label">Generating PDF...</div>
+        <div class="sr-progress-bar-outer">
+          <div id="sr-progress-bar" class="sr-progress-bar-inner"></div>
+        </div>
+      </div>
+      <button id="sr-generate-btn" class="sr-generate-btn">Generate Report</button>
+      <button id="sr-upload-drive-btn" class="sr-upload-drive-btn">Upload to Google Drive</button>
+    </div>
+  </div>
+
+  <script>
+    const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbwJw4AlRqB-u92ZG6pH1hMV8_f5mz5JMgB5jbWSbNMJE5SOut-6y4WyCRyGc7dzYpU/exec";
+    const OFFICE_PHONE = "4075794403";
+
+    // DOM refs
+    const loginScreen = document.getElementById('login-screen');
+    const dashboard = document.getElementById('dashboard');
+    const phoneInput = document.getElementById('phone-input');
+    const loginBtn = document.getElementById('login-btn');
+    const loginError = document.getElementById('login-error');
+    const crewNameEl = document.getElementById('crew-name');
+    const requestsList = document.getElementById('requests-list');
+    const modalOverlay = document.getElementById('modal-overlay');
+    const logoutBtn = document.getElementById('logout-btn');
+    const saveBtn = document.getElementById('save-btn');
+
+    let currentCrewPhone = '';
+    let currentCrewName = '';
+    let currentRequests = [];
+    let selectedRequest = null;
+    let selectedStatus = '';
+
+    // Format phone number
+    phoneInput.addEventListener('input', function() {
+      // Count digits before cursor in raw input
+      var rawCursorPos = this.selectionStart;
+      var rawValue = this.value;
+      var digitsBeforeCursor = rawValue.substring(0, rawCursorPos).replace(/\D/g, '').length;
+
+      // Extract all digits (max 10)
+      var digits = rawValue.replace(/\D/g, '').substring(0, 10);
+
+      // Format the number
+      var formatted = '';
+      if (digits.length > 0) {
+        formatted = '(' + digits.substring(0, 3);
+        if (digits.length >= 3) formatted += ') ' + digits.substring(3, 6);
+        if (digits.length >= 6) formatted += '-' + digits.substring(6, 10);
+      }
+
+      this.value = formatted;
+
+      // Position cursor after the same number of digits
+      var newCursorPos = 0;
+      var digitsSeen = 0;
+      for (var i = 0; i < formatted.length; i++) {
+        if (/\d/.test(formatted[i])) {
+          digitsSeen++;
+          if (digitsSeen === digitsBeforeCursor) {
+            newCursorPos = i + 1;
+            break;
+          }
+        }
+      }
+      if (digitsBeforeCursor > digitsSeen) {
+        newCursorPos = formatted.length;
+      }
+
+      this.setSelectionRange(newCursorPos, newCursorPos);
+      loginBtn.disabled = digits.length < 10;
+    });
+
+    phoneInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !loginBtn.disabled) {
+        loginBtn.click();
+      }
+    });
+
+    // Login
+    loginBtn.addEventListener('click', function() {
+      var phone = phoneInput.value.replace(/\D/g, '');
+      loginError.style.display = 'none';
+      loginBtn.textContent = 'Checking...';
+      loginBtn.disabled = true;
+
+      fetch(GOOGLE_SHEETS_URL + '?action=getRequests&phone=' + phone)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.authorized) {
+            currentCrewPhone = phone;
+            currentCrewName = data.crewName;
+            localStorage.setItem('crewPhone', phone);
+            showDashboard();
+          } else {
+            loginError.textContent = 'Phone number not found. Contact the office for access.';
+            loginError.style.display = 'block';
+            loginBtn.textContent = 'View My Requests';
+            loginBtn.disabled = false;
+          }
+        })
+        .catch(function(err) {
+          loginError.textContent = 'Connection error. Please try again.';
+          loginError.style.display = 'block';
+          loginBtn.textContent = 'View My Requests';
+          loginBtn.disabled = false;
+        });
+    });
+
+    // Show dashboard
+    function showDashboard() {
+      loginScreen.style.display = 'none';
+      dashboard.classList.add('active');
+      crewNameEl.textContent = 'Welcome, ' + currentCrewName;
+      loadRequests();
+    }
+
+    // Load requests
+    function loadRequests() {
+      requestsList.innerHTML = '<div class="loading">Loading requests...</div>';
+
+      fetch(GOOGLE_SHEETS_URL + '?action=getRequests&phone=' + currentCrewPhone)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          currentRequests = data.requests || [];
+          renderRequests();
+          updateStats();
+        })
+        .catch(function(err) {
+          requestsList.innerHTML = '<div class="error-msg">Failed to load requests. Pull down to retry.</div>';
+        });
+    }
+
+    // Render requests
+    function renderRequests() {
+      // Filter requests based on current filter
+      var filteredRequests = currentRequests.filter(function(req) {
+        var status = (req.status || 'Open').toLowerCase();
+        if (currentFilter === 'open') return !status.includes('complete');
+        if (currentFilter === 'completed') return status.includes('complete');
+        return true; // 'all' shows everything
+      });
+
+      if (filteredRequests.length === 0) {
+        var emptyMsg = currentFilter === 'completed' ? 'No completed requests' : 'No open requests!';
+        requestsList.innerHTML =
+          '<div class="empty-state">' +
+            '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">' +
+              '<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>' +
+            '</svg>' +
+            '<p>' + emptyMsg + '</p>' +
+          '</div>';
+        return;
+      }
+
+      var html = '';
+      filteredRequests.forEach(function(req) {
+        var originalIndex = currentRequests.indexOf(req);
+        var statusClass = 'open';
+        if (req.status && req.status.toLowerCase().includes('complete')) statusClass = 'completed';
+        var isInternal = req.type === 'Internal';
+
+        html +=
+          '<div class="request-card" data-index="' + originalIndex + '">' +
+            '<div class="request-header">' +
+              '<div class="request-property">' + escapeHtml(req.property) + (isInternal ? ' <span style="background:#DBEAFE;color:#1E40AF;font-size:10px;padding:2px 6px;border-radius:4px;margin-left:6px;">INTERNAL</span>' : '') + '</div>' +
+              '<div class="request-date">' + escapeHtml(req.date) + '</div>' +
+            '</div>' +
+            '<div class="request-message">' + escapeHtml(req.message || 'No description') + '</div>' +
+            '<div class="request-customer">' + escapeHtml(req.customerName) + ' · ' + escapeHtml(req.customerPhone) + '</div>' +
+            '<div class="request-footer">' +
+              '<span class="status-badge ' + statusClass + '">' + escapeHtml(req.status || 'Open') + '</span>' +
+              (req.photo ? '<span class="photo-indicator">📷 Photo</span>' : '') +
+            '</div>' +
+          '</div>';
+      });
+      requestsList.innerHTML = html;
+
+      // Add click handlers
+      document.querySelectorAll('.request-card').forEach(function(card) {
+        card.addEventListener('click', function() {
+          var index = parseInt(this.getAttribute('data-index'));
+          openRequestModal(currentRequests[index], index);
+        });
+      });
+    }
+
+    // Update stats
+    function updateStats() {
+      var open = 0, completed = 0;
+      currentRequests.forEach(function(req) {
+        var status = (req.status || 'Open').toLowerCase();
+        if (status.includes('complete')) completed++;
+        else open++;
+      });
+      document.getElementById('stat-open').textContent = open;
+      document.getElementById('stat-all').textContent = currentRequests.length;
+      document.getElementById('stat-completed').textContent = completed;
+    }
+
+    // Filter functionality
+    var currentFilter = 'open';
+
+    document.querySelectorAll('.filter-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
+        this.classList.add('active');
+        currentFilter = this.getAttribute('data-filter');
+
+        // Update section title
+        var titles = { open: 'Open Requests', all: 'All Requests', completed: 'Completed Requests' };
+        document.getElementById('section-title').textContent = titles[currentFilter];
+
+        renderRequests();
+      });
+    });
+
+    // Open modal
+    function openRequestModal(req, index) {
+      selectedRequest = { ...req, index: index };
+      selectedStatus = req.status || 'Open';
+
+      var typeBadge = req.type === 'Internal' ? ' <span style="background:#DBEAFE;color:#1E40AF;font-size:11px;padding:2px 8px;border-radius:4px;margin-left:8px;">INTERNAL</span>' : '';
+      document.getElementById('modal-property').innerHTML = escapeHtml(req.property) + typeBadge;
+      document.getElementById('modal-customer').textContent = req.customerName + ' · ' + req.customerPhone;
+      document.getElementById('modal-date').textContent = req.date + ' at ' + req.time;
+      document.getElementById('modal-message').textContent = req.message || 'No description';
+
+      if (req.photo && req.photo.startsWith('http')) {
+        document.getElementById('modal-photo-section').style.display = 'block';
+        document.getElementById('modal-photo-link').href = req.photo;
+      } else {
+        document.getElementById('modal-photo-section').style.display = 'none';
+      }
+
+      // Set selected status
+      document.querySelectorAll('.status-btn').forEach(function(btn) {
+        btn.classList.remove('selected');
+        if (btn.getAttribute('data-status') === selectedStatus) {
+          btn.classList.add('selected');
+        }
+      });
+
+      modalOverlay.classList.add('active');
+    }
+
+    // Status button clicks
+    document.querySelectorAll('.status-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('.status-btn').forEach(function(b) { b.classList.remove('selected'); });
+        this.classList.add('selected');
+        selectedStatus = this.getAttribute('data-status');
+      });
+    });
+
+    // Close modal on overlay click
+    modalOverlay.addEventListener('click', function(e) {
+      if (e.target === modalOverlay) {
+        modalOverlay.classList.remove('active');
+      }
+    });
+
+    // Build SMS URL for completion notification
+    function buildCompletionSmsUrl(req) {
+      var customerPhone = req.customerPhone.replace(/\D/g, '');
+      var bodyText = "✅ COMPLETED\n\n" +
+                     "Your request has been completed!\n\n" +
+                     "Property: " + req.property + "\n" +
+                     "Original Request: " + (req.message || 'No description') + "\n\n" +
+                     "Thank you for using Text My Team!\n— Endurance Services";
+
+      var body = encodeURIComponent(bodyText);
+      var recipients = OFFICE_PHONE + "," + customerPhone;
+
+      var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+      if (isIOS) {
+        return "sms:/open?addresses=" + recipients + "&body=" + body;
+      } else {
+        return "sms:" + recipients + "?body=" + body;
+      }
+    }
+
+    // Save changes
+    saveBtn.addEventListener('click', function() {
+      if (!selectedRequest) return;
+
+      saveBtn.textContent = 'Saving...';
+      saveBtn.disabled = true;
+
+      var isMarkingComplete = selectedStatus === 'Completed' &&
+                              currentRequests[selectedRequest.index].status !== 'Completed';
+
+      fetch(GOOGLE_SHEETS_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+          updateStatus: true,
+          requestId: selectedRequest.id,
+          status: selectedStatus
+        })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.success) {
+          // Update local data
+          currentRequests[selectedRequest.index].status = selectedStatus;
+          renderRequests();
+          updateStats();
+          modalOverlay.classList.remove('active');
+
+          // If marking complete and not internal, open SMS to notify customer
+          if (isMarkingComplete && selectedRequest.type !== 'Internal') {
+            var smsUrl = buildCompletionSmsUrl(selectedRequest);
+            window.location.href = smsUrl;
+          }
+        } else {
+          alert('Failed to update. Please try again.');
+        }
+        saveBtn.textContent = 'Save Changes';
+        saveBtn.disabled = false;
+      })
+      .catch(function(err) {
+        alert('Connection error. Please try again.');
+        saveBtn.textContent = 'Save Changes';
+        saveBtn.disabled = false;
+      });
+    });
+
+    // Logout
+    logoutBtn.addEventListener('click', function() {
+      localStorage.removeItem('crewPhone');
+      currentCrewPhone = '';
+      currentCrewName = '';
+      currentRequests = [];
+      dashboard.classList.remove('active');
+      loginScreen.style.display = 'flex';
+      phoneInput.value = '';
+      loginBtn.disabled = true;
+    });
+
+    // Auto-login if saved
+    var savedPhone = localStorage.getItem('crewPhone');
+    if (savedPhone) {
+      phoneInput.value = savedPhone;
+      loginBtn.disabled = false;
+      loginBtn.click();
+    }
+
+    // Pull to refresh
+    var pullStartY = 0;
+    dashboard.addEventListener('touchstart', function(e) {
+      if (window.scrollY === 0) pullStartY = e.touches[0].clientY;
+    }, { passive: true });
+
+    dashboard.addEventListener('touchend', function(e) {
+      var pullDistance = e.changedTouches[0].clientY - pullStartY;
+      if (pullDistance > 80 && window.scrollY === 0) {
+        loadRequests();
+      }
+    }, { passive: true });
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      var div = document.createElement('div');
+      div.appendChild(document.createTextNode(str));
+      return div.innerHTML;
+    }
+
+    function formatPhoneNumber(digits) {
+      digits = digits.replace(/\D/g, '');
+      if (digits.length === 10) {
+        return '(' + digits.substring(0,3) + ') ' + digits.substring(3,6) + '-' + digits.substring(6,10);
+      }
+      return digits;
+    }
+
+    // --- Submit Ticket ---
+    var submitTicketBtn = document.getElementById('submit-ticket-btn');
+    var ticketOverlay = document.getElementById('ticket-overlay');
+    var ticketProperty = document.getElementById('ticket-property');
+    var ticketMessage = document.getElementById('ticket-message');
+    var ticketPhotoInput = document.getElementById('ticket-photo-input');
+    var ticketPhotoBtn = document.getElementById('ticket-photo-btn');
+    var ticketPhotoPreview = document.getElementById('ticket-photo-preview');
+    var ticketPreviewImg = document.getElementById('ticket-preview-img');
+    var ticketPhotoRemove = document.getElementById('ticket-photo-remove');
+    var submitTicketSaveBtn = document.getElementById('submit-ticket-save-btn');
+    var cancelTicketBtn = document.getElementById('cancel-ticket-btn');
+    var ticketPhotoBase64 = null;
+    var ticketPhotoUploadPromise = null;
+    var ticketUploadedPhotoUrl = null;
+    var propertiesList = [];
+    var ticketSelectedProp = null;
+    var ticketAcList = document.getElementById('ticket-autocomplete-list');
+    var ticketPropertyCard = document.getElementById('ticket-property-card');
+    var ticketCardAddress = document.getElementById('ticket-card-address');
+    var ticketCardCrew = document.getElementById('ticket-card-crew');
+    var ticketPropertyClear = document.getElementById('ticket-property-clear');
+
+    // Start background upload for ticket photo
+    function startTicketPhotoUpload() {
+      if (!ticketPhotoBase64 || !ticketSelectedProp) return;
+
+      ticketUploadedPhotoUrl = null;
+      var propertyAddress = ticketSelectedProp.address;
+      var now = new Date();
+      var dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      var filename = propertyAddress.split(',')[0] + ' - ' + dateStr;
+
+      ticketPhotoUploadPromise = fetch(GOOGLE_SHEETS_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+          photoOnly: true,
+          photo: ticketPhotoBase64,
+          filename: filename,
+          property: propertyAddress,
+          internal: true
+        })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        ticketUploadedPhotoUrl = data.photoUrl || null;
+        return ticketUploadedPhotoUrl;
+      })
+      .catch(function() {
+        return null;
+      });
+    }
+
+    // Load properties
+    function loadProperties() {
+      fetch(GOOGLE_SHEETS_URL + '?action=getProperties')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          propertiesList = data.properties || [];
+        });
+    }
+
+    // Load properties on dashboard show
+    var originalShowDashboard = showDashboard;
+    showDashboard = function() {
+      originalShowDashboard();
+      loadProperties();
+    };
+
+    // Ticket property autocomplete
+    ticketProperty.addEventListener('input', function() {
+      var query = this.value.trim().toLowerCase();
+      ticketAcList.innerHTML = '';
+      if (query.length === 0) { ticketAcList.classList.remove('active'); return; }
+      var matches = propertiesList.filter(function(p) { return p.address.toLowerCase().indexOf(query) >= 0; });
+      if (matches.length === 0) { ticketAcList.classList.remove('active'); return; }
+      matches.forEach(function(prop) {
+        var item = document.createElement('div');
+        item.classList.add('autocomplete-item');
+        var idx = prop.address.toLowerCase().indexOf(query);
+        if (idx >= 0) {
+          item.innerHTML = escapeHtml(prop.address.substring(0, idx)) +
+            '<span class="highlight">' + escapeHtml(prop.address.substring(idx, idx + query.length)) + '</span>' +
+            escapeHtml(prop.address.substring(idx + query.length));
+        } else {
+          item.textContent = prop.address;
+        }
+        item.addEventListener('click', function() { selectTicketProperty(prop); });
+        ticketAcList.appendChild(item);
+      });
+      ticketAcList.classList.add('active');
+    });
+
+    function selectTicketProperty(prop) {
+      ticketSelectedProp = prop;
+      ticketProperty.value = prop.address;
+      ticketAcList.classList.remove('active');
+      ticketCardAddress.textContent = prop.address;
+      ticketCardCrew.textContent = prop.crew || 'N/A';
+      ticketPropertyCard.style.display = 'block';
+      ticketProperty.style.display = 'none';
+      ticketProperty.closest('.search-container').querySelector('.search-icon').style.display = 'none';
+      updateTicketSaveBtn();
+      if (ticketPhotoBase64 && !ticketUploadedPhotoUrl && !ticketPhotoUploadPromise) {
+        startTicketPhotoUpload();
+      }
+    }
+
+    ticketPropertyClear.addEventListener('click', function() {
+      ticketSelectedProp = null;
+      ticketProperty.value = '';
+      ticketPropertyCard.style.display = 'none';
+      ticketProperty.style.display = '';
+      ticketProperty.closest('.search-container').querySelector('.search-icon').style.display = '';
+      updateTicketSaveBtn();
+    });
+
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('#ticket-overlay .search-container')) {
+        ticketAcList.classList.remove('active');
+      }
+      if (!e.target.closest('#inspection-overlay .search-container')) {
+        document.getElementById('inspection-autocomplete-list').classList.remove('active');
+      }
+    });
+
+    submitTicketBtn.addEventListener('click', function() {
+      ticketSelectedProp = null;
+      ticketProperty.value = '';
+      ticketProperty.style.display = '';
+      ticketProperty.closest('.search-container').querySelector('.search-icon').style.display = '';
+      ticketPropertyCard.style.display = 'none';
+      ticketMessage.value = '';
+      ticketPhotoBase64 = null;
+      ticketPhotoUploadPromise = null;
+      ticketUploadedPhotoUrl = null;
+      ticketPhotoPreview.style.display = 'none';
+      ticketPhotoBtn.style.display = 'block';
+      updateTicketSaveBtn();
+      ticketOverlay.classList.add('active');
+    });
+
+    ticketPhotoBtn.addEventListener('click', function() {
+      ticketPhotoInput.click();
+    });
+
+    ticketPhotoInput.addEventListener('change', function() {
+      var file = this.files[0];
+      if (!file) return;
+
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        var img = new Image();
+        img.onload = function() {
+          var maxWidth = 1000;
+          var width = img.width;
+          var height = img.height;
+          if (width > maxWidth) {
+            height = Math.round(height * maxWidth / width);
+            width = maxWidth;
+          }
+          var canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          var ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          ticketPhotoBase64 = canvas.toDataURL('image/jpeg', 0.7);
+          ticketPreviewImg.src = ticketPhotoBase64;
+          ticketPhotoPreview.style.display = 'block';
+          ticketPhotoBtn.style.display = 'none';
+          // Start upload if property is already selected
+          if (ticketProperty.value !== '') {
+            startTicketPhotoUpload();
+          }
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    ticketPhotoRemove.addEventListener('click', function() {
+      ticketPhotoBase64 = null;
+      ticketPhotoUploadPromise = null;
+      ticketUploadedPhotoUrl = null;
+      ticketPhotoInput.value = '';
+      ticketPhotoPreview.style.display = 'none';
+      ticketPhotoBtn.style.display = 'block';
+    });
+
+    ticketMessage.addEventListener('input', updateTicketSaveBtn);
+
+    function updateTicketSaveBtn() {
+      var hasProperty = ticketSelectedProp !== null;
+      var hasMessage = ticketMessage.value.trim().length > 0;
+      submitTicketSaveBtn.disabled = !(hasProperty && hasMessage);
+    }
+
+    cancelTicketBtn.addEventListener('click', function() {
+      ticketOverlay.classList.remove('active');
+    });
+
+    ticketOverlay.addEventListener('click', function(e) {
+      if (e.target === ticketOverlay) {
+        ticketOverlay.classList.remove('active');
+      }
+    });
+
+    submitTicketSaveBtn.addEventListener('click', function() {
+      submitTicketSaveBtn.textContent = 'Submitting...';
+      submitTicketSaveBtn.disabled = true;
+
+      var selectedProp = ticketSelectedProp;
+
+      // If there's a photo, check upload status
+      if (ticketPhotoBase64) {
+        if (ticketUploadedPhotoUrl) {
+          submitTicket(selectedProp, ticketUploadedPhotoUrl);
+        } else if (ticketPhotoUploadPromise) {
+          ticketPhotoUploadPromise.then(function(photoUrl) {
+            submitTicket(selectedProp, photoUrl || '');
+          });
+        } else {
+          startTicketPhotoUpload();
+          ticketPhotoUploadPromise.then(function(photoUrl) {
+            submitTicket(selectedProp, photoUrl || '');
+          });
+        }
+      } else {
+        submitTicket(selectedProp, '');
+      }
+    });
+
+    function submitTicket(prop, photoUrl) {
+      var ticketData = {
+        submitTicket: true,
+        customerName: currentCrewName + ' (Crew)',
+        customerPhone: formatPhoneNumber(currentCrewPhone),
+        propertyAddress: prop.address,
+        crewLeader: prop.crew,
+        crewLeaderPhone: formatPhoneNumber(prop.phone),
+        message: ticketMessage.value.trim(),
+        photoUrl: photoUrl,
+        type: 'Internal'
+      };
+
+      fetch(GOOGLE_SHEETS_URL, {
+        method: 'POST',
+        body: JSON.stringify(ticketData)
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.success) {
+          ticketOverlay.classList.remove('active');
+          alert('Ticket submitted successfully!');
+          loadRequests(); // Refresh the list
+        } else {
+          alert('Failed to submit ticket: ' + (data.error || 'Unknown error'));
+        }
+        submitTicketSaveBtn.textContent = 'Submit Ticket';
+        submitTicketSaveBtn.disabled = false;
+      })
+      .catch(function(err) {
+        alert('Connection error. Please try again.');
+        submitTicketSaveBtn.textContent = 'Submit Ticket';
+        submitTicketSaveBtn.disabled = false;
+      });
+    }
+
+    // --- Inspection Report ---
+    var inspectionBtn = document.getElementById('inspection-btn');
+    var inspectionOverlay = document.getElementById('inspection-overlay');
+    var inspectionProperty = document.getElementById('inspection-property');
+    var inspectionPhotoInput = document.getElementById('inspection-photo-input');
+    var inspectionPhotoBtn = document.getElementById('inspection-photo-btn');
+    var inspectionPhotosGrid = document.getElementById('inspection-photos-grid');
+    var inspectionPhotoCount = document.getElementById('inspection-photo-count');
+    var inspectionUploadBtn = document.getElementById('inspection-upload-btn');
+    var cancelInspectionBtn = document.getElementById('cancel-inspection-btn');
+    var inspectionProgress = document.getElementById('inspection-progress');
+    var inspectionUploadStatus = document.getElementById('inspection-upload-status');
+    var inspectionProgressBar = document.getElementById('inspection-progress-bar');
+    var inspectionPhotos = [];
+    var inspectionSelectedProp = null;
+    var inspectionAcList = document.getElementById('inspection-autocomplete-list');
+    var inspectionPropertyCard = document.getElementById('inspection-property-card');
+    var inspectionCardAddress = document.getElementById('inspection-card-address');
+    var inspectionCardCrew = document.getElementById('inspection-card-crew');
+    var inspectionPropertyClear = document.getElementById('inspection-property-clear');
+
+    inspectionBtn.addEventListener('click', function() {
+      inspectionSelectedProp = null;
+      inspectionProperty.value = '';
+      inspectionProperty.style.display = '';
+      inspectionProperty.closest('.search-container').querySelector('.search-icon').style.display = '';
+      inspectionPropertyCard.style.display = 'none';
+      inspectionPhotos = [];
+      inspectionPhotosGrid.innerHTML = '';
+      inspectionPhotoCount.textContent = '0';
+      inspectionProgress.style.display = 'none';
+      inspectionUploadBtn.disabled = true;
+      inspectionUploadBtn.textContent = 'Upload Inspection Report';
+      inspectionOverlay.classList.add('active');
+    });
+
+    // Inspection property autocomplete
+    inspectionProperty.addEventListener('input', function() {
+      var query = this.value.trim().toLowerCase();
+      inspectionAcList.innerHTML = '';
+      if (query.length === 0) { inspectionAcList.classList.remove('active'); return; }
+      var matches = propertiesList.filter(function(p) { return p.address.toLowerCase().indexOf(query) >= 0; });
+      if (matches.length === 0) { inspectionAcList.classList.remove('active'); return; }
+      matches.forEach(function(prop) {
+        var item = document.createElement('div');
+        item.classList.add('autocomplete-item');
+        var idx = prop.address.toLowerCase().indexOf(query);
+        if (idx >= 0) {
+          item.innerHTML = escapeHtml(prop.address.substring(0, idx)) +
+            '<span class="highlight">' + escapeHtml(prop.address.substring(idx, idx + query.length)) + '</span>' +
+            escapeHtml(prop.address.substring(idx + query.length));
+        } else {
+          item.textContent = prop.address;
+        }
+        item.addEventListener('click', function() { selectInspectionProperty(prop); });
+        inspectionAcList.appendChild(item);
+      });
+      inspectionAcList.classList.add('active');
+    });
+
+    function selectInspectionProperty(prop) {
+      inspectionSelectedProp = prop;
+      inspectionProperty.value = prop.address;
+      inspectionAcList.classList.remove('active');
+      inspectionCardAddress.textContent = prop.address;
+      inspectionCardCrew.textContent = prop.crew || 'N/A';
+      inspectionPropertyCard.style.display = 'block';
+      inspectionProperty.style.display = 'none';
+      inspectionProperty.closest('.search-container').querySelector('.search-icon').style.display = 'none';
+      updateInspectionBtn();
+    }
+
+    inspectionPropertyClear.addEventListener('click', function() {
+      inspectionSelectedProp = null;
+      inspectionProperty.value = '';
+      inspectionPropertyCard.style.display = 'none';
+      inspectionProperty.style.display = '';
+      inspectionProperty.closest('.search-container').querySelector('.search-icon').style.display = '';
+      updateInspectionBtn();
+    });
+
+    inspectionPhotoBtn.addEventListener('click', function() {
+      inspectionPhotoInput.click();
+    });
+
+    inspectionPhotoInput.addEventListener('change', function() {
+      var files = this.files;
+      for (var i = 0; i < files.length; i++) {
+        processInspectionPhoto(files[i]);
+      }
+      this.value = '';
+    });
+
+    function processInspectionPhoto(file) {
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        var img = new Image();
+        img.onload = function() {
+          var maxWidth = 1000;
+          var width = img.width;
+          var height = img.height;
+          if (width > maxWidth) {
+            height = Math.round(height * maxWidth / width);
+            width = maxWidth;
+          }
+          var canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          var ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          var base64 = canvas.toDataURL('image/jpeg', 0.7);
+
+          inspectionPhotos.push({base64: base64, note: ''});
+          addPhotoToGrid(base64, inspectionPhotos.length - 1);
+          updateInspectionBtn();
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function addPhotoToGrid(base64, index) {
+      var div = document.createElement('div');
+      div.style.cssText = 'display:flex;align-items:flex-start;gap:10px;background:var(--green-pale);border-radius:8px;padding:8px;';
+      div.innerHTML = '<img src="' + base64 + '" style="width:80px;height:80px;object-fit:cover;border-radius:6px;flex-shrink:0;">' +
+        '<textarea data-index="' + index + '" placeholder="Add note for photo ' + (index + 1) + '..." style="flex:1;min-height:60px;border:1px solid var(--green-accent);border-radius:6px;padding:8px;font-size:13px;resize:vertical;font-family:inherit;background:var(--white);color:var(--text-dark);">' + escapeHtml(inspectionPhotos[index].note) + '</textarea>' +
+        '<button data-index="' + index + '" style="width:28px;height:28px;border-radius:50%;background:rgba(220,50,50,0.8);border:none;color:white;font-size:16px;cursor:pointer;flex-shrink:0;">&times;</button>';
+      div.querySelector('textarea').addEventListener('input', function() {
+        var idx = parseInt(this.getAttribute('data-index'));
+        inspectionPhotos[idx].note = this.value;
+      });
+      div.querySelector('button').addEventListener('click', function() {
+        var idx = parseInt(this.getAttribute('data-index'));
+        removeInspectionPhoto(idx);
+      });
+      inspectionPhotosGrid.appendChild(div);
+      inspectionPhotoCount.textContent = inspectionPhotos.length;
+    }
+
+    function removeInspectionPhoto(index) {
+      inspectionPhotos.splice(index, 1);
+      rebuildPhotosGrid();
+      updateInspectionBtn();
+    }
+
+    function rebuildPhotosGrid() {
+      inspectionPhotosGrid.innerHTML = '';
+      inspectionPhotos.forEach(function(photo, index) {
+        addPhotoToGrid(photo.base64, index);
+      });
+      inspectionPhotoCount.textContent = inspectionPhotos.length;
+    }
+
+    function updateInspectionBtn() {
+      var hasProperty = inspectionSelectedProp !== null;
+      var hasPhotos = inspectionPhotos.length > 0;
+      inspectionUploadBtn.disabled = !(hasProperty && hasPhotos);
+    }
+
+    cancelInspectionBtn.addEventListener('click', function() {
+      inspectionOverlay.classList.remove('active');
+    });
+
+    inspectionOverlay.addEventListener('click', function(e) {
+      if (e.target === inspectionOverlay) {
+        inspectionOverlay.classList.remove('active');
+      }
+    });
+
+    inspectionUploadBtn.addEventListener('click', function() {
+      inspectionUploadBtn.disabled = true;
+      inspectionUploadBtn.textContent = 'Uploading...';
+      inspectionProgress.style.display = 'block';
+
+      var propertyAddress = inspectionSelectedProp.address;
+      var now = new Date();
+      var dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      var streetAddress = propertyAddress.split(',')[0].trim();
+      var reportName = 'Report - ' + streetAddress + ' - ' + dateStr;
+
+      var uploaded = 0;
+      var total = inspectionPhotos.length;
+      inspectionUploadStatus.textContent = '0/' + total;
+
+      // Upload a single photo and update progress
+      function uploadPhoto(index) {
+        var photoNum = index + 1;
+        var filename = 'Photo ' + photoNum;
+
+        return fetch(GOOGLE_SHEETS_URL, {
+          method: 'POST',
+          body: JSON.stringify({
+            inspectionPhoto: true,
+            photo: inspectionPhotos[index].base64,
+            filename: filename,
+            property: propertyAddress,
+            reportName: reportName,
+            note: inspectionPhotos[index].note
+          })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function() {
+          uploaded++;
+          inspectionUploadStatus.textContent = uploaded + '/' + total;
+          inspectionProgressBar.style.width = (uploaded / total * 100) + '%';
+        })
+        .catch(function() {
+          uploaded++;
+          inspectionUploadStatus.textContent = uploaded + '/' + total;
+          inspectionProgressBar.style.width = (uploaded / total * 100) + '%';
+        });
+      }
+
+      // Upload 3 at a time in parallel
+      var concurrency = 3;
+      var nextIndex = 0;
+
+      function startWorker() {
+        if (nextIndex >= inspectionPhotos.length) return Promise.resolve();
+        var currentIndex = nextIndex++;
+        return uploadPhoto(currentIndex).then(function() {
+          return startWorker();
+        });
+      }
+
+      var workers = [];
+      for (var w = 0; w < Math.min(concurrency, inspectionPhotos.length); w++) {
+        workers.push(startWorker());
+      }
+
+      Promise.all(workers).then(function() {
+        inspectionOverlay.classList.remove('active');
+        alert('Inspection report uploaded successfully! (' + total + ' photos)');
+      });
+    });
+
+    // ─── Site Report ───────────────────────────────
+    var CLOUD_FUNCTION_URL = 'http://localhost:8080';
+
+    var srWizard = document.getElementById('site-report-wizard');
+    var srBackBtn = document.getElementById('sr-back-btn');
+    var srCloseBtn = document.getElementById('sr-close-btn');
+    var srPropertyInput = document.getElementById('sr-property');
+    var srAcList = document.getElementById('sr-autocomplete-list');
+    var srPropertyCard = document.getElementById('sr-property-card');
+    var srCardAddress = document.getElementById('sr-card-address');
+    var srCardCrew = document.getElementById('sr-card-crew');
+    var srPropertyClear = document.getElementById('sr-property-clear');
+    var srInspector = document.getElementById('sr-inspector');
+    var srDate = document.getElementById('sr-date');
+    var srStep1Next = document.getElementById('sr-step1-next');
+    var srCameraInput = document.getElementById('sr-camera-input');
+    var srUploadInput = document.getElementById('sr-upload-input');
+    var srModeCameraBtn = document.getElementById('sr-mode-camera');
+    var srModeUploadBtn = document.getElementById('sr-mode-upload');
+    var srCanvas = document.getElementById('sr-canvas');
+    var srCanvasWrap = document.getElementById('sr-canvas-wrap');
+    var srAnnotateArea = document.getElementById('sr-annotate-area');
+    var srNoPhotos = document.getElementById('sr-no-photos');
+    var srPhotoNote = document.getElementById('sr-photo-note');
+    var srUndoBtn = document.getElementById('sr-undo-btn');
+    var srClearBtn = document.getElementById('sr-clear-btn');
+    var srPrevPhoto = document.getElementById('sr-prev-photo');
+    var srNextPhoto = document.getElementById('sr-next-photo');
+    var srStep3Next = document.getElementById('sr-step3-next');
+    var srAddAnotherBtn = document.getElementById('sr-add-another-btn');
+    var srUploadMoreBtn = document.getElementById('sr-upload-more-btn');
+    var srThumbstrip = document.getElementById('sr-thumbstrip');
+    var srPhotoCounter = document.getElementById('sr-photo-counter');
+    var srGenerateBtn = document.getElementById('sr-generate-btn');
+    var srUploadDriveBtn = document.getElementById('sr-upload-drive-btn');
+    var srSummary = document.getElementById('sr-summary');
+    var srProgressWrap = document.getElementById('sr-progress-wrap');
+    var srProgressBar = document.getElementById('sr-progress-bar');
+    var srProgressLabel = document.getElementById('sr-progress-label');
+    var srCtx = srCanvas.getContext('2d');
+    var srCategoryInput = document.getElementById('sr-category');
+
+    var srDefaultCategories = ['Shrub Health','Tree Health','Turf Health','Irrigation','Drainage and/or Erosion','Priority Areas','Hardscape','Miscellaneous'];
+
+    var srState = {
+      currentStep: 1,
+      selectedProp: null,
+      inspectorName: '',
+      reportDate: '',
+      photos: [],
+      currentPhotoIndex: 0,
+      isDrawing: false,
+      drawStart: null,
+      drawCurrent: null,
+      generatedPdfBlob: null,
+      photoMode: null
+    };
+
+    // Open / close wizard
+    document.getElementById('site-report-btn').addEventListener('click', function() {
+      srState = {
+        currentStep: 1, selectedProp: null, inspectorName: '', reportDate: '',
+        photos: [], currentPhotoIndex: 0, isDrawing: false, drawStart: null, drawCurrent: null, generatedPdfBlob: null,
+        photoMode: null
+      };
+      srPropertyInput.value = '';
+      srPropertyInput.style.display = '';
+      srPropertyInput.closest('.search-container').querySelector('.search-icon').style.display = '';
+      srPropertyCard.style.display = 'none';
+      srInspector.value = currentCrewName || '';
+      var today = new Date();
+      srDate.value = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+      srProgressWrap.style.display = 'none';
+      srUploadDriveBtn.style.display = 'none';
+      srGenerateBtn.disabled = false;
+      srGenerateBtn.textContent = 'Generate Report';
+      srGoToStep(1);
+      srWizard.classList.add('active');
+    });
+
+    srCloseBtn.addEventListener('click', function() {
+      if (srState.photos.length > 0) {
+        if (!confirm('Discard this site report?')) return;
+      }
+      srWizard.classList.remove('active');
+    });
+
+    srBackBtn.addEventListener('click', function() {
+      if (srState.currentStep === 3 && srState.photos.length > 0) {
+        if (!confirm('Going back will discard all photos. Continue?')) return;
+        srState.photos = [];
+        srState.currentPhotoIndex = 0;
+        srState.photoMode = null;
+      }
+      if (srState.currentStep > 1) srGoToStep(srState.currentStep - 1);
+    });
+
+    function srGoToStep(step) {
+      srState.currentStep = step;
+      for (var i = 1; i <= 4; i++) {
+        var panel = document.getElementById('sr-step-' + i);
+        panel.classList.toggle('active', i === step);
+      }
+      var dots = document.querySelectorAll('.site-report-steps .sr-dot');
+      dots.forEach(function(dot) {
+        var s = parseInt(dot.getAttribute('data-step'));
+        dot.classList.toggle('active', s === step);
+        dot.classList.toggle('done', s < step);
+      });
+      srBackBtn.style.display = step > 1 ? '' : 'none';
+      if (step === 3) {
+        srUpdateStep3Visibility();
+        if (srState.photos.length > 0) srRenderAnnotation();
+      }
+      if (step === 4) srRenderSummary();
+    }
+
+    // Step 1: Property autocomplete (reuse pattern)
+    srPropertyInput.addEventListener('input', function() {
+      var query = this.value.trim().toLowerCase();
+      srAcList.innerHTML = '';
+      if (query.length === 0) { srAcList.classList.remove('active'); return; }
+      var matches = propertiesList.filter(function(p) { return p.address.toLowerCase().indexOf(query) >= 0; });
+      if (matches.length === 0) { srAcList.classList.remove('active'); return; }
+      matches.forEach(function(prop) {
+        var item = document.createElement('div');
+        item.classList.add('autocomplete-item');
+        var idx = prop.address.toLowerCase().indexOf(query);
+        if (idx >= 0) {
+          item.innerHTML = escapeHtml(prop.address.substring(0, idx)) +
+            '<span class="highlight">' + escapeHtml(prop.address.substring(idx, idx + query.length)) + '</span>' +
+            escapeHtml(prop.address.substring(idx + query.length));
+        } else {
+          item.textContent = prop.address;
+        }
+        item.addEventListener('click', function() { srSelectProperty(prop); });
+        srAcList.appendChild(item);
+      });
+      srAcList.classList.add('active');
+    });
+
+    function srSelectProperty(prop) {
+      srState.selectedProp = prop;
+      srPropertyInput.value = prop.address;
+      srAcList.classList.remove('active');
+      srCardAddress.textContent = prop.address;
+      srCardCrew.textContent = prop.crew || 'N/A';
+      srPropertyCard.style.display = 'block';
+      srPropertyInput.style.display = 'none';
+      srPropertyInput.closest('.search-container').querySelector('.search-icon').style.display = 'none';
+      srUpdateStep1();
+    }
+
+    srPropertyClear.addEventListener('click', function() {
+      srState.selectedProp = null;
+      srPropertyInput.value = '';
+      srPropertyCard.style.display = 'none';
+      srPropertyInput.style.display = '';
+      srPropertyInput.closest('.search-container').querySelector('.search-icon').style.display = '';
+      srUpdateStep1();
+    });
+
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('#site-report-wizard .search-container')) {
+        srAcList.classList.remove('active');
+      }
+    });
+
+    srInspector.addEventListener('input', srUpdateStep1);
+    srDate.addEventListener('input', srUpdateStep1);
+
+    function srUpdateStep1() {
+      srState.inspectorName = srInspector.value.trim();
+      srState.reportDate = srDate.value;
+      srStep1Next.disabled = !(srState.selectedProp && srState.inspectorName && srState.reportDate);
+    }
+
+    srStep1Next.addEventListener('click', function() {
+      if (!srStep1Next.disabled) srGoToStep(2);
+    });
+
+    // Step 2: Mode selection
+    srModeCameraBtn.addEventListener('click', function() {
+      srState.photoMode = 'camera';
+      srGoToStep(3);
+      srCameraInput.click();
+    });
+
+    srModeUploadBtn.addEventListener('click', function() {
+      srState.photoMode = 'upload';
+      srUploadInput.click();
+    });
+
+    // File input handlers
+    srCameraInput.addEventListener('change', function() {
+      var file = this.files[0];
+      if (!file) return;
+      srProcessPhoto(file, function() {
+        srState.currentPhotoIndex = srState.photos.length - 1;
+        srUpdateStep3Visibility();
+        srRenderAnnotation();
+      });
+      this.value = '';
+    });
+
+    srUploadInput.addEventListener('change', function() {
+      var files = this.files;
+      if (!files || files.length === 0) return;
+      var total = files.length;
+      var processed = 0;
+      var firstNewIndex = srState.photos.length;
+      for (var i = 0; i < files.length; i++) {
+        srProcessPhoto(files[i], function() {
+          processed++;
+          if (processed === total) {
+            srState.currentPhotoIndex = firstNewIndex;
+            if (srState.currentStep !== 3) srGoToStep(3);
+            srUpdateStep3Visibility();
+            srRenderAnnotation();
+          }
+        });
+      }
+      this.value = '';
+    });
+
+    function srProcessPhoto(file, callback) {
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        var img = new Image();
+        img.onload = function() {
+          var maxW = 1000;
+          var w = img.width, h = img.height;
+          if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+          var canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          var ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          var base64 = canvas.toDataURL('image/jpeg', 0.7);
+          srState.photos.push({ originalBase64: base64, imgWidth: w, imgHeight: h, rects: [], note: '', category: '' });
+          if (callback) callback();
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Step 3: Visibility controller
+    function srUpdateStep3Visibility() {
+      var hasPhotos = srState.photos.length > 0;
+      srNoPhotos.style.display = hasPhotos ? 'none' : '';
+      srAnnotateArea.style.display = hasPhotos ? '' : 'none';
+      srStep3Next.disabled = !hasPhotos;
+      // Show/hide prev/next when multiple photos
+      var multi = srState.photos.length > 1;
+      srPrevPhoto.style.display = multi ? '' : 'none';
+      srNextPhoto.style.display = multi ? '' : 'none';
+    }
+
+    // Step 3: "Take Another Photo" + "Upload Photos" handlers
+    srAddAnotherBtn.addEventListener('click', function() {
+      srSaveCurrentNote();
+      srCameraInput.click();
+    });
+
+    srUploadMoreBtn.addEventListener('click', function() {
+      srSaveCurrentNote();
+      srUploadInput.click();
+    });
+
+    // Step 3: Annotation
+    function srRenderAnnotation() {
+      if (srState.photos.length === 0) return;
+      srRebuildThumbstrip();
+      var photo = srState.photos[srState.currentPhotoIndex];
+      srPhotoNote.value = photo.note || '';
+      srCategoryInput.value = photo.category || '';
+      srPhotoCounter.textContent = (srState.currentPhotoIndex + 1) + '/' + srState.photos.length;
+
+      var img = new Image();
+      img.onload = function() {
+        var wrapW = srCanvasWrap.clientWidth;
+        var scale = wrapW / photo.imgWidth;
+        var displayH = Math.round(photo.imgHeight * scale);
+        srCanvas.width = wrapW;
+        srCanvas.height = displayH;
+        srCanvas.style.height = displayH + 'px';
+        srDrawCanvas(img, photo, scale);
+      };
+      img.src = photo.originalBase64;
+    }
+
+    function srDrawCanvas(img, photo, scale) {
+      srCtx.clearRect(0, 0, srCanvas.width, srCanvas.height);
+      srCtx.drawImage(img, 0, 0, srCanvas.width, srCanvas.height);
+      srCtx.strokeStyle = 'red';
+      srCtx.lineWidth = 3;
+      photo.rects.forEach(function(r) {
+        srCtx.strokeRect(r.x * scale, r.y * scale, r.w * scale, r.h * scale);
+      });
+      // Draw in-progress rect
+      if (srState.isDrawing && srState.drawStart && srState.drawCurrent) {
+        srCtx.setLineDash([6, 4]);
+        var sx = srState.drawStart.x, sy = srState.drawStart.y;
+        var cx = srState.drawCurrent.x, cy = srState.drawCurrent.y;
+        srCtx.strokeRect(sx, sy, cx - sx, cy - sy);
+        srCtx.setLineDash([]);
+      }
+    }
+
+    function srRebuildThumbstrip() {
+      srThumbstrip.innerHTML = '';
+      srState.photos.forEach(function(photo, i) {
+        var wrap = document.createElement('div');
+        wrap.className = 'sr-strip-thumb-wrap';
+        var div = document.createElement('div');
+        div.className = 'sr-strip-thumb' + (i === srState.currentPhotoIndex ? ' active' : '');
+        div.innerHTML = '<img src="' + photo.originalBase64 + '">';
+        div.addEventListener('click', function() {
+          srSaveCurrentNote();
+          srState.currentPhotoIndex = i;
+          srRenderAnnotation();
+        });
+        var delBtn = document.createElement('button');
+        delBtn.className = 'sr-strip-delete';
+        delBtn.innerHTML = '&times;';
+        delBtn.setAttribute('data-idx', i);
+        delBtn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          var idx = parseInt(this.getAttribute('data-idx'));
+          srState.photos.splice(idx, 1);
+          if (srState.photos.length === 0) {
+            srState.currentPhotoIndex = 0;
+          } else if (srState.currentPhotoIndex >= srState.photos.length) {
+            srState.currentPhotoIndex = srState.photos.length - 1;
+          } else if (srState.currentPhotoIndex > idx) {
+            srState.currentPhotoIndex--;
+          }
+          srUpdateStep3Visibility();
+          if (srState.photos.length > 0) {
+            srRenderAnnotation();
+          }
+        });
+        wrap.appendChild(div);
+        wrap.appendChild(delBtn);
+        srThumbstrip.appendChild(wrap);
+      });
+    }
+
+    function srSaveCurrentNote() {
+      if (srState.photos.length > 0) {
+        var p = srState.photos[srState.currentPhotoIndex];
+        p.note = srPhotoNote.value;
+        p.category = srCategoryInput.value.trim();
+        srRebuildCategoryDatalist();
+      }
+    }
+
+    function srRebuildCategoryDatalist() {
+      var cats = {};
+      srDefaultCategories.forEach(function(c) { cats[c] = true; });
+      srState.photos.forEach(function(p) {
+        if (p.category && p.category.trim()) cats[p.category.trim()] = true;
+      });
+      var datalist = document.getElementById('sr-category-list');
+      datalist.innerHTML = '';
+      Object.keys(cats).forEach(function(c) {
+        var opt = document.createElement('option');
+        opt.value = c;
+        datalist.appendChild(opt);
+      });
+    }
+
+    // Canvas pointer helpers
+    function srGetCanvasPos(e) {
+      var rect = srCanvas.getBoundingClientRect();
+      var clientX, clientY;
+      if (e.touches) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+      } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+      }
+      return { x: clientX - rect.left, y: clientY - rect.top };
+    }
+
+    function srStartDraw(e) {
+      e.preventDefault();
+      srState.isDrawing = true;
+      srState.drawStart = srGetCanvasPos(e);
+      srState.drawCurrent = srState.drawStart;
+    }
+
+    function srMoveDraw(e) {
+      if (!srState.isDrawing) return;
+      e.preventDefault();
+      srState.drawCurrent = srGetCanvasPos(e);
+      var photo = srState.photos[srState.currentPhotoIndex];
+      var wrapW = srCanvasWrap.clientWidth;
+      var scale = wrapW / photo.imgWidth;
+      var img = new Image();
+      img.onload = function() { srDrawCanvas(img, photo, scale); };
+      img.src = photo.originalBase64;
+    }
+
+    function srEndDraw(e) {
+      if (!srState.isDrawing) return;
+      srState.isDrawing = false;
+      if (!srState.drawStart || !srState.drawCurrent) return;
+      var photo = srState.photos[srState.currentPhotoIndex];
+      var wrapW = srCanvasWrap.clientWidth;
+      var scale = wrapW / photo.imgWidth;
+
+      var sx = srState.drawStart.x / scale;
+      var sy = srState.drawStart.y / scale;
+      var ex = srState.drawCurrent.x / scale;
+      var ey = srState.drawCurrent.y / scale;
+      var rw = Math.abs(ex - sx);
+      var rh = Math.abs(ey - sy);
+
+      if (rw >= 10 && rh >= 10) {
+        photo.rects.push({ x: Math.min(sx, ex), y: Math.min(sy, ey), w: rw, h: rh });
+      }
+      srState.drawStart = null;
+      srState.drawCurrent = null;
+      srRenderAnnotation();
+    }
+
+    srCanvas.addEventListener('mousedown', srStartDraw);
+    srCanvas.addEventListener('mousemove', srMoveDraw);
+    srCanvas.addEventListener('mouseup', srEndDraw);
+    srCanvas.addEventListener('mouseleave', srEndDraw);
+    srCanvas.addEventListener('touchstart', srStartDraw, { passive: false });
+    srCanvas.addEventListener('touchmove', srMoveDraw, { passive: false });
+    srCanvas.addEventListener('touchend', srEndDraw);
+
+    srUndoBtn.addEventListener('click', function() {
+      var photo = srState.photos[srState.currentPhotoIndex];
+      if (photo && photo.rects.length > 0) {
+        photo.rects.pop();
+        srRenderAnnotation();
+      }
+    });
+
+    srClearBtn.addEventListener('click', function() {
+      var photo = srState.photos[srState.currentPhotoIndex];
+      if (photo) {
+        photo.rects = [];
+        srRenderAnnotation();
+      }
+    });
+
+    srPrevPhoto.addEventListener('click', function() {
+      if (srState.currentPhotoIndex > 0) {
+        srSaveCurrentNote();
+        srState.currentPhotoIndex--;
+        srRenderAnnotation();
+      }
+    });
+
+    srNextPhoto.addEventListener('click', function() {
+      if (srState.currentPhotoIndex < srState.photos.length - 1) {
+        srSaveCurrentNote();
+        srState.currentPhotoIndex++;
+        srRenderAnnotation();
+      }
+    });
+
+    srStep3Next.addEventListener('click', function() {
+      srSaveCurrentNote();
+      srGoToStep(4);
+    });
+
+    // Step 4: Summary + Generate
+    function srRenderSummary() {
+      var catCounts = {};
+      srState.photos.forEach(function(p) {
+        var cat = p.category || 'Uncategorized';
+        if (!catCounts[cat]) catCounts[cat] = 0;
+        catCounts[cat]++;
+      });
+      var catHtml = '';
+      Object.keys(catCounts).forEach(function(cat) {
+        catHtml += '<div class="sr-sum-row"><span class="sr-sum-label">' + escapeHtml(cat) + '</span><span class="sr-sum-value">' + catCounts[cat] + ' photos</span></div>';
+      });
+      srSummary.innerHTML =
+        '<div class="sr-sum-row"><span class="sr-sum-label">Property</span><span class="sr-sum-value">' + escapeHtml(srState.selectedProp.address) + '</span></div>' +
+        '<div class="sr-sum-row"><span class="sr-sum-label">Inspector</span><span class="sr-sum-value">' + escapeHtml(srState.inspectorName) + '</span></div>' +
+        '<div class="sr-sum-row"><span class="sr-sum-label">Date</span><span class="sr-sum-value">' + escapeHtml(srState.reportDate) + '</span></div>' +
+        '<div class="sr-sum-row"><span class="sr-sum-label">Photos</span><span class="sr-sum-value">' + srState.photos.length + '</span></div>' +
+        '<div style="border-top:1px solid var(--green-pale);margin:8px 0;"></div>' +
+        catHtml;
+      srProgressWrap.style.display = 'none';
+      srUploadDriveBtn.style.display = 'none';
+      srGenerateBtn.disabled = false;
+      srGenerateBtn.textContent = 'Generate Report';
+      srState.generatedPdfBlob = null;
+    }
+
+    srGenerateBtn.addEventListener('click', function() {
+      srGenerateBtn.disabled = true;
+      srGenerateBtn.textContent = 'Preparing...';
+      srProgressWrap.style.display = 'block';
+      srProgressLabel.textContent = 'Compositing photos...';
+      srProgressBar.style.width = '0%';
+
+      // Composite annotations onto photos as JPEG blobs
+      var composited = [];
+      var total = srState.photos.length;
+      var done = 0;
+
+      function compositeNext() {
+        if (done >= total) {
+          srSendToCloudFunction(composited);
+          return;
+        }
+        var photo = srState.photos[done];
+        var img = new Image();
+        img.onload = function() {
+          var c = document.createElement('canvas');
+          c.width = photo.imgWidth;
+          c.height = photo.imgHeight;
+          var cx = c.getContext('2d');
+          cx.drawImage(img, 0, 0, photo.imgWidth, photo.imgHeight);
+          // Draw rects
+          cx.strokeStyle = 'red';
+          cx.lineWidth = Math.max(3, Math.round(photo.imgWidth / 200));
+          photo.rects.forEach(function(r) {
+            cx.strokeRect(r.x, r.y, r.w, r.h);
+          });
+          c.toBlob(function(blob) {
+            composited.push({ blob: blob, note: photo.note, category: photo.category });
+            done++;
+            srProgressBar.style.width = Math.round(done / total * 40) + '%';
+            compositeNext();
+          }, 'image/jpeg', 0.85);
+        };
+        img.src = photo.originalBase64;
+      }
+      compositeNext();
+    });
+
+    function srSendToCloudFunction(composited) {
+      srProgressLabel.textContent = 'Generating PDF...';
+      srProgressBar.style.width = '50%';
+
+      var formData = new FormData();
+      var metadata = {
+        address: srState.selectedProp.address,
+        inspector: srState.inspectorName,
+        date: srState.reportDate,
+        photos: composited.map(function(c) { return { note: c.note, category: c.category || '' }; })
+      };
+      formData.append('metadata', JSON.stringify(metadata));
+      composited.forEach(function(c, i) {
+        formData.append('photos', c.blob, 'photo_' + i + '.jpg');
+      });
+
+      fetch(CLOUD_FUNCTION_URL, {
+        method: 'POST',
+        body: formData
+      })
+      .then(function(resp) {
+        if (!resp.ok) throw new Error('Server error ' + resp.status);
+        srProgressBar.style.width = '90%';
+        return resp.blob();
+      })
+      .then(function(blob) {
+        srState.generatedPdfBlob = blob;
+        srProgressBar.style.width = '100%';
+        srProgressLabel.textContent = 'PDF ready!';
+
+        // Auto-download
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        var street = srState.selectedProp.address.split(',')[0].trim();
+        a.href = url;
+        a.download = 'Site Report - ' + street + ' - ' + srState.reportDate + '.pdf';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        srGenerateBtn.textContent = 'Download Again';
+        srGenerateBtn.disabled = false;
+        srGenerateBtn.onclick = function() {
+          var url2 = URL.createObjectURL(srState.generatedPdfBlob);
+          var a2 = document.createElement('a');
+          a2.href = url2;
+          a2.download = 'Site Report - ' + street + ' - ' + srState.reportDate + '.pdf';
+          document.body.appendChild(a2);
+          a2.click();
+          document.body.removeChild(a2);
+          URL.revokeObjectURL(url2);
+        };
+        srUploadDriveBtn.style.display = 'block';
+      })
+      .catch(function(err) {
+        srProgressLabel.textContent = 'Error: ' + err.message;
+        srGenerateBtn.textContent = 'Retry';
+        srGenerateBtn.disabled = false;
+      });
+    }
+
+    srUploadDriveBtn.addEventListener('click', function() {
+      if (!srState.generatedPdfBlob) return;
+      srUploadDriveBtn.disabled = true;
+      srUploadDriveBtn.textContent = 'Uploading to Drive...';
+
+      var reader = new FileReader();
+      reader.onload = function() {
+        var base64 = reader.result.split(',')[1];
+        var street = srState.selectedProp.address.split(',')[0].trim();
+        var filename = 'Site Report - ' + street + ' - ' + srState.reportDate;
+
+        fetch(GOOGLE_SHEETS_URL, {
+          method: 'POST',
+          body: JSON.stringify({
+            siteReportPdf: true,
+            pdfBase64: base64,
+            filename: filename,
+            property: srState.selectedProp.address
+          })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.success) {
+            srUploadDriveBtn.textContent = 'Uploaded to Drive!';
+            if (data.pdfUrl) {
+              srUploadDriveBtn.textContent = 'Uploaded! View in Drive';
+              srUploadDriveBtn.onclick = function() { window.open(data.pdfUrl, '_blank'); };
+            }
+          } else {
+            srUploadDriveBtn.textContent = 'Upload failed. Tap to retry.';
+            srUploadDriveBtn.disabled = false;
+          }
+        })
+        .catch(function() {
+          srUploadDriveBtn.textContent = 'Upload failed. Tap to retry.';
+          srUploadDriveBtn.disabled = false;
+        });
+      };
+      reader.readAsDataURL(srState.generatedPdfBlob);
+    });
+  </script>
+</body>
+</html>
