@@ -7,6 +7,10 @@
   <meta name="robots" content="noindex, nofollow">
   <link rel="icon" type="image/png" href="images/icon.png">
   <link rel="apple-touch-icon" href="images/icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Crew">
+  <link rel="manifest" href="manifest-crew.json">
   <style>
     :root {
       --green-dark: #2D4A3E;
@@ -560,15 +564,24 @@
     .site-report-steps .sr-dot.done {
       background: var(--green-accent);
     }
+    .site-report-content {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      overflow: hidden;
+      min-height: 0;
+    }
     .site-report-panel {
       display: none;
+      flex-direction: column;
       flex: 1;
       overflow-y: auto;
       padding: 20px;
       -webkit-overflow-scrolling: touch;
+      min-height: 0;
     }
     .site-report-panel.active {
-      display: block;
+      display: flex;
     }
     .site-report-panel .sr-field-label {
       font-size: 12px;
@@ -644,7 +657,7 @@
       border-radius: 8px;
       overflow: hidden;
       position: relative;
-      touch-action: none;
+      touch-action: auto;
       user-select: none;
       -webkit-user-select: none;
     }
@@ -705,6 +718,83 @@
       color: var(--text-dark);
       font-weight: 600;
     }
+    .sr-preview-section {
+      margin-top: 16px;
+    }
+    .sr-preview-category {
+      margin-bottom: 16px;
+    }
+    .sr-preview-cat-header {
+      background: #666;
+      color: white;
+      padding: 8px 12px;
+      font-weight: 600;
+      font-size: 13px;
+      border-radius: 6px 6px 0 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .sr-cat-controls {
+      display: flex;
+      gap: 4px;
+    }
+    .sr-cat-controls button {
+      width: 28px;
+      height: 24px;
+      padding: 0;
+      font-size: 12px;
+      background: rgba(255,255,255,0.2);
+      border: 1px solid rgba(255,255,255,0.4);
+      border-radius: 4px;
+      color: white;
+      cursor: pointer;
+    }
+    .sr-cat-controls button:active {
+      background: rgba(255,255,255,0.4);
+    }
+    .sr-preview-photos {
+      background: var(--white);
+      border: 1px solid #ddd;
+      border-top: none;
+      border-radius: 0 0 6px 6px;
+      padding: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .sr-preview-item {
+      position: relative;
+      width: 72px;
+    }
+    .sr-preview-thumb {
+      width: 72px;
+      height: 54px;
+      object-fit: cover;
+      border-radius: 4px;
+      border: 2px solid transparent;
+    }
+    .sr-preview-controls {
+      display: flex;
+      justify-content: center;
+      gap: 4px;
+      margin-top: 4px;
+    }
+    .sr-preview-controls button {
+      width: 28px;
+      height: 24px;
+      padding: 0;
+      font-size: 12px;
+      background: var(--green-pale);
+      border: 1px solid var(--green-primary);
+      border-radius: 4px;
+      color: var(--green-primary);
+      cursor: pointer;
+    }
+    .sr-preview-controls button:active {
+      background: var(--green-primary);
+      color: white;
+    }
     .sr-progress-wrap {
       display: none;
       margin-top: 16px;
@@ -734,6 +824,97 @@
       background: var(--white);
       color: var(--green-primary);
       cursor: pointer;
+    }
+
+    /* Before & After styles */
+    .ba-reports-list {
+      max-height: 250px;
+      overflow-y: auto;
+    }
+    .ba-report-item {
+      padding: 12px;
+      background: var(--white);
+      border: 1px solid var(--green-pale);
+      border-radius: var(--radius);
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    .ba-report-item:hover, .ba-report-item.selected {
+      border-color: var(--green-primary);
+    }
+    .ba-report-item.selected {
+      background: var(--green-pale);
+    }
+    .ba-report-item .ba-report-name {
+      font-weight: 600;
+      color: var(--text-dark);
+    }
+    .ba-report-item .ba-report-date {
+      font-size: 12px;
+      color: var(--text-light);
+      margin-top: 2px;
+    }
+    .ba-before-photo-wrap {
+      background: #1a1a1a;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .ba-before-photo-wrap img {
+      width: 100%;
+      display: block;
+      max-height: 35vh;
+      object-fit: contain;
+    }
+    .ba-before-info {
+      margin-top: 8px;
+    }
+    .ba-before-cat {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--green-primary);
+      text-transform: uppercase;
+    }
+    .ba-before-note {
+      font-size: 13px;
+      color: var(--text-medium);
+      margin-top: 4px;
+    }
+    .ba-after-wrap {
+      background: var(--green-pale);
+      border-radius: 8px;
+      padding: 16px;
+      position: relative;
+    }
+    .ba-no-after {
+      text-align: center;
+      color: var(--text-light);
+    }
+    .ba-no-after p {
+      margin: 0 0 8px 0;
+    }
+    #ba-has-after img {
+      width: 100%;
+      border-radius: 6px;
+      display: block;
+      max-height: 30vh;
+      object-fit: contain;
+    }
+    .ba-remove-after {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: rgba(220,50,50,0.9);
+      border: none;
+      color: white;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     /* Dark mode */
@@ -926,7 +1107,8 @@
 
       <button id="submit-ticket-btn" class="btn btn-primary" style="width:100%;margin-bottom:8px;">+ Submit Internal Ticket</button>
       <button id="inspection-btn" class="btn btn-primary" style="width:100%;margin-bottom:8px;background:linear-gradient(135deg, #1E40AF, #3B82F6);">📋 Inspection Report</button>
-      <button id="site-report-btn" class="btn btn-primary" style="width:100%;margin-bottom:20px;background:linear-gradient(135deg, #92400E, #D97706);">📸 Site Report</button>
+      <button id="site-report-btn" class="btn btn-primary" style="width:100%;margin-bottom:8px;background:linear-gradient(135deg, #92400E, #D97706);">📸 Site Report</button>
+      <button id="before-after-btn" class="btn btn-primary" style="width:100%;margin-bottom:20px;background:linear-gradient(135deg, #065F46, #10B981);">🔄 Before &amp; After Report</button>
 
       <h2 class="section-title" id="section-title">Open Requests</h2>
       <div id="requests-list"></div>
@@ -1137,20 +1319,21 @@
           <canvas id="sr-canvas"></canvas>
         </div>
         <div class="site-report-annotate-controls">
+          <button id="sr-draw-toggle" style="background:var(--green-primary);color:white;">Draw: OFF</button>
           <button id="sr-undo-btn">Undo</button>
           <button id="sr-clear-btn">Clear All</button>
+          <button id="sr-rotate-btn">Rotate</button>
         </div>
         <div class="sr-field-label">Category</div>
         <input type="text" id="sr-category" class="form-input" list="sr-category-list" style="max-width:100%;text-align:left;" placeholder="e.g. Shrub Health" autocomplete="off">
         <datalist id="sr-category-list">
+          <option value="Drainage and/or Erosion">
+          <option value="Hardscape">
+          <option value="Irrigation">
+          <option value="Misc.">
+          <option value="Priority Areas">
           <option value="Shrub Health">
           <option value="Tree Health">
-          <option value="Turf Health">
-          <option value="Irrigation">
-          <option value="Drainage and/or Erosion">
-          <option value="Priority Areas">
-          <option value="Hardscape">
-          <option value="Miscellaneous">
         </datalist>
 
         <div class="sr-field-label">Note for this photo</div>
@@ -1167,10 +1350,12 @@
       <button id="sr-step3-next" class="sr-next-btn" disabled>Done — Generate Report</button>
     </div>
 
-    <!-- Step 4: Generate & Upload -->
+    <!-- Step 4: Preview, Reorder & Generate -->
     <div id="sr-step-4" class="site-report-panel">
       <div class="sr-field-label">Report Summary</div>
       <div id="sr-summary" class="sr-summary-card"></div>
+      <div class="sr-field-label" style="margin-top:16px;">Preview & Reorder</div>
+      <div id="sr-preview" class="sr-preview-section"></div>
       <div id="sr-progress-wrap" class="sr-progress-wrap">
         <div class="sr-field-label" id="sr-progress-label">Generating PDF...</div>
         <div class="sr-progress-bar-outer">
@@ -1179,6 +1364,103 @@
       </div>
       <button id="sr-generate-btn" class="sr-generate-btn">Generate Report</button>
       <button id="sr-upload-drive-btn" class="sr-upload-drive-btn">Upload to Google Drive</button>
+    </div>
+  </div>
+
+  <!-- Before & After Wizard -->
+  <div id="ba-wizard" class="site-report-wizard">
+    <div class="site-report-topbar">
+      <button id="ba-back-btn" style="display:none;">&#8592;</button>
+      <span class="sr-title">Before &amp; After</span>
+      <button id="ba-close-btn">&times;</button>
+    </div>
+    <div class="site-report-steps">
+      <div class="step-dot active"></div>
+      <div class="step-dot"></div>
+      <div class="step-dot"></div>
+    </div>
+    <div class="site-report-content">
+
+    <!-- BA Step 1: Select Property & Report -->
+    <div id="ba-step-1" class="site-report-panel active">
+      <div class="sr-field-label">Property</div>
+      <div class="search-container">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="ba-property-input" class="form-input search-input" placeholder="Search properties..." autocomplete="off">
+        <div id="ba-property-dropdown" class="property-dropdown"></div>
+      </div>
+      <div id="ba-property-card" class="sr-property-card" style="display:none;">
+        <div id="ba-selected-address" class="sr-prop-address"></div>
+        <button id="ba-change-prop" class="sr-change-btn">Change</button>
+      </div>
+
+      <div id="ba-reports-section" style="display:none;margin-top:20px;">
+        <div class="sr-field-label">Select Previous Report</div>
+        <div id="ba-reports-list" class="ba-reports-list"></div>
+        <div id="ba-no-reports" style="display:none;padding:20px;text-align:center;color:var(--text-light);">
+          No saved reports found for this property.
+        </div>
+      </div>
+
+      <button id="ba-step1-next" class="sr-next-btn" disabled>Next</button>
+    </div>
+
+    <!-- BA Step 2: Capture After Photos -->
+    <div id="ba-step-2" class="site-report-panel">
+      <input type="file" id="ba-camera-input" accept="image/*" capture="environment" style="display:none;">
+      <input type="file" id="ba-upload-input" accept="image/*" style="display:none;">
+
+      <div class="sr-field-label">Before Photo <span id="ba-photo-counter">1/1</span></div>
+      <div class="ba-before-photo-wrap">
+        <img id="ba-before-img" src="" alt="Before photo">
+      </div>
+      <div class="ba-before-info">
+        <div id="ba-before-category" class="ba-before-cat"></div>
+        <div id="ba-before-note" class="ba-before-note"></div>
+      </div>
+
+      <div class="sr-field-label" style="margin-top:16px;">After Photo</div>
+      <div id="ba-after-wrap" class="ba-after-wrap">
+        <div id="ba-no-after" class="ba-no-after">
+          <p>No after photo yet</p>
+          <div style="display:flex;gap:8px;margin-top:12px;">
+            <button id="ba-take-after" class="btn btn-primary" style="flex:1;">📷 Take Photo</button>
+            <button id="ba-upload-after" class="btn" style="flex:1;background:var(--green-pale);color:var(--text-dark);">📁 Upload</button>
+          </div>
+        </div>
+        <div id="ba-has-after" style="display:none;">
+          <img id="ba-after-img" src="" alt="After photo">
+          <button id="ba-remove-after" class="ba-remove-after">&times;</button>
+        </div>
+      </div>
+
+      <div class="sr-field-label" style="margin-top:12px;">After Note (optional)</div>
+      <textarea id="ba-after-note" class="form-input" style="max-width:100%;text-align:left;min-height:50px;resize:vertical;" placeholder="Describe what was done..."></textarea>
+
+      <div style="display:flex;gap:8px;margin-top:16px;">
+        <button id="ba-prev-photo" class="btn" style="flex:1;background:var(--green-pale);color:var(--text-dark);">&#8592; Prev</button>
+        <button id="ba-skip-photo" class="btn" style="flex:1;background:#fef3c7;color:#92400e;">Skip</button>
+        <button id="ba-next-photo" class="btn" style="flex:1;background:var(--green-pale);color:var(--text-dark);">Next &#8594;</button>
+      </div>
+
+      <button id="ba-step2-next" class="sr-next-btn">Done — Preview Report</button>
+    </div>
+
+    <!-- BA Step 3: Generate -->
+    <div id="ba-step-3" class="site-report-panel">
+      <div class="sr-field-label">Report Summary</div>
+      <div id="ba-summary" class="sr-summary-card"></div>
+
+      <div id="ba-progress-wrap" class="sr-progress-wrap">
+        <div class="sr-field-label" id="ba-progress-label">Generating PDF...</div>
+        <div class="sr-progress-bar-outer">
+          <div id="ba-progress-bar" class="sr-progress-bar-inner"></div>
+        </div>
+      </div>
+      <button id="ba-generate-btn" class="sr-generate-btn">Generate Before &amp; After Report</button>
+      <button id="ba-upload-drive-btn" class="sr-upload-drive-btn" style="display:none;">Upload to Google Drive</button>
+    </div>
+
     </div>
   </div>
 
@@ -2053,7 +2335,7 @@
     });
 
     // ─── Site Report ───────────────────────────────
-    var CLOUD_FUNCTION_URL = 'http://localhost:8080';
+    var CLOUD_FUNCTION_URL = 'https://us-central1-project-f79b8c58-677c-45a1-b49.cloudfunctions.net/generate_site_report';
 
     var srWizard = document.getElementById('site-report-wizard');
     var srBackBtn = document.getElementById('sr-back-btn');
@@ -2078,6 +2360,9 @@
     var srPhotoNote = document.getElementById('sr-photo-note');
     var srUndoBtn = document.getElementById('sr-undo-btn');
     var srClearBtn = document.getElementById('sr-clear-btn');
+    var srRotateBtn = document.getElementById('sr-rotate-btn');
+    var srDrawToggle = document.getElementById('sr-draw-toggle');
+    var srDrawModeOn = false;
     var srPrevPhoto = document.getElementById('sr-prev-photo');
     var srNextPhoto = document.getElementById('sr-next-photo');
     var srStep3Next = document.getElementById('sr-step3-next');
@@ -2088,13 +2373,14 @@
     var srGenerateBtn = document.getElementById('sr-generate-btn');
     var srUploadDriveBtn = document.getElementById('sr-upload-drive-btn');
     var srSummary = document.getElementById('sr-summary');
+    var srPreview = document.getElementById('sr-preview');
     var srProgressWrap = document.getElementById('sr-progress-wrap');
     var srProgressBar = document.getElementById('sr-progress-bar');
     var srProgressLabel = document.getElementById('sr-progress-label');
     var srCtx = srCanvas.getContext('2d');
     var srCategoryInput = document.getElementById('sr-category');
 
-    var srDefaultCategories = ['Shrub Health','Tree Health','Turf Health','Irrigation','Drainage and/or Erosion','Priority Areas','Hardscape','Miscellaneous'];
+    var srDefaultCategories = ['Drainage and/or Erosion','Hardscape','Irrigation','Misc.','Priority Areas','Shrub Health','Tree Health'];
 
     var srState = {
       currentStep: 1,
@@ -2107,7 +2393,8 @@
       drawStart: null,
       drawCurrent: null,
       generatedPdfBlob: null,
-      photoMode: null
+      photoMode: null,
+      compositedPhotos: []
     };
 
     // Open / close wizard
@@ -2115,7 +2402,7 @@
       srState = {
         currentStep: 1, selectedProp: null, inspectorName: '', reportDate: '',
         photos: [], currentPhotoIndex: 0, isDrawing: false, drawStart: null, drawCurrent: null, generatedPdfBlob: null,
-        photoMode: null
+        photoMode: null, compositedPhotos: []
       };
       srPropertyInput.value = '';
       srPropertyInput.style.display = '';
@@ -2278,24 +2565,19 @@
     });
 
     function srProcessPhoto(file, callback) {
-      var reader = new FileReader();
-      reader.onload = function(e) {
-        var img = new Image();
-        img.onload = function() {
-          var maxW = 1000;
-          var w = img.width, h = img.height;
-          if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
-          var canvas = document.createElement('canvas');
-          canvas.width = w; canvas.height = h;
-          var ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, w, h);
-          var base64 = canvas.toDataURL('image/jpeg', 0.7);
-          srState.photos.push({ originalBase64: base64, imgWidth: w, imgHeight: h, rects: [], note: '', category: '' });
-          if (callback) callback();
-        };
-        img.src = e.target.result;
-      };
-      reader.readAsDataURL(file);
+      // Use createImageBitmap which handles EXIF orientation correctly in modern browsers
+      createImageBitmap(file).then(function(bitmap) {
+        var maxW = 1000;
+        var w = bitmap.width, h = bitmap.height;
+        if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+        var canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(bitmap, 0, 0, w, h);
+        var base64 = canvas.toDataURL('image/jpeg', 0.7);
+        srState.photos.push({ originalBase64: base64, imgWidth: w, imgHeight: h, rects: [], note: '', category: '' });
+        if (callback) callback();
+      });
     }
 
     // Step 3: Visibility controller
@@ -2439,6 +2721,7 @@
     }
 
     function srStartDraw(e) {
+      if (!srDrawModeOn) return;
       e.preventDefault();
       srState.isDrawing = true;
       srState.drawStart = srGetCanvasPos(e);
@@ -2446,7 +2729,7 @@
     }
 
     function srMoveDraw(e) {
-      if (!srState.isDrawing) return;
+      if (!srDrawModeOn || !srState.isDrawing) return;
       e.preventDefault();
       srState.drawCurrent = srGetCanvasPos(e);
       var photo = srState.photos[srState.currentPhotoIndex];
@@ -2458,7 +2741,7 @@
     }
 
     function srEndDraw(e) {
-      if (!srState.isDrawing) return;
+      if (!srDrawModeOn || !srState.isDrawing) return;
       srState.isDrawing = false;
       if (!srState.drawStart || !srState.drawCurrent) return;
       var photo = srState.photos[srState.currentPhotoIndex];
@@ -2477,6 +2760,8 @@
       }
       srState.drawStart = null;
       srState.drawCurrent = null;
+      // Save current note/category before re-rendering
+      srSaveCurrentNote();
       srRenderAnnotation();
     }
 
@@ -2484,13 +2769,22 @@
     srCanvas.addEventListener('mousemove', srMoveDraw);
     srCanvas.addEventListener('mouseup', srEndDraw);
     srCanvas.addEventListener('mouseleave', srEndDraw);
-    srCanvas.addEventListener('touchstart', srStartDraw, { passive: false });
+    srCanvas.addEventListener('touchstart', srStartDraw, { passive: true });
     srCanvas.addEventListener('touchmove', srMoveDraw, { passive: false });
     srCanvas.addEventListener('touchend', srEndDraw);
+
+    // Draw mode toggle - allows scrolling when OFF, drawing when ON
+    srDrawToggle.addEventListener('click', function() {
+      srDrawModeOn = !srDrawModeOn;
+      srDrawToggle.textContent = srDrawModeOn ? 'Draw: ON' : 'Draw: OFF';
+      srDrawToggle.style.background = srDrawModeOn ? '#c0392b' : 'var(--green-primary)';
+      srCanvasWrap.style.touchAction = srDrawModeOn ? 'none' : 'auto';
+    });
 
     srUndoBtn.addEventListener('click', function() {
       var photo = srState.photos[srState.currentPhotoIndex];
       if (photo && photo.rects.length > 0) {
+        srSaveCurrentNote();
         photo.rects.pop();
         srRenderAnnotation();
       }
@@ -2499,9 +2793,36 @@
     srClearBtn.addEventListener('click', function() {
       var photo = srState.photos[srState.currentPhotoIndex];
       if (photo) {
+        srSaveCurrentNote();
         photo.rects = [];
         srRenderAnnotation();
       }
+    });
+
+    srRotateBtn.addEventListener('click', function() {
+      var photo = srState.photos[srState.currentPhotoIndex];
+      if (!photo) return;
+      srSaveCurrentNote();
+      // Rotate the image 90 degrees counter-clockwise
+      var img = new Image();
+      img.onload = function() {
+        var canvas = document.createElement('canvas');
+        canvas.width = photo.imgHeight;
+        canvas.height = photo.imgWidth;
+        var ctx = canvas.getContext('2d');
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.rotate(-90 * Math.PI / 180);
+        ctx.drawImage(img, -photo.imgWidth / 2, -photo.imgHeight / 2);
+        photo.originalBase64 = canvas.toDataURL('image/jpeg', 0.7);
+        // Swap dimensions
+        var tmp = photo.imgWidth;
+        photo.imgWidth = photo.imgHeight;
+        photo.imgHeight = tmp;
+        // Clear rects since they won't match the rotated image
+        photo.rects = [];
+        srRenderAnnotation();
+      };
+      img.src = photo.originalBase64;
     });
 
     srPrevPhoto.addEventListener('click', function() {
@@ -2549,7 +2870,138 @@
       srGenerateBtn.disabled = false;
       srGenerateBtn.textContent = 'Generate Report';
       srState.generatedPdfBlob = null;
+      srRenderPreview();
     }
+
+    function srRenderPreview() {
+      // Group photos by category, preserving order within each category
+      var categories = {};
+      var categoryOrder = [];
+      srState.photos.forEach(function(p, idx) {
+        var cat = p.category || 'Uncategorized';
+        if (!categories[cat]) {
+          categories[cat] = [];
+          categoryOrder.push(cat);
+        }
+        categories[cat].push({ photo: p, index: idx });
+      });
+
+      var html = '';
+      var numCats = categoryOrder.length;
+      categoryOrder.forEach(function(cat, catIndex) {
+        var photos = categories[cat];
+        html += '<div class="sr-preview-category">';
+        html += '<div class="sr-preview-cat-header">';
+        html += '<span>' + escapeHtml(cat) + ' (' + photos.length + ')</span>';
+        html += '<span class="sr-cat-controls">';
+        if (catIndex > 0) {
+          html += '<button onclick="srMoveCategory(\'' + escapeHtml(cat).replace(/'/g, "\\'") + '\', -1)">▲</button>';
+        } else {
+          html += '<button disabled style="opacity:0.3;">▲</button>';
+        }
+        if (catIndex < numCats - 1) {
+          html += '<button onclick="srMoveCategory(\'' + escapeHtml(cat).replace(/'/g, "\\'") + '\', 1)">▼</button>';
+        } else {
+          html += '<button disabled style="opacity:0.3;">▼</button>';
+        }
+        html += '</span>';
+        html += '</div>';
+        html += '<div class="sr-preview-photos">';
+        photos.forEach(function(item, posInCat) {
+          var p = item.photo;
+          var globalIdx = item.index;
+          html += '<div class="sr-preview-item">';
+          html += '<img class="sr-preview-thumb" src="' + p.originalBase64 + '">';
+          html += '<div class="sr-preview-controls">';
+          // Up arrow (move earlier in category)
+          if (posInCat > 0) {
+            html += '<button onclick="srMovePhoto(' + globalIdx + ', -1)">▲</button>';
+          } else {
+            html += '<button disabled style="opacity:0.3;">▲</button>';
+          }
+          // Down arrow (move later in category)
+          if (posInCat < photos.length - 1) {
+            html += '<button onclick="srMovePhoto(' + globalIdx + ', 1)">▼</button>';
+          } else {
+            html += '<button disabled style="opacity:0.3;">▼</button>';
+          }
+          html += '</div>';
+          html += '</div>';
+        });
+        html += '</div></div>';
+      });
+
+      srPreview.innerHTML = html;
+    }
+
+    // Move a photo within its category
+    window.srMovePhoto = function(photoIndex, direction) {
+      var photo = srState.photos[photoIndex];
+      var cat = photo.category || 'Uncategorized';
+
+      // Find all photos in this category with their indices
+      var sameCat = [];
+      srState.photos.forEach(function(p, idx) {
+        if ((p.category || 'Uncategorized') === cat) {
+          sameCat.push(idx);
+        }
+      });
+
+      // Find position of this photo in category
+      var posInCat = sameCat.indexOf(photoIndex);
+      var swapPosInCat = posInCat + direction;
+
+      if (swapPosInCat < 0 || swapPosInCat >= sameCat.length) return;
+
+      // Get the global index of the photo to swap with
+      var swapIndex = sameCat[swapPosInCat];
+
+      // Swap in the main photos array
+      var temp = srState.photos[photoIndex];
+      srState.photos[photoIndex] = srState.photos[swapIndex];
+      srState.photos[swapIndex] = temp;
+
+      // Re-render preview
+      srRenderSummary();
+    };
+
+    // Move an entire category up or down
+    window.srMoveCategory = function(categoryName, direction) {
+      // Build category order from current photos
+      var categoryOrder = [];
+      srState.photos.forEach(function(p) {
+        var cat = p.category || 'Uncategorized';
+        if (categoryOrder.indexOf(cat) === -1) {
+          categoryOrder.push(cat);
+        }
+      });
+
+      // Find current position of this category
+      var catIndex = categoryOrder.indexOf(categoryName);
+      var swapIndex = catIndex + direction;
+
+      if (swapIndex < 0 || swapIndex >= categoryOrder.length) return;
+
+      // Swap categories in order
+      var swapCat = categoryOrder[swapIndex];
+
+      // Rebuild photos array with new category order
+      var newPhotos = [];
+      var newOrder = categoryOrder.slice();
+      newOrder[catIndex] = swapCat;
+      newOrder[swapIndex] = categoryName;
+
+      newOrder.forEach(function(cat) {
+        srState.photos.forEach(function(p) {
+          if ((p.category || 'Uncategorized') === cat) {
+            newPhotos.push(p);
+          }
+        });
+      });
+
+      srState.photos = newPhotos;
+      srRenderSummary();
+    };
 
     srGenerateBtn.addEventListener('click', function() {
       srGenerateBtn.disabled = true;
@@ -2560,6 +3012,7 @@
 
       // Composite annotations onto photos as JPEG blobs
       var composited = [];
+      srState.compositedPhotos = [];
       var total = srState.photos.length;
       var done = 0;
 
@@ -2581,6 +3034,13 @@
           cx.lineWidth = Math.max(3, Math.round(photo.imgWidth / 200));
           photo.rects.forEach(function(r) {
             cx.strokeRect(r.x, r.y, r.w, r.h);
+          });
+          // Store base64 for before/after reports
+          var base64 = c.toDataURL('image/jpeg', 0.85);
+          srState.compositedPhotos.push({
+            base64: base64,
+            note: photo.note,
+            category: photo.category
           });
           c.toBlob(function(blob) {
             composited.push({ blob: blob, note: photo.note, category: photo.category });
@@ -2621,33 +3081,125 @@
       })
       .then(function(blob) {
         srState.generatedPdfBlob = blob;
-        srProgressBar.style.width = '100%';
-        srProgressLabel.textContent = 'PDF ready!';
-
-        // Auto-download
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement('a');
         var street = srState.selectedProp.address.split(',')[0].trim();
-        a.href = url;
-        a.download = 'Site Report - ' + street + ' - ' + srState.reportDate + '.pdf';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        var filename = 'Site Report - ' + street + ' - ' + srState.reportDate;
 
-        srGenerateBtn.textContent = 'Download Again';
-        srGenerateBtn.disabled = false;
-        srGenerateBtn.onclick = function() {
-          var url2 = URL.createObjectURL(srState.generatedPdfBlob);
-          var a2 = document.createElement('a');
-          a2.href = url2;
-          a2.download = 'Site Report - ' + street + ' - ' + srState.reportDate + '.pdf';
-          document.body.appendChild(a2);
-          a2.click();
-          document.body.removeChild(a2);
-          URL.revokeObjectURL(url2);
+        // Upload to Drive FIRST, then download
+        srProgressLabel.textContent = 'Uploading PDF to Drive...';
+        srProgressBar.style.width = '60%';
+
+        var reader = new FileReader();
+        reader.onload = function() {
+          var base64 = reader.result.split(',')[1];
+
+          // Upload PDF
+          fetch(GOOGLE_SHEETS_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+              siteReportPdf: true,
+              pdfBase64: base64,
+              filename: filename,
+              property: srState.selectedProp.address
+            })
+          })
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            if (data.success) {
+              srProgressBar.style.width = '80%';
+              srProgressLabel.textContent = 'Saving report data...';
+
+              // Upload JSON data
+              var reportData = {
+                address: srState.selectedProp.address,
+                inspector: srState.inspectorName,
+                date: srState.reportDate,
+                photos: srState.compositedPhotos
+              };
+
+              fetch(GOOGLE_SHEETS_URL, {
+                method: 'POST',
+                body: JSON.stringify({
+                  siteReportJson: true,
+                  jsonData: reportData,
+                  filename: filename,
+                  property: srState.selectedProp.address
+                })
+              })
+              .then(function(r) { return r.json(); })
+              .then(function() {
+                srProgressBar.style.width = '100%';
+                srProgressLabel.textContent = 'Success! Saved to Drive.';
+
+                // Now auto-download the PDF
+                var url = URL.createObjectURL(srState.generatedPdfBlob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = filename + '.pdf';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                srGenerateBtn.textContent = 'Download PDF';
+                srGenerateBtn.disabled = false;
+                srGenerateBtn.onclick = function() {
+                  var url2 = URL.createObjectURL(srState.generatedPdfBlob);
+                  var a2 = document.createElement('a');
+                  a2.href = url2;
+                  a2.download = filename + '.pdf';
+                  document.body.appendChild(a2);
+                  a2.click();
+                  document.body.removeChild(a2);
+                  URL.revokeObjectURL(url2);
+                };
+                if (data.pdfUrl) {
+                  srUploadDriveBtn.textContent = 'View in Drive';
+                  srUploadDriveBtn.style.display = 'block';
+                  srUploadDriveBtn.disabled = false;
+                  srUploadDriveBtn.onclick = function() { window.open(data.pdfUrl, '_blank'); };
+                }
+              })
+              .catch(function() {
+                srProgressBar.style.width = '100%';
+                srProgressLabel.textContent = 'PDF uploaded but data save failed';
+                srGenerateBtn.textContent = 'Download PDF';
+                srGenerateBtn.disabled = false;
+              });
+            } else {
+              srProgressBar.style.width = '100%';
+              srProgressLabel.textContent = 'Upload failed. Tap to download PDF.';
+              srGenerateBtn.textContent = 'Download PDF';
+              srGenerateBtn.disabled = false;
+              srGenerateBtn.onclick = function() {
+                var url2 = URL.createObjectURL(srState.generatedPdfBlob);
+                var a2 = document.createElement('a');
+                a2.href = url2;
+                a2.download = filename + '.pdf';
+                document.body.appendChild(a2);
+                a2.click();
+                document.body.removeChild(a2);
+                URL.revokeObjectURL(url2);
+              };
+            }
+          })
+          .catch(function(err) {
+            srProgressBar.style.width = '100%';
+            srProgressLabel.textContent = 'Upload failed. Tap to download PDF.';
+            srGenerateBtn.textContent = 'Download PDF';
+            srGenerateBtn.disabled = false;
+            srGenerateBtn.onclick = function() {
+              var url2 = URL.createObjectURL(srState.generatedPdfBlob);
+              var a2 = document.createElement('a');
+              a2.href = url2;
+              a2.download = filename + '.pdf';
+              document.body.appendChild(a2);
+              a2.click();
+              document.body.removeChild(a2);
+              URL.revokeObjectURL(url2);
+            };
+          });
         };
-        srUploadDriveBtn.style.display = 'block';
+        reader.readAsDataURL(blob);
       })
       .catch(function(err) {
         srProgressLabel.textContent = 'Error: ' + err.message;
@@ -2659,7 +3211,7 @@
     srUploadDriveBtn.addEventListener('click', function() {
       if (!srState.generatedPdfBlob) return;
       srUploadDriveBtn.disabled = true;
-      srUploadDriveBtn.textContent = 'Uploading to Drive...';
+      srUploadDriveBtn.textContent = 'Uploading PDF...';
 
       var reader = new FileReader();
       reader.onload = function() {
@@ -2667,6 +3219,7 @@
         var street = srState.selectedProp.address.split(',')[0].trim();
         var filename = 'Site Report - ' + street + ' - ' + srState.reportDate;
 
+        // Step 1: Upload PDF only
         fetch(GOOGLE_SHEETS_URL, {
           method: 'POST',
           body: JSON.stringify({
@@ -2679,11 +3232,39 @@
         .then(function(r) { return r.json(); })
         .then(function(data) {
           if (data.success) {
-            srUploadDriveBtn.textContent = 'Uploaded to Drive!';
-            if (data.pdfUrl) {
-              srUploadDriveBtn.textContent = 'Uploaded! View in Drive';
-              srUploadDriveBtn.onclick = function() { window.open(data.pdfUrl, '_blank'); };
-            }
+            var pdfUrl = data.pdfUrl;
+            srUploadDriveBtn.textContent = 'Uploading data...';
+
+            // Step 2: Upload JSON data separately
+            var reportData = {
+              address: srState.selectedProp.address,
+              inspector: srState.inspectorName,
+              date: srState.reportDate,
+              photos: srState.compositedPhotos
+            };
+
+            fetch(GOOGLE_SHEETS_URL, {
+              method: 'POST',
+              body: JSON.stringify({
+                siteReportJson: true,
+                jsonData: reportData,
+                filename: filename,
+                property: srState.selectedProp.address
+              })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(jsonResult) {
+              if (pdfUrl) {
+                srUploadDriveBtn.textContent = 'Uploaded! View in Drive';
+                srUploadDriveBtn.onclick = function() { window.open(pdfUrl, '_blank'); };
+              } else {
+                srUploadDriveBtn.textContent = 'Uploaded to Drive!';
+              }
+            })
+            .catch(function() {
+              // JSON upload failed but PDF succeeded
+              srUploadDriveBtn.textContent = 'PDF uploaded (data save failed)';
+            });
           } else {
             srUploadDriveBtn.textContent = 'Upload failed. Tap to retry.';
             srUploadDriveBtn.disabled = false;
@@ -2696,6 +3277,488 @@
       };
       reader.readAsDataURL(srState.generatedPdfBlob);
     });
+
+    // ─── Before & After Report ───────────────────────────────
+    var baWizard = document.getElementById('ba-wizard');
+    var baBackBtn = document.getElementById('ba-back-btn');
+    var baCloseBtn = document.getElementById('ba-close-btn');
+    var baPropertyInput = document.getElementById('ba-property-input');
+    var baPropertyDropdown = document.getElementById('ba-property-dropdown');
+    var baPropertyCard = document.getElementById('ba-property-card');
+    var baSelectedAddress = document.getElementById('ba-selected-address');
+    var baChangeBtn = document.getElementById('ba-change-prop');
+    var baReportsSection = document.getElementById('ba-reports-section');
+    var baReportsList = document.getElementById('ba-reports-list');
+    var baNoReports = document.getElementById('ba-no-reports');
+    var baStep1Next = document.getElementById('ba-step1-next');
+    var baCameraInput = document.getElementById('ba-camera-input');
+    var baUploadInput = document.getElementById('ba-upload-input');
+    var baBeforeImg = document.getElementById('ba-before-img');
+    var baBeforeCategory = document.getElementById('ba-before-category');
+    var baBeforeNote = document.getElementById('ba-before-note');
+    var baPhotoCounter = document.getElementById('ba-photo-counter');
+    var baNoAfter = document.getElementById('ba-no-after');
+    var baHasAfter = document.getElementById('ba-has-after');
+    var baAfterImg = document.getElementById('ba-after-img');
+    var baRemoveAfter = document.getElementById('ba-remove-after');
+    var baTakeAfter = document.getElementById('ba-take-after');
+    var baUploadAfter = document.getElementById('ba-upload-after');
+    var baAfterNote = document.getElementById('ba-after-note');
+    var baPrevPhoto = document.getElementById('ba-prev-photo');
+    var baSkipPhoto = document.getElementById('ba-skip-photo');
+    var baNextPhoto = document.getElementById('ba-next-photo');
+    var baStep2Next = document.getElementById('ba-step2-next');
+    var baSummary = document.getElementById('ba-summary');
+    var baProgressWrap = document.getElementById('ba-progress-wrap');
+    var baProgressBar = document.getElementById('ba-progress-bar');
+    var baProgressLabel = document.getElementById('ba-progress-label');
+    var baGenerateBtn = document.getElementById('ba-generate-btn');
+    var baUploadDriveBtn = document.getElementById('ba-upload-drive-btn');
+
+    var baState = {
+      currentStep: 1,
+      selectedProp: null,
+      selectedReportId: null,
+      selectedReportName: null,
+      beforePhotos: [],
+      currentPhotoIndex: 0,
+      generatedPdfBlob: null
+    };
+
+    // Open wizard
+    document.getElementById('before-after-btn').addEventListener('click', function() {
+      baState = {
+        currentStep: 1, selectedProp: null, selectedReportId: null, selectedReportName: null,
+        beforePhotos: [], currentPhotoIndex: 0, generatedPdfBlob: null
+      };
+      baPropertyInput.value = '';
+      baPropertyInput.style.display = '';
+      baPropertyInput.closest('.search-container').querySelector('.search-icon').style.display = '';
+      baPropertyCard.style.display = 'none';
+      baReportsSection.style.display = 'none';
+      baReportsList.innerHTML = '';
+      baStep1Next.disabled = true;
+      baGoToStep(1);
+      baWizard.style.display = 'flex';
+    });
+
+    // Close wizard
+    baCloseBtn.addEventListener('click', function() {
+      baWizard.style.display = 'none';
+    });
+
+    // Back button
+    baBackBtn.addEventListener('click', function() {
+      if (baState.currentStep > 1) {
+        baGoToStep(baState.currentStep - 1);
+      }
+    });
+
+    function baGoToStep(step) {
+      baState.currentStep = step;
+      document.querySelectorAll('#ba-wizard .site-report-panel').forEach(function(p, i) {
+        p.classList.toggle('active', i === step - 1);
+      });
+      document.querySelectorAll('#ba-wizard .step-dot').forEach(function(d, i) {
+        d.classList.toggle('active', i < step);
+      });
+      baBackBtn.style.display = step > 1 ? '' : 'none';
+
+      if (step === 2) {
+        baRenderCurrentPhoto();
+      } else if (step === 3) {
+        baRenderSummary();
+      }
+    }
+
+    // Property search (reuse existing properties)
+    baPropertyInput.addEventListener('input', function() {
+      var val = this.value.toLowerCase();
+      if (val.length < 1) {
+        baPropertyDropdown.style.display = 'none';
+        return;
+      }
+      var matches = propertiesList.filter(function(p) {
+        return p.address.toLowerCase().includes(val);
+      }).slice(0, 5);
+      if (matches.length === 0) {
+        baPropertyDropdown.style.display = 'none';
+        return;
+      }
+      baPropertyDropdown.innerHTML = matches.map(function(p) {
+        return '<div class="property-option" data-addr="' + escapeHtml(p.address) + '">' + escapeHtml(p.address) + '</div>';
+      }).join('');
+      baPropertyDropdown.style.display = 'block';
+    });
+
+    baPropertyDropdown.addEventListener('click', function(e) {
+      if (e.target.classList.contains('property-option')) {
+        var addr = e.target.getAttribute('data-addr');
+        baState.selectedProp = propertiesList.find(function(p) { return p.address === addr; });
+        baPropertyInput.value = '';
+        baPropertyInput.style.display = 'none';
+        baPropertyInput.closest('.search-container').querySelector('.search-icon').style.display = 'none';
+        baPropertyDropdown.style.display = 'none';
+        baSelectedAddress.textContent = addr;
+        baPropertyCard.style.display = 'flex';
+        baLoadReports(addr);
+      }
+    });
+
+    baChangeBtn.addEventListener('click', function() {
+      baState.selectedProp = null;
+      baState.selectedReportId = null;
+      baPropertyInput.style.display = '';
+      baPropertyInput.closest('.search-container').querySelector('.search-icon').style.display = '';
+      baPropertyCard.style.display = 'none';
+      baReportsSection.style.display = 'none';
+      baStep1Next.disabled = true;
+    });
+
+    function baLoadReports(propertyAddress) {
+      baReportsSection.style.display = 'block';
+      baReportsList.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-light);">Loading reports...</div>';
+      baNoReports.style.display = 'none';
+
+      fetch(GOOGLE_SHEETS_URL + '?action=getSavedReports&property=' + encodeURIComponent(propertyAddress))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.success && data.reports && data.reports.length > 0) {
+            baReportsList.innerHTML = data.reports.map(function(r) {
+              var dateStr = new Date(r.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+              return '<div class="ba-report-item" data-id="' + r.id + '" data-name="' + escapeHtml(r.name) + '">' +
+                '<div class="ba-report-name">' + escapeHtml(r.name) + '</div>' +
+                '<div class="ba-report-date">' + dateStr + '</div>' +
+                '</div>';
+            }).join('');
+            baNoReports.style.display = 'none';
+          } else {
+            baReportsList.innerHTML = '';
+            baNoReports.style.display = 'block';
+          }
+        })
+        .catch(function() {
+          baReportsList.innerHTML = '';
+          baNoReports.style.display = 'block';
+        });
+    }
+
+    baReportsList.addEventListener('click', function(e) {
+      var item = e.target.closest('.ba-report-item');
+      if (item) {
+        document.querySelectorAll('.ba-report-item').forEach(function(i) { i.classList.remove('selected'); });
+        item.classList.add('selected');
+        baState.selectedReportId = item.getAttribute('data-id');
+        baState.selectedReportName = item.getAttribute('data-name');
+        baStep1Next.disabled = false;
+      }
+    });
+
+    baStep1Next.addEventListener('click', function() {
+      if (!baState.selectedReportId) return;
+      baStep1Next.disabled = true;
+      baStep1Next.textContent = 'Loading report...';
+
+      fetch(GOOGLE_SHEETS_URL + '?action=getReportData&fileId=' + encodeURIComponent(baState.selectedReportId))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          baStep1Next.disabled = false;
+          baStep1Next.textContent = 'Next';
+          if (data.success && data.data && data.data.photos) {
+            baState.beforePhotos = data.data.photos.map(function(p) {
+              return {
+                beforeBase64: p.base64,
+                beforeNote: p.note || '',
+                beforeCategory: p.category || '',
+                afterBase64: null,
+                afterNote: ''
+              };
+            });
+            baState.currentPhotoIndex = 0;
+            baGoToStep(2);
+          } else {
+            alert('Failed to load report data.');
+          }
+        })
+        .catch(function() {
+          baStep1Next.disabled = false;
+          baStep1Next.textContent = 'Next';
+          alert('Failed to load report data.');
+        });
+    });
+
+    function baRenderCurrentPhoto() {
+      var photo = baState.beforePhotos[baState.currentPhotoIndex];
+      if (!photo) return;
+
+      baBeforeImg.src = photo.beforeBase64;
+      baBeforeCategory.textContent = photo.beforeCategory || 'Uncategorized';
+      baBeforeNote.textContent = photo.beforeNote || 'No note';
+      baPhotoCounter.textContent = (baState.currentPhotoIndex + 1) + '/' + baState.beforePhotos.length;
+      baAfterNote.value = photo.afterNote || '';
+
+      if (photo.afterBase64) {
+        baAfterImg.src = photo.afterBase64;
+        baNoAfter.style.display = 'none';
+        baHasAfter.style.display = 'block';
+      } else {
+        baNoAfter.style.display = 'block';
+        baHasAfter.style.display = 'none';
+      }
+
+      baPrevPhoto.disabled = baState.currentPhotoIndex === 0;
+      baNextPhoto.disabled = baState.currentPhotoIndex >= baState.beforePhotos.length - 1;
+    }
+
+    function baSaveCurrentAfterNote() {
+      var photo = baState.beforePhotos[baState.currentPhotoIndex];
+      if (photo) {
+        photo.afterNote = baAfterNote.value;
+      }
+    }
+
+    baTakeAfter.addEventListener('click', function() {
+      baSaveCurrentAfterNote();
+      baCameraInput.click();
+    });
+
+    baUploadAfter.addEventListener('click', function() {
+      baSaveCurrentAfterNote();
+      baUploadInput.click();
+    });
+
+    baCameraInput.addEventListener('change', function(e) {
+      if (e.target.files && e.target.files[0]) {
+        baProcessAfterPhoto(e.target.files[0]);
+      }
+      e.target.value = '';
+    });
+
+    baUploadInput.addEventListener('change', function(e) {
+      if (e.target.files && e.target.files[0]) {
+        baProcessAfterPhoto(e.target.files[0]);
+      }
+      e.target.value = '';
+    });
+
+    function baProcessAfterPhoto(file) {
+      createImageBitmap(file).then(function(bmp) {
+        var c = document.createElement('canvas');
+        c.width = bmp.width;
+        c.height = bmp.height;
+        var ctx = c.getContext('2d');
+        ctx.drawImage(bmp, 0, 0);
+        var base64 = c.toDataURL('image/jpeg', 0.85);
+
+        var photo = baState.beforePhotos[baState.currentPhotoIndex];
+        if (photo) {
+          photo.afterBase64 = base64;
+        }
+        baRenderCurrentPhoto();
+      });
+    }
+
+    baRemoveAfter.addEventListener('click', function() {
+      var photo = baState.beforePhotos[baState.currentPhotoIndex];
+      if (photo) {
+        photo.afterBase64 = null;
+      }
+      baRenderCurrentPhoto();
+    });
+
+    baPrevPhoto.addEventListener('click', function() {
+      if (baState.currentPhotoIndex > 0) {
+        baSaveCurrentAfterNote();
+        baState.currentPhotoIndex--;
+        baRenderCurrentPhoto();
+      }
+    });
+
+    baNextPhoto.addEventListener('click', function() {
+      if (baState.currentPhotoIndex < baState.beforePhotos.length - 1) {
+        baSaveCurrentAfterNote();
+        baState.currentPhotoIndex++;
+        baRenderCurrentPhoto();
+      }
+    });
+
+    baSkipPhoto.addEventListener('click', function() {
+      // Just move to next without requiring after photo
+      if (baState.currentPhotoIndex < baState.beforePhotos.length - 1) {
+        baSaveCurrentAfterNote();
+        baState.currentPhotoIndex++;
+        baRenderCurrentPhoto();
+      }
+    });
+
+    baStep2Next.addEventListener('click', function() {
+      baSaveCurrentAfterNote();
+      baGoToStep(3);
+    });
+
+    function baRenderSummary() {
+      var withAfter = baState.beforePhotos.filter(function(p) { return p.afterBase64; }).length;
+      var skipped = baState.beforePhotos.length - withAfter;
+
+      baSummary.innerHTML =
+        '<div class="sr-sum-row"><span class="sr-sum-label">Property</span><span class="sr-sum-value">' + escapeHtml(baState.selectedProp.address) + '</span></div>' +
+        '<div class="sr-sum-row"><span class="sr-sum-label">Original Report</span><span class="sr-sum-value">' + escapeHtml(baState.selectedReportName) + '</span></div>' +
+        '<div class="sr-sum-row"><span class="sr-sum-label">Total Photos</span><span class="sr-sum-value">' + baState.beforePhotos.length + '</span></div>' +
+        '<div class="sr-sum-row"><span class="sr-sum-label">With After Photos</span><span class="sr-sum-value">' + withAfter + '</span></div>' +
+        '<div class="sr-sum-row"><span class="sr-sum-label">Skipped</span><span class="sr-sum-value">' + skipped + '</span></div>';
+
+      baProgressWrap.style.display = 'none';
+      baUploadDriveBtn.style.display = 'none';
+      baGenerateBtn.disabled = false;
+      baGenerateBtn.textContent = 'Generate Before & After Report';
+      baState.generatedPdfBlob = null;
+    }
+
+    baGenerateBtn.addEventListener('click', function() {
+      baGenerateBtn.disabled = true;
+      baGenerateBtn.textContent = 'Preparing...';
+      baProgressWrap.style.display = 'block';
+      baProgressLabel.textContent = 'Generating PDF...';
+      baProgressBar.style.width = '10%';
+
+      // Filter to only include photos that have after images
+      var pairs = baState.beforePhotos.filter(function(p) { return p.afterBase64; });
+
+      if (pairs.length === 0) {
+        alert('No after photos to include in report.');
+        baGenerateBtn.disabled = false;
+        baGenerateBtn.textContent = 'Generate Before & After Report';
+        baProgressWrap.style.display = 'none';
+        return;
+      }
+
+      baSendToCloudFunction(pairs);
+    });
+
+    function baSendToCloudFunction(pairs) {
+      baProgressBar.style.width = '30%';
+
+      var formData = new FormData();
+      var metadata = {
+        address: baState.selectedProp.address,
+        originalReport: baState.selectedReportName,
+        date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        type: 'before_after',
+        photos: pairs.map(function(p) {
+          return {
+            beforeNote: p.beforeNote,
+            beforeCategory: p.beforeCategory,
+            afterNote: p.afterNote
+          };
+        })
+      };
+      formData.append('metadata', JSON.stringify(metadata));
+
+      // Convert base64 to blobs and append
+      var blobPromises = [];
+      pairs.forEach(function(p, i) {
+        // Before image
+        blobPromises.push(
+          fetch(p.beforeBase64).then(function(r) { return r.blob(); }).then(function(blob) {
+            formData.append('before_photos', blob, 'before_' + i + '.jpg');
+          })
+        );
+        // After image
+        blobPromises.push(
+          fetch(p.afterBase64).then(function(r) { return r.blob(); }).then(function(blob) {
+            formData.append('after_photos', blob, 'after_' + i + '.jpg');
+          })
+        );
+      });
+
+      Promise.all(blobPromises).then(function() {
+        baProgressBar.style.width = '50%';
+
+        fetch(CLOUD_FUNCTION_URL, {
+          method: 'POST',
+          body: formData
+        })
+        .then(function(response) {
+          if (!response.ok) throw new Error('Server error');
+          return response.blob();
+        })
+        .then(function(blob) {
+          baProgressBar.style.width = '100%';
+          baProgressLabel.textContent = 'Done!';
+          baState.generatedPdfBlob = blob;
+
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          var street = baState.selectedProp.address.split(',')[0].trim();
+          a.href = url;
+          a.download = 'Before-After - ' + street + '.pdf';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+
+          baGenerateBtn.textContent = 'Download Again';
+          baGenerateBtn.disabled = false;
+          baGenerateBtn.onclick = function() {
+            var url2 = URL.createObjectURL(baState.generatedPdfBlob);
+            var a2 = document.createElement('a');
+            a2.href = url2;
+            a2.download = 'Before-After - ' + street + '.pdf';
+            document.body.appendChild(a2);
+            a2.click();
+            document.body.removeChild(a2);
+            URL.revokeObjectURL(url2);
+          };
+          baUploadDriveBtn.style.display = 'block';
+        })
+        .catch(function(err) {
+          baProgressLabel.textContent = 'Error: ' + err.message;
+          baGenerateBtn.disabled = false;
+          baGenerateBtn.textContent = 'Retry';
+        });
+      });
+    }
+
+    baUploadDriveBtn.addEventListener('click', function() {
+      if (!baState.generatedPdfBlob) return;
+      baUploadDriveBtn.disabled = true;
+      baUploadDriveBtn.textContent = 'Uploading...';
+
+      var reader = new FileReader();
+      reader.onload = function() {
+        var base64 = reader.result.split(',')[1];
+        var street = baState.selectedProp.address.split(',')[0].trim();
+        var filename = 'Before-After - ' + street + ' - ' + new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+        fetch(GOOGLE_SHEETS_URL, {
+          method: 'POST',
+          body: JSON.stringify({
+            siteReportPdf: true,
+            pdfBase64: base64,
+            filename: filename,
+            property: baState.selectedProp.address
+          })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.success) {
+            baUploadDriveBtn.textContent = 'Uploaded!';
+            if (data.pdfUrl) {
+              baUploadDriveBtn.onclick = function() { window.open(data.pdfUrl, '_blank'); };
+            }
+          } else {
+            baUploadDriveBtn.textContent = 'Upload failed';
+            baUploadDriveBtn.disabled = false;
+          }
+        })
+        .catch(function() {
+          baUploadDriveBtn.textContent = 'Upload failed';
+          baUploadDriveBtn.disabled = false;
+        });
+      };
+      reader.readAsDataURL(baState.generatedPdfBlob);
+    });
+
   </script>
 </body>
 </html>
