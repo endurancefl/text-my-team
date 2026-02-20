@@ -79,7 +79,6 @@
             <div class="day-clock-label" data-i18n="dayTimer">Day Timer</div>
             <div class="day-clock-time" id="day-clock-timer">00:00:00</div>
           </div>
-          <div class="day-clock-crew" id="day-clock-crew"></div>
           <button class="day-clock-end-btn" id="end-day-btn" onclick="endDay()" data-i18n="endDay">End Day</button>
         </div>
 
@@ -1836,12 +1835,11 @@
 
       // Render Edit Crew button + Shop card at top
       if (dayStarted) {
-        var crewCount = checkedInMembers.length;
         var crewNames = checkedInMembers.map(function(m) { return typeof m === 'string' ? m : m.name; });
-        html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:0 16px 8px 16px;">';
-        html += '<div style="font-size:13px;color:var(--ios-text-secondary);">' + crewCount + ' ' + t('crew') + ': ' + crewNames.join(', ') + '</div>';
-        html += '<button style="font-size:13px;font-weight:600;color:var(--tint);background:none;border:none;padding:4px 8px;cursor:pointer;" onclick="showEditCrewModal()">' + t('editCrew') + '</button>';
-        html += '</div>';
+        html += '<button class="edit-crew-banner" onclick="showEditCrewModal()">';
+        html += '<div class="edit-crew-banner-title">' + t('editCrew') + '</div>';
+        html += '<div class="edit-crew-banner-names">' + escapeHtml(crewNames.join(', ')) + '</div>';
+        html += '</button>';
 
         var isShopActive = !!activeTickets['SHOP'];
         html += '<div class="property-group-card shop-card' + (isShopActive ? ' active' : '') + '">';
@@ -2845,7 +2843,6 @@
     }
 
     function updateDayClockCrew() {
-      document.getElementById('day-clock-crew').textContent = checkedInMembers.map(function(m) { return typeof m === 'string' ? m : m.name; }).join(', ');
     }
 
     // ─── Start Job + Request Alert ───

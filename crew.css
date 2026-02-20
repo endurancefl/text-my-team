@@ -2247,6 +2247,35 @@
     }
 
     /* Day Clock Banner */
+    .edit-crew-banner {
+      display: block;
+      width: 100%;
+      background: #1C1C1E;
+      color: white;
+      border-radius: 12px;
+      padding: 12px 16px;
+      margin-bottom: 12px;
+      border: none;
+      text-align: left;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .edit-crew-banner:active {
+      opacity: 0.8;
+    }
+    .edit-crew-banner-title {
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .edit-crew-banner-names {
+      font-size: 13px;
+      color: #8E8E93;
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
     .day-clock-banner {
       background: #1C1C1E;
       color: white;
@@ -2269,14 +2298,6 @@
       font-size: 28px;
       font-weight: 700;
       font-variant-numeric: tabular-nums;
-    }
-
-    .day-clock-crew {
-      font-size: 12px;
-      color: #8E8E93;
-      text-align: center;
-      flex: 1;
-      padding: 0 12px;
     }
 
     .day-clock-end-btn {
