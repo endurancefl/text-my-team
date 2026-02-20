@@ -1,0 +1,24 @@
+{
+  "name": "Text My Team — Endurance Services",
+  "short_name": "Text My Team",
+  "description": "Contact the Endurance Services landscape crew at your property",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#F7FAF8",
+  "theme_color": "#3A5F4B",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "images/icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "images/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "name": "Crew Dashboard — Endurance Services",
+  "short_name": "Crew",
+  "description": "Crew dashboard for Endurance Services",
+  "start_url": "crew.html",
+  "display": "standalone",
+  "background_color": "#F7FAF8",
+  "theme_color": "#3A5F4B",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "images/icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "images/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -466,6 +466,7 @@
     .status-accepted { background: rgba(30, 142, 62, 0.12); color: var(--gw-green); }
     .status-rejected { background: rgba(217, 48, 37, 0.12); color: var(--gw-red); }
     .status-finalized { background: #d32f2f; color: white; }
+    .status-revision { background: rgba(249, 171, 0, 0.15); color: #B06000; }
 
     /* ═══════════════════════════════════════════════════════════════ */
     /*  SCHEDULE VIEW                                                  */
@@ -1586,7 +1587,10 @@
     }
 
     .view.active {
-      display: block !important;
+      display: flex !important;
+      flex-direction: column;
+      align-items: stretch;
+      justify-content: flex-start;
     }
 
     /* ESTIMATES LIST VIEW - Google Drive style cards */
@@ -6453,7 +6457,7 @@
   <div class="modal-overlay" id="finalize-modal" style="display:none;">
     <div class="save-template-modal">
       <div class="modal-header">
-        <h3>Finalize Estimate & Generate Contract</h3>
+        <h3 id="finalize-modal-title">Finalize Estimate & Generate Contract</h3>
         <button class="modal-close" onclick="closeFinalizeModal()">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
@@ -6461,7 +6465,7 @@
         </button>
       </div>
       <div class="modal-body" style="padding: 20px;">
-        <p style="color: #666; margin-bottom: 16px; font-size: 14px;">This will lock the estimate and generate scheduled tickets for the entire contract period.</p>
+        <p id="finalize-description" style="color: #666; margin-bottom: 16px; font-size: 14px;">This will lock the estimate and generate scheduled tickets for the entire contract period.</p>
 
         <div class="form-group" style="margin-bottom: 12px;">
           <label class="form-label">Assigned Crew</label>
@@ -6500,7 +6504,7 @@
 
         <div style="display: flex; gap: 8px;">
           <button class="btn btn-secondary" onclick="previewTickets()" style="flex: 1;">Preview Tickets</button>
-          <button class="btn btn-primary" onclick="finalizeEstimate()" style="flex: 1; background: #d32f2f;">Finalize & Generate</button>
+          <button id="finalize-action-btn" class="btn btn-primary" onclick="finalizeEstimate()" style="flex: 1; background: #d32f2f;">Finalize & Generate</button>
         </div>
       </div>
     </div>
@@ -7266,6 +7270,10 @@ function markEstimateDirty() {
   }
 
   estimateDirty = true;
+  if (currentEstimate.contractId && currentEstimate.status === 'Finalized') {
+    currentEstimate.status = 'Revision';
+    updateHeaderActions();
+  }
   updateActiveEstimateIndicator();
   const ss = document.getElementById('save-status');
   if (ss) { ss.textContent = 'Unsaved changes'; ss.className = 'save-status unsaved'; }
@@ -8603,17 +8611,17 @@ function buildServicesFromTakeoffs() {
   // These items will REPLACE any existing catalog items with the same name
   const takeoffItemsByService = {};
 
-  // Helper to add items to the map, checking service name and aliases
+  // Helper to add items to the map, checking service name and ALL aliases
   const addToMap = (serviceName, itemName) => {
     // Add for exact name
     if (!takeoffItemsByService[serviceName]) takeoffItemsByService[serviceName] = new Set();
     takeoffItemsByService[serviceName].add(itemName);
-    // Also add for alias
-    const alias = getServiceAlias(serviceName);
-    if (alias) {
+    // Also add for all aliases (e.g. 'Leaf Cleanup Service' -> 'Leaf Removal Service')
+    const aliases = getServiceAliases(serviceName);
+    aliases.forEach(alias => {
       if (!takeoffItemsByService[alias]) takeoffItemsByService[alias] = new Set();
       takeoffItemsByService[alias].add(itemName);
-    }
+    });
   };
 
   // Lawn takeoff produces these items
@@ -8820,7 +8828,8 @@ function getServiceAlias(name) {
     'Perennial Care': 'Perennial Care Service',
     'Seasonal Color Service': 'Seasonal Color',
     'Seasonal Color': 'Seasonal Color Service',
-    'Leaf Cleanup Service': 'Leaf Cleanup',
+    'Leaf Cleanup Service': 'Leaf Removal Service',
+    'Leaf Removal Service': 'Leaf Cleanup Service',
     'Leaf Cleanup': 'Leaf Cleanup Service',
     'Weed Control Service': 'Weed Control',
     'Weed Control': 'Weed Control Service'
@@ -8844,6 +8853,7 @@ function getServiceAliases(name) {
     'Seasonal Color Service': ['Seasonal Color'],
     'Seasonal Color': ['Seasonal Color Service'],
     'Leaf Cleanup Service': ['Leaf Cleanup', 'Leaf Removal Service', 'Fall Cleanup', 'Leaf Removal'],
+    'Leaf Removal Service': ['Leaf Cleanup Service', 'Leaf Cleanup', 'Fall Cleanup', 'Leaf Removal'],
     'Leaf Cleanup': ['Leaf Cleanup Service', 'Leaf Removal Service'],
     'Weed Control Service': ['Weed Control', 'Bed Weed Control'],
     'Weed Control': ['Weed Control Service']
@@ -8892,12 +8902,13 @@ function injectItemsIntoService(serviceName, items) {
 function createServiceShell(serviceName) {
   const catalog = serviceCatalog.length > 0 ? serviceCatalog : DEFAULT_SERVICE_CATALOG;
 
-  // Try to find by exact name first, then by alias
+  // Try to find by exact name first, then by all aliases
   let catalogEntry = catalog.find(s => s.serviceName === serviceName);
   if (!catalogEntry) {
-    const alias = getServiceAlias(serviceName);
-    if (alias) {
+    const aliases = getServiceAliases(serviceName);
+    for (const alias of aliases) {
       catalogEntry = catalog.find(s => s.serviceName === alias);
+      if (catalogEntry) break;
     }
   }
 
@@ -10567,6 +10578,9 @@ function showView(viewId) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById(`view-${viewId}`).classList.add('active');
 
+  // Scroll to top when switching views
+  document.getElementById('main-body').scrollTop = 0;
+
   // Update header
   const titles = {
     'estimates': 'Estimates',
@@ -10683,7 +10697,33 @@ function showView(viewId) {
     } else if (currentEstimate.status === 'Finalized') {
       actionsEl.innerHTML = `
         <span class="status-badge status-finalized">Finalized</span>
-        <span style="color: #666; font-size: 13px; margin-left: 8px;">${currentEstimate.contractId || ''}</span>
+        <span style="color: var(--gw-text-secondary); font-size: 13px; margin-left: 8px;">${currentEstimate.contractId || ''}</span>
+        <button class="btn btn-secondary" onclick="enterRevisionMode()">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+          </svg>
+          Revise Estimate
+        </button>
+        <button class="btn btn-secondary" onclick="openSchedule('${currentEstimate.contractId}', '${(currentEstimate.propertyAddress || '').replace(/'/g, "\\'")}')">
+          View Schedule
+        </button>
+      `;
+    } else if (currentEstimate.status === 'Revision') {
+      actionsEl.innerHTML = `
+        <span class="status-badge status-revision">Revision</span>
+        <span style="color: var(--gw-text-secondary); font-size: 13px; margin-left: 8px;">${currentEstimate.contractId || ''}</span>
+        <button class="btn btn-secondary" onclick="handleSaveBid()">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+          </svg>
+          Save Draft
+        </button>
+        <button class="btn btn-primary" onclick="openFinalizeModal()" style="background: #E8A000;">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+          Update Contract
+        </button>
       `;
     } else {
       actionsEl.innerHTML = `
@@ -10820,11 +10860,11 @@ async function openSavedEstimate(bidId) {
         estimateDirty = false;
         debugLog('Loaded saved estimate from Drive:', bid.propertyAddress);
 
-        // If finalized, show read-only notice
-        if (bid.status === 'Finalized') {
-          setTimeout(() => {
-            showToast('This estimate is finalized and locked. You can view it but cannot make changes.', 'info', 5000);
-          }, 300);
+        // If finalized or revision, restore contract link and status
+        if (bid.status === 'Finalized' || bid.status === 'Revision') {
+          currentEstimate.status = bid.status;
+          currentEstimate.contractId = bid.contractId || '';
+          currentEstimate.revisionCount = parseInt(bid.revisionCount) || 0;
         }
         return;
       }
@@ -10856,6 +10896,13 @@ async function openSavedEstimate(bidId) {
 
       estimateDirty = false;
       debugLog('Loaded saved estimate from inline JSON:', bid.propertyAddress);
+
+      // If finalized or revision, restore contract link and status
+      if (bid.status === 'Finalized' || bid.status === 'Revision') {
+        currentEstimate.status = bid.status;
+        currentEstimate.contractId = bid.contractId || '';
+        currentEstimate.revisionCount = parseInt(bid.revisionCount) || 0;
+      }
       return;
     } catch (err) {
       console.error('Error loading saved estimate:', err);
@@ -11608,6 +11655,8 @@ async function finalizeEstimate() {
 
   const travelPercent = currentEstimate.travelPercent || bidSettings.defaultTravelTime || 30;
 
+  const isRevision = !!currentEstimate.contractId;
+
   const tickets = generateAllTickets({
     services: currentEstimate.services,
     startDate,
@@ -11652,140 +11701,301 @@ async function finalizeEstimate() {
     });
   }
 
-  const serviceBreakdown = {};
-  const itemBreakdown = {};
-  tickets.forEach(t => {
-    t.services.forEach(s => {
-      serviceBreakdown[s.name] = (serviceBreakdown[s.name] || 0) + 1;
-      s.items.forEach(item => {
-        const key = s.name + ' → ' + item.name;
-        itemBreakdown[key] = (itemBreakdown[key] || 0) + 1;
-      });
-    });
-  });
+  if (isRevision) {
+    // ═══════════════════════════════════════════════════
+    //  REVISION: Update existing contract + regenerate future tickets
+    // ═══════════════════════════════════════════════════
 
-  let confirmMsg = `Ready to finalize and generate ${tickets.length} tickets.\n\n`;
-  confirmMsg += `Contract: ${startDate} to ${endDate} (${contractMonths} mo)\n`;
-  confirmMsg += `Crew: ${crew || 'Unassigned'}\n`;
-  confirmMsg += `Day: ${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][preferredDay]}\n\n`;
-  confirmMsg += `Services:\n`;
-  Object.entries(serviceBreakdown).forEach(([name, count]) => {
-    confirmMsg += `  ${name}: ${count} visits\n`;
-  });
-  confirmMsg += `\nThis will lock the estimate. Continue?`;
+    const today = new Date().toISOString().split('T')[0];
+    const futureTickets = tickets.filter(t => t.eventDate > today);
 
-  if (!confirm(confirmMsg)) return;
-
-  closeFinalizeModal();
-  if (finalizeBtn) finalizeBtn.classList.add('btn--loading');
-
-  const totals = calculateBidTotals();
-  const tierTotals = calculateTierTotals();
-  const fixedAnnual = tierTotals.fixed.total || 0;
-  const paymentMonths = currentEstimate.contract.paymentMonths || 12;
-  const monthlyPayment = paymentMonths > 0 ? fixedAnnual / paymentMonths : 0;
-
-  try {
-    if (!currentEstimate.bidId) {
-      await handleSaveBid();
+    if (futureTickets.length === 0) {
+      showToast('No future tickets to regenerate. All visits are in the past or today.', 'error');
+      return;
     }
 
-    const contractResult = await fetch(GOOGLE_SHEETS_URL, {
-      method: 'POST',
-      body: JSON.stringify({
-        createContract: true,
-        bidId: currentEstimate.bidId,
+    // Fetch existing ticket counts for the confirm dialog
+    let existingTicketInfo = { completed: 0, scheduled: 0, today: 0 };
+    try {
+      const ticketResp = await fetch(GOOGLE_SHEETS_URL + '?action=getTickets&contractId=' + encodeURIComponent(currentEstimate.contractId));
+      const ticketResult = await ticketResp.json();
+      if (ticketResult.success && ticketResult.tickets) {
+        ticketResult.tickets.forEach(t => {
+          if (t.status === 'completed') existingTicketInfo.completed++;
+          else if (t.eventDate === today) existingTicketInfo.today++;
+          else if (t.eventDate > today && t.status === 'scheduled') existingTicketInfo.scheduled++;
+        });
+      }
+    } catch (err) {
+      console.error('Could not fetch existing tickets for preview:', err);
+    }
+
+    let confirmMsg = `Update contract ${currentEstimate.contractId}?\n\n`;
+    confirmMsg += `This will:\n`;
+    confirmMsg += `  Keep ${existingTicketInfo.completed} completed tickets unchanged\n`;
+    confirmMsg += `  Keep ${existingTicketInfo.today} today's tickets unchanged\n`;
+    confirmMsg += `  Delete ${existingTicketInfo.scheduled} future scheduled tickets\n`;
+    confirmMsg += `  Generate ${futureTickets.length} new future tickets\n\n`;
+    confirmMsg += `Contract: ${startDate} to ${endDate} (${contractMonths} mo)\n`;
+    confirmMsg += `Crew: ${crew || 'Unassigned'}\n`;
+    confirmMsg += `\nCompleted and today's tickets will not be affected. Continue?`;
+
+    if (!confirm(confirmMsg)) return;
+
+    closeFinalizeModal();
+    if (finalizeBtn) finalizeBtn.classList.add('btn--loading');
+
+    const totals = calculateBidTotals();
+    const tierTotals = calculateTierTotals();
+    const fixedAnnual = tierTotals.fixed.total || 0;
+    const paymentMonths = currentEstimate.contract.paymentMonths || 12;
+    const monthlyPayment = paymentMonths > 0 ? fixedAnnual / paymentMonths : 0;
+
+    try {
+      // Step 1: Save the updated estimate to Drive
+      await handleSaveBid();
+
+      // Step 2: Update contract row with new totals
+      await fetch(GOOGLE_SHEETS_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+          updateContract: true,
+          contractId: currentEstimate.contractId,
+          propertyAddress: currentEstimate.propertyAddress,
+          assignedCrew: crew,
+          preferredDay: preferredDay,
+          startDate: startDate,
+          endDate: endDate,
+          contractMonths: contractMonths,
+          monthlyPayment: Math.round(monthlyPayment * 100) / 100
+        })
+      });
+
+      // Step 3: Delete future scheduled tickets (status = 'scheduled' AND date > today)
+      await fetch(GOOGLE_SHEETS_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+          deleteFutureTickets: true,
+          contractId: currentEstimate.contractId,
+          afterDate: today
+        })
+      });
+
+      // Step 4: Generate new future tickets
+      const ticketPayload = futureTickets.map(t => ({
+        contractId: currentEstimate.contractId,
         propertyAddress: currentEstimate.propertyAddress,
         assignedCrew: crew,
-        preferredDay: preferredDay,
-        startDate: startDate,
-        endDate: endDate,
-        contractMonths: contractMonths,
-        monthlyPayment: Math.round(monthlyPayment * 100) / 100
-      })
-    });
-    const contractData = await contractResult.json();
+        eventDate: t.eventDate,
+        services: t.services,
+        totalEstHours: t.totalEstHours,
+        travelHours: t.travelHours || 0,
+        earnedValue: t.earnedValue || 0,
+        internalCost: t.internalCost || 0
+      }));
 
-    if (!contractData.success) {
-      showToast('Error creating contract: ' + (contractData.error || 'Unknown'), 'error');
-      return;
+      const ticketResult = await fetch(GOOGLE_SHEETS_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+          saveTickets: true,
+          tickets: ticketPayload
+        })
+      });
+      const ticketData = await ticketResult.json();
+
+      if (!ticketData.success) {
+        showToast('Contract updated but error regenerating tickets: ' + (ticketData.error || 'Unknown'), 'error');
+        return;
+      }
+
+      // Step 5: Update bid status back to Finalized with revision count
+      const newRevisionCount = (currentEstimate.revisionCount || 0) + 1;
+      await fetch(GOOGLE_SHEETS_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+          updateBid: true,
+          bidData: {
+            bidId: currentEstimate.bidId,
+            status: 'Finalized',
+            contractId: currentEstimate.contractId,
+            revisionCount: newRevisionCount
+          }
+        })
+      });
+
+      currentEstimate.status = 'Finalized';
+      currentEstimate.revisionCount = newRevisionCount;
+      estimateDirty = false;
+
+      showToast(`Contract ${currentEstimate.contractId} updated. ${existingTicketInfo.completed} completed tickets kept, ${futureTickets.length} future tickets regenerated. (Revision #${newRevisionCount})`, 'success', 5000);
+      loadBids();
+      showView('estimates');
+
+    } catch (err) {
+      console.error('Error updating contract:', err);
+      showToast('Error updating contract. Check your connection and try again.', 'error');
+    } finally {
+      if (finalizeBtn) finalizeBtn.classList.remove('btn--loading');
     }
 
-    const contractId = contractData.contractId;
+  } else {
+    // ═══════════════════════════════════════════════════
+    //  FIRST-TIME FINALIZATION (existing behavior)
+    // ═══════════════════════════════════════════════════
 
-    const ticketPayload = tickets.map(t => ({
-      contractId: contractId,
-      propertyAddress: currentEstimate.propertyAddress,
-      assignedCrew: crew,
-      eventDate: t.eventDate,
-      services: t.services,
-      totalEstHours: t.totalEstHours,
-      travelHours: t.travelHours || 0,
-      earnedValue: t.earnedValue || 0,
-      internalCost: t.internalCost || 0
-    }));
-
-    const ticketResult = await fetch(GOOGLE_SHEETS_URL, {
-      method: 'POST',
-      body: JSON.stringify({
-        saveTickets: true,
-        tickets: ticketPayload
-      })
+    const serviceBreakdown = {};
+    const itemBreakdown = {};
+    tickets.forEach(t => {
+      t.services.forEach(s => {
+        serviceBreakdown[s.name] = (serviceBreakdown[s.name] || 0) + 1;
+        s.items.forEach(item => {
+          const key = s.name + ' → ' + item.name;
+          itemBreakdown[key] = (itemBreakdown[key] || 0) + 1;
+        });
+      });
     });
-    const ticketData = await ticketResult.json();
 
-    if (!ticketData.success) {
-      showToast('Contract created but error saving tickets: ' + (ticketData.error || 'Unknown'), 'error');
-      return;
-    }
+    let confirmMsg = `Ready to finalize and generate ${tickets.length} tickets.\n\n`;
+    confirmMsg += `Contract: ${startDate} to ${endDate} (${contractMonths} mo)\n`;
+    confirmMsg += `Crew: ${crew || 'Unassigned'}\n`;
+    confirmMsg += `Day: ${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][preferredDay]}\n\n`;
+    confirmMsg += `Services:\n`;
+    Object.entries(serviceBreakdown).forEach(([name, count]) => {
+      confirmMsg += `  ${name}: ${count} visits\n`;
+    });
+    confirmMsg += `\nThis will lock the estimate. Continue?`;
 
-    await fetch(GOOGLE_SHEETS_URL, {
-      method: 'POST',
-      body: JSON.stringify({
-        updateBid: true,
-        bidData: {
+    if (!confirm(confirmMsg)) return;
+
+    closeFinalizeModal();
+    if (finalizeBtn) finalizeBtn.classList.add('btn--loading');
+
+    const totals = calculateBidTotals();
+    const tierTotals = calculateTierTotals();
+    const fixedAnnual = tierTotals.fixed.total || 0;
+    const paymentMonths = currentEstimate.contract.paymentMonths || 12;
+    const monthlyPayment = paymentMonths > 0 ? fixedAnnual / paymentMonths : 0;
+
+    try {
+      if (!currentEstimate.bidId) {
+        await handleSaveBid();
+      }
+
+      const contractResult = await fetch(GOOGLE_SHEETS_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+          createContract: true,
           bidId: currentEstimate.bidId,
-          status: 'Finalized',
-          contractId: contractId
-        }
-      })
-    });
+          propertyAddress: currentEstimate.propertyAddress,
+          assignedCrew: crew,
+          preferredDay: preferredDay,
+          startDate: startDate,
+          endDate: endDate,
+          contractMonths: contractMonths,
+          monthlyPayment: Math.round(monthlyPayment * 100) / 100
+        })
+      });
+      const contractData = await contractResult.json();
 
-    currentEstimate.status = 'Finalized';
-    currentEstimate.contractId = contractId;
-    currentEstimate.contractId = contractId;
-    estimateDirty = false;
+      if (!contractData.success) {
+        showToast('Error creating contract: ' + (contractData.error || 'Unknown'), 'error');
+        return;
+      }
 
-    showToast(`Contract ${contractId} created with ${ticketData.ticketCount} tickets!`, 'success', 5000);
+      const contractId = contractData.contractId;
 
-    // Auto-promote contact to Customer
-    if (currentEstimate.contactId) {
-      const contact = contacts.find(c => c.contactId === currentEstimate.contactId);
-      if (contact && contact.stage !== 'Customer') {
-        try {
-          await fetch(GOOGLE_SHEETS_URL, {
-            method: 'POST',
-            body: JSON.stringify({ updateContact: true, contactId: contact.contactId, firstName: contact.firstName, lastName: contact.lastName, email: contact.email, phone: contact.phone, company: contact.company, billingAddress: contact.billingAddress, propertyAddress: contact.propertyAddress, stage: 'Customer', source: contact.source, notes: contact.notes })
-          });
-          contact.stage = 'Customer';
-        } catch (e) {
-          console.error('Error auto-promoting contact:', e);
+      const ticketPayload = tickets.map(t => ({
+        contractId: contractId,
+        propertyAddress: currentEstimate.propertyAddress,
+        assignedCrew: crew,
+        eventDate: t.eventDate,
+        services: t.services,
+        totalEstHours: t.totalEstHours,
+        travelHours: t.travelHours || 0,
+        earnedValue: t.earnedValue || 0,
+        internalCost: t.internalCost || 0
+      }));
+
+      const ticketResult = await fetch(GOOGLE_SHEETS_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+          saveTickets: true,
+          tickets: ticketPayload
+        })
+      });
+      const ticketData = await ticketResult.json();
+
+      if (!ticketData.success) {
+        showToast('Contract created but error saving tickets: ' + (ticketData.error || 'Unknown'), 'error');
+        return;
+      }
+
+      await fetch(GOOGLE_SHEETS_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+          updateBid: true,
+          bidData: {
+            bidId: currentEstimate.bidId,
+            status: 'Finalized',
+            contractId: contractId,
+            revisionCount: 0
+          }
+        })
+      });
+
+      currentEstimate.status = 'Finalized';
+      currentEstimate.contractId = contractId;
+      currentEstimate.revisionCount = 0;
+      estimateDirty = false;
+
+      showToast(`Contract ${contractId} created with ${ticketData.ticketCount} tickets!`, 'success', 5000);
+
+      // Auto-promote contact to Customer
+      if (currentEstimate.contactId) {
+        const contact = contacts.find(c => c.contactId === currentEstimate.contactId);
+        if (contact && contact.stage !== 'Customer') {
+          try {
+            await fetch(GOOGLE_SHEETS_URL, {
+              method: 'POST',
+              body: JSON.stringify({ updateContact: true, contactId: contact.contactId, firstName: contact.firstName, lastName: contact.lastName, email: contact.email, phone: contact.phone, company: contact.company, billingAddress: contact.billingAddress, propertyAddress: contact.propertyAddress, stage: 'Customer', source: contact.source, notes: contact.notes })
+            });
+            contact.stage = 'Customer';
+          } catch (e) {
+            console.error('Error auto-promoting contact:', e);
+          }
         }
       }
+
+      loadBids();
+      showView('estimates');
+
+    } catch (err) {
+      console.error('Error finalizing estimate:', err);
+      showToast('Error finalizing estimate. Check your connection and try again.', 'error');
+    } finally {
+      if (finalizeBtn) finalizeBtn.classList.remove('btn--loading');
     }
-
-    loadBids();
-    showView('estimates');
-
-  } catch (err) {
-    console.error('Error finalizing estimate:', err);
-    showToast('Error finalizing estimate. Check your connection and try again.', 'error');
-  } finally {
-    if (finalizeBtn) finalizeBtn.classList.remove('btn--loading');
   }
 }
 
 async function openFinalizeModal() {
+  const isRevision = !!currentEstimate.contractId;
+
+  // Update modal title, description, and button for revision vs first-time
+  const modalTitle = document.getElementById('finalize-modal-title');
+  const modalDesc = document.getElementById('finalize-description');
+  const actionBtn = document.getElementById('finalize-action-btn');
+
+  if (isRevision) {
+    if (modalTitle) modalTitle.textContent = 'Update Contract & Regenerate Tickets';
+    if (modalDesc) modalDesc.textContent = 'This will update the contract and regenerate future tickets. Completed and today\'s tickets will not be affected.';
+    if (actionBtn) { actionBtn.textContent = 'Update & Regenerate'; actionBtn.style.background = '#E8A000'; }
+  } else {
+    if (modalTitle) modalTitle.textContent = 'Finalize Estimate & Generate Contract';
+    if (modalDesc) modalDesc.textContent = 'This will lock the estimate and generate scheduled tickets for the entire contract period.';
+    if (actionBtn) { actionBtn.textContent = 'Finalize & Generate'; actionBtn.style.background = '#d32f2f'; }
+  }
+
   document.getElementById('finalize-start-date').value = currentEstimate.contract.startDate || '';
   document.getElementById('finalize-duration').value = currentEstimate.contract.duration || 12;
 
@@ -11816,6 +12026,54 @@ async function openFinalizeModal() {
 
 function closeFinalizeModal() {
   document.getElementById('finalize-modal').style.display = 'none';
+}
+
+function enterRevisionMode() {
+  if (!confirm('This will allow you to edit the estimate. Changes won\'t affect the contract until you click "Update Contract."')) return;
+  currentEstimate.status = 'Revision';
+  updateHeaderActions();
+  showToast('You can now edit this estimate. Click "Update Contract" when done.', 'info', 5000);
+}
+
+function updateHeaderActions() {
+  const actionsEl = document.getElementById('header-actions');
+  if (!actionsEl) return;
+
+  if (currentEstimate.status === 'Finalized') {
+    actionsEl.innerHTML = `
+      <span class="status-badge status-finalized">Finalized</span>
+      <span style="color: var(--gw-text-secondary); font-size: 13px; margin-left: 8px;">${currentEstimate.contractId || ''}</span>
+      <button class="btn btn-secondary" onclick="enterRevisionMode()">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+        </svg>
+        Revise Estimate
+      </button>
+      <button class="btn btn-secondary" onclick="openSchedule('${currentEstimate.contractId}', '${(currentEstimate.propertyAddress || '').replace(/'/g, "\\'")}')">
+        View Schedule
+      </button>
+    `;
+  } else if (currentEstimate.status === 'Revision') {
+    actionsEl.innerHTML = `
+      <span class="status-badge status-revision">Revision</span>
+      <span style="color: var(--gw-text-secondary); font-size: 13px; margin-left: 8px;">${currentEstimate.contractId || ''}</span>
+      <button class="btn btn-secondary" onclick="handleSaveBid()">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+        </svg>
+        Save Draft
+      </button>
+      <button class="btn btn-primary" onclick="openFinalizeModal()" style="background: #E8A000;">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        </svg>
+        Update Contract
+      </button>
+    `;
+  } else {
+    // Draft — fall back to full re-render
+    showView('builder');
+  }
 }
 
 function previewTickets() {
@@ -14031,7 +14289,7 @@ async function _handleSaveBidInner() {
     bidTotal: totals.bidTotal,
     profit: totals.profit,
     margin: totals.margin,
-    status: 'Draft',
+    status: currentEstimate.status || 'Draft',
     contractStartDate: currentEstimate.contract.startDate,
     contractEndDate: currentEstimate.contract.endDate,
     contractDuration: currentEstimate.contract.duration,
@@ -14050,7 +14308,9 @@ async function _handleSaveBidInner() {
       visits: s.visits,
       accepted: s.accepted
     })),
-    estimateFileId: estimateFileId
+    estimateFileId: estimateFileId,
+    contractId: currentEstimate.contractId || '',
+    revisionCount: currentEstimate.revisionCount || 0
   };
 
   // Check if updating existing or creating new
@@ -15525,6 +15785,7 @@ async function loadWeeklyReports() {
   }
 
   renderWeeklyReports();
+  document.getElementById('main-body').scrollTop = 0;
 }
 
 function renderWeeklyReports() {

@@ -56,19 +56,46 @@ The platform supports four divisions, each representing a distinct revenue strea
 - Returning user personalization (remembers name, PIN, language preference)
 - PWA manifest with apple-mobile-web-app-capable
 
-**crew.html — Crew Dashboard (~7,600 lines)**
+**crew.html + crew.css — Crew Dashboard (~8,440 lines HTML/JS + ~4,210 lines CSS)**
 - iOS 18-precision mobile app for crew leaders
+- **Full English/Spanish bilingual support** via `data-i18n` system — same `localStorage` key `preferredLang` shared with index.html so language choice persists across apps. Toggle pill-button on both login screen and dashboard header. `translations` object with ~145 keys (en/es), `t(key)` lookup function with English fallback, `updateLanguage()` traverses `[data-i18n]` and `[data-i18n-placeholder]` elements + rebuilds JS-generated UI via `renderStopCards()` and `renderRequests()`. All static HTML text tagged with `data-i18n` attributes. All JS-generated strings use `t()` calls with `{name}` template replacement for dynamic values. Date locales switch between `en-US` and `es-US`. Site Report and Before-After wizard internals deferred (large subsystems with ~50+ strings each).
 - Phone number authentication against Crew Members sheet (Role = "Leader")
-- **Schedule Tab (Home Screen)** — daily route with stop cards, day/job clocks, crew check-in:
-  - **Crew check-in modal**: crew leader selects who's on the crew today (checkboxes for each active member)
-  - **Day clock**: Start Day → running timer → End Day with auto-calculated total
-  - **Stop cards**: numbered route with property address, bundled services, estimated hours
-  - **Job clock**: Start Job → blue timer banner → Complete with est vs. actual comparison
-  - **Request alerts**: yellow banner when starting a job at a property with open customer requests — "Handle It" (marks In Progress) or "Office" (dismisses for office to handle later)
-  - **Complete job modal**: elapsed time vs. estimate, service checklist, optional notes
-  - **Day summary**: direct time vs. budgeted direct, indirect time vs. budgeted indirect (from travel %), total hours, direct %, over/under badges, crew members
-  - **Crew-hours display**: all estimated times divided by checked-in crew size (man-hours ÷ crew = crew-hours), so a 2-person crew on a 1 man-hour property sees "30m" not "1h"
-  - **Resume support**: app can be closed and reopened mid-day, resumes active timers from saved time entries
+- **Schedule Tab (Home Screen)** — daily route with property-grouped stop cards, day/job clocks, crew check-in:
+  - **Property-grouped route cards**: tickets are grouped by property address into collapsed cards (Shop ticket excluded from grouping). Each card shows address, total estimated time, service summary, and ticket count. Tapping expands to reveal individual tickets with Start buttons, per-service controls, and active ticket views. State tracked in `expandedPropertyGroups` map (address → boolean). Groups with active tickets auto-expand and cannot be collapsed. **Column-aligned layout**: est time, Start/Return buttons, Skip buttons, checkmarks, and "Skipped" labels all use fixed `min-width` + `text-align` so they form consistent vertical columns across all ticket rows regardless of content width. Est times use `font-variant-numeric: tabular-nums` for consistent digit widths. Helper functions: `renderPropertyGroupCard()`, `renderTicketSubRow()`, `renderActiveTicketExpanded()`, `togglePropertyGroup()`.
+  - **Persistent Shop card**: always rendered at top of route when day is started. Orange-accented card with "S" badge. Start/Stop buttons toggle shop time tracking. Shop never fully "completes" — status resets to 'scheduled' on clock-out. Shop is fully manual (not auto-stopped by job tickets). Shop time shows as its own row in Day Summary, separate from Direct and Travel. Synthetic `SHOP` ticket injected in `loadSchedule()` with `isShopTicket: true`.
+  - **Automatic travel time**: all time between stops is automatically tracked as travel behind the scenes. `autoStartTravel()` fires when `startDay()` completes and when a ticket completes with no other non-Shop tickets active. `autoStopTravel()` fires when a non-Shop ticket starts and when `endDay()` runs. Travel entries saved as `entryType: 'indirect'`, `indirectCategory: 'travel'`. State tracked in `currentTravelEntryId`. Indirect category picker UI fully removed.
+  - **Sequential property enforcement**: crew cannot start a ticket at a new property while another property has active tickets. A confirmation dialog ("You still have active tickets at another property. Start this ticket anyway?") allows override for edge cases like adjacent properties. Shop tickets are excluded from this check. Enforced in `startTicket()`.
+  - **Service-level crew reassignment ("Where to Next?" wizard)**: when a service within a ticket is completed and crew members are freed (not on any other active service in the same ticket), blocking modal via `#crew-reassign-overlay` (`data-reassign-type="service"`) shows an iOS inset-grouped-list of services. **Time-aware decision support**: active services display remaining wall-clock time (e.g. "~18 min left") and a blue projection line showing the time impact of adding the freed member (e.g. "→ ~12 min with Carlos"). Not-started services show their estimated time for 1 crew (e.g. "Not started · Est. ~50 min"). This turns blind reassignment into informed crew allocation — the crew leader can instantly see where the freed member would have the most impact. Active services have green left accent bar and "Active · 2 crew" label; not-started services show "Not started" in muted text. Each row has a right chevron affordance. **Tap feedback**: `haptic('light')` fires immediately, button highlights via `.tapped` class (150ms transition), then transitions to `.success` state (green background tint, green checkmark circle replaces chevron, service name turns green). All buttons disabled during 500ms animation to prevent double-taps. `haptic('success')` fires on advance to next member. Auto-dismisses when all ticket members are on a service or no services remain. Ticket-level reassignment between properties is intentionally omitted — freed crew goes into automatic travel time instead. CSS: `.reassign-list` (grouped container), `.reassign-service-btn` (row), `.is-active` (green accent), `.tapped`/`.success` (feedback states), `.reassign-chevron`, `.reassign-check` (green circle checkmark), `.reassign-time-info` (remaining time), `.reassign-time-projection` (blue projected-with-member line). Functions: `checkServiceReassignment()`, `showServiceReassignmentModal()`, `renderReassignWizard()`, `assignMemberToService()`, `refreshServiceReassignmentContent()`, `refreshReassignmentModal()`, `confirmReassignment()`. `closeAssignmentOverlay()` calls `refreshReassignmentModal()` to auto-dismiss when all members assigned.
+  - **PIN-based crew check-in** (full-screen push overlay): each crew member verifies identity with a 4-digit PIN via `verifyPin` endpoint. Roster shows default crew; members enter PINs to verify. "Add Member" allows subs from other crews to join via PIN. `checkedInMembers` stored as objects `{name, pin, role, defaultCrew}` with backward-compatible `typeof m === 'string' ? m : m.name` pattern everywhere. Check-in slides in from right with back chevron navigation. **Auto-cycling PIN entry**: PIN pad auto-opens for the first crew member on check-in, then auto-advances to the next unverified member after each successful PIN (800ms success flash with green "✓ Name"). Shows "X of Y checked in" counter. "Done" button on PIN pad lets crew leader stop early without verifying everyone. When all members verified, shows "✓ All checked in!" and auto-closes. Functions: `findNextUnverifiedMember()`, `showPinEntryForNext()`.
+  - **Day clock**: Start Day (requires at least 1 verified PIN) → running HH:MM:SS timer → auto-starts travel → End Day with auto-calculated total. End Day excludes Shop from active ticket check, auto-closes Shop if running, auto-stops travel.
+  - **Multi-ticket simultaneous clocking**: crews can run multiple tickets at the same property simultaneously. Each ticket has its own elapsed timer and static target time shown in the expanded stop card. State tracked in `activeTickets` map (ticketId → {startTime, interval, assignedMembers, serviceClocks, completedServices, manHoursConsumed, phaseStartTime}).
+  - **Member assignment overlay** (iOS bottom sheet): when starting a ticket, crew leader selects which checked-in members work this ticket. Edit Crew mid-ticket updates backend. Slides up from bottom with grabber handle, backdrop blur, tap-scrim-to-dismiss.
+  - **Per-service clocking with crew assignment**: starting a service opens the member assignment overlay showing only AVAILABLE members — ticket members not already on another active service are shown; busy members are excluded from the new-service picker. Edit Crew for an existing service shows all ticket members but marks busy-on-other-service members as disabled. `startService()` → `showServiceMemberAssignment()` → `confirmStartService()`. Per-service assigned members stored in `at.serviceClocks[serviceName].assignedMembers`. Active services show assigned member names and an "Edit Crew" button (`confirmEditServiceCrew()`). When editing removes members from a service, freed members trigger `checkServiceReassignment()` — same "Where to Next?" wizard used after service completion. Available member list stored on overlay via `data-available-members` for correct checkbox-to-member mapping. Service time entries saved to backend with `serviceName`, per-service `crewMembers`, and `memberCount`.
+  - **Clock-out decision overlay** (full-screen push): slides in from right with back chevron + "Clock Out" title. Shows est vs actual, over/under, service completion status. "Complete This Ticket" marks all services done. "Return Later" creates partial ticket with completed services carried over and `elapsedBeforePause` stored for timer resume.
+  - **Timer resume for partial tickets**: when resuming a partial ticket, `effectiveStart` is offset backward by `elapsedBeforePause` seconds so the UI timer shows cumulative time across sessions. Backend still gets separate time entries per session. `elapsedBeforePause` is in-memory only (lost on page reload, but backend totals are always correct).
+  - **PIN entry overlay** (iOS bottom sheet): slides up from bottom with grabber handle, backdrop blur, tap-scrim-to-dismiss. Max-width 500px.
+  - **Partial ticket carry-over**: tickets with status "partial" show orange styling, completed services listed, "Return" button resumes with remaining services and cumulative timer.
+  - **Request alerts**: yellow banner when starting a job at a property with open customer requests
+  - **Complete job modal** (legacy, centered): elapsed time vs. estimate, service checklist, optional notes
+  - **Day summary** (centered modal): direct time (excludes Shop) vs. budgeted direct, travel time (all indirect = travel) vs. budgeted travel, separate Shop time row (orange), total hours, direct %, over/under badges, crew members. Stop counts exclude Shop ticket. No indirect category breakdown (simplified).
+  - **Crew-hours display**: Two-tier time division. Property-group-level estimates are divided by full crew size (man-hours ÷ crew = crew-hours). Ticket-level targets use `at.assignedMembers.length` (the people actually assigned to that ticket) instead of total crew, so individual ticket timers reflect the real crew working that stop.
+  - **Split time entries on crew changes**: When crew composition changes on a running entry (member added, removed, or Edit Crew confirms different list), the app splits the backend entry: closes the current entry at the moment of change and opens a new entry with the updated crew list. This prevents man-hour corruption (e.g., 2 crew for 60min + 2 more for 30min = 4 man-hours, not 6). Function `splitTimeEntry(opts)` handles the close+open: uses `queueableFetch` for fire-and-forget close, `fetch` for the new entry (needs entryId). Callers update `entryId` and `startTime`/`phaseStartTime` after split. Functions that trigger splits: `assignMemberToService()` (freed member joins active service), `confirmEditServiceCrew()` (edit service crew), `confirmEditCrew()` (edit ticket crew), `removeCrewMember()` (remove from all running entries), `addMemberMidDay()` (add to all ticket job entries). Only splits when crew actually changed. If a removed member was the last person on a service, the entry is closed without opening a new one.
+  - **Service progress bars + remaining time**: Active services show a thin 3px progress bar (green → yellow at 75% → red at 100%) tracking man-hours consumed vs `estimatedHours` from the service object. **Below the progress bar, a live-updating time label shows remaining wall-clock time** (e.g. "~18 min left · 2 crew" or "12m over · 3 crew"). Time recalculates instantly when crew changes — adding a member to a service immediately reduces the remaining time displayed. Updated every second in `updateServiceProgressBars()`. Turns red (`.over` class) when over budget. Progress accounts for crew changes via `svcClock.manHoursConsumed` (cumulative man-minutes from prior segments). On each split, `manHoursConsumed += segmentMinutes × oldCrewCount`. Helper functions: `getServiceEstHours(ticket, serviceName)` extracts per-service hours, `getServiceProgress(svcClock, estManHours)` computes progress fraction, `getServiceRemainingMin(svcClock, estManHours)` computes remaining wall-clock minutes for current crew, `getServiceRemainingWithExtra(svcClock, estManHours)` computes projected remaining with +1 crew member, `formatEstMin(wallMinutes)` formats as H:MM (e.g. "0:22", "1:15"), `formatRemainingMin(wallMinutes)` appends "left"/"over" suffix (e.g. "0:22 left", "0:12 over"). `formatMinutes()` also uses H:MM format for consistency across all time displays. CSS: `.svc-progress-track`, `.svc-progress-fill`, `.yellow`, `.red`, `.svc-remaining-time`, `.svc-remaining-time.over`.
+  - **Resume support**: app can be closed and reopened mid-day, resumes ALL active ticket timers from saved time entries (multi-ticket aware), resumes open travel entry via `currentTravelEntryId`
+  - **Native iOS overlay patterns**: PIN entry and member assignment use bottom-sheet pattern (slide up, rounded top corners, grabber, backdrop blur). Clock-out and check-in use full-screen push pattern (slide in from right, topbar with back chevron, swipe-from-left-edge to dismiss). Confirmations use iOS action sheet pattern (slide up from bottom, rounded button groups). Alerts use top-pill toast pattern. Complete-job, day-summary, and crew-reassignment remain centered modals.
+  - **Haptic feedback**: `haptic(style)` utility using `navigator.vibrate()` with iOS-matching patterns: `light` (10ms), `medium` (20ms), `heavy` (30ms), `success` (double-tap), `warning` (triple-pulse), `error` (triple-buzz). Applied to: PIN digit entry, PIN error shake, service completion, day start, ticket start, tab switches, timer target exceeded, pull-to-refresh, swipe-back dismissal, action sheet presentation.
+  - **iOS action sheets** (replaces all native `alert()`/`confirm()`/`prompt()`): `iosAlert()` shows a pill-shaped toast that slides down from top and auto-dismisses after 2.8s. `iosConfirm()` shows a bottom action sheet with rounded button groups, destructive styling, and Cancel button — matches iOS Share Sheet pattern. `iosPrompt()` shows a centered iOS-style alert dialog with text input. All 20+ native dialog calls replaced. CSS: `.ios-action-sheet-backdrop`, `.ios-action-sheet-group`, `.ios-action-sheet-btn`, `.ios-toast-alert`.
+  - **Scroll-to-top on tab re-tap**: tapping the already-active tab scrolls content to top with `smooth` behavior. Standard iOS pattern. Implemented in `switchTab()`.
+  - **Tab badge for requests**: red circle badge (`#requests-badge`) on Requests tab showing count of open requests. Updated in `updateStats()` via `updateRequestBadge()`. Hides when count is zero. CSS: `.tab-badge`.
+  - **Theme-color meta tags**: `<meta name="theme-color">` with `prefers-color-scheme` media queries — `#F2F2F7` for light mode, `#000000` for dark mode. Browser chrome matches app background.
+  - **Timer target vibration**: when a ticket's elapsed time crosses the estimated target, fires `haptic('warning')` once and turns the timer text red. Tracked in `timerTargetFired` map (ticketId → boolean). Implemented in `updateTicketCountdown()`.
+  - **Pull-to-refresh visual indicator**: spinner pill (`#pull-refresh-indicator`) appears during pull-down gesture at scroll top. Rotation tracks pull progress, transitions to spinning animation on release past threshold (80px), auto-hides after 1.2s. Triggers `loadSchedule()` or `loadRequests()` depending on active tab. CSS: `.pull-refresh-indicator`, `.pulling`, `.refreshing`.
+  - **Swipe-back gesture on push overlays**: `enableSwipeBack()` attaches touch listeners to full-screen push overlays. Tracks horizontal swipe starting from left 30px edge, translates overlay in real-time, dismisses on 100px+ swipe. Applied to: check-in overlay, clock-out overlay, all `.ios-screen` push views. Cancels if vertical movement exceeds horizontal.
+  - **Demo mode** (`?demo=true` URL parameter): enables full-day testing without backend. Monkey-patches `fetch` to intercept all Google Apps Script calls and return mock data. Provides 5 crew members (Jake Miller/1111, Carlos Rivera/2222, Sam Thompson/3333, Dani Brooks/4444, Tyler Nguyen/5555), 5 tickets across 4 properties with 2-3 services each, with per-service `estimatedHours` matching `totalEstHours` totals. Auto-skips login, shows dashboard immediately. All write operations (saveTimeEntry, updateTimeEntry, deleteTimeEntry, completeJob, updateTicketStatus) return mock success with `DEMO-*` entry IDs. Split operations logged with `[DEMO] saveTimeEntry` and `[DEMO] closeEntry` details. All intercepted calls logged to console with `[DEMO]` prefix.
+  - **Cancel started ticket**: "Cancel Ticket" button in active ticket expanded view, only visible before any services are completed. Deletes the job time entry and any active service time entries from backend via `deleteTimeEntry`. Stops timer, resets ticket status to `scheduled`, dismisses reassignment overlay if open. Auto-starts travel if no other non-Shop tickets are active. Function: `cancelStartedTicket()`.
+  - **Undo completed service** (15-second toast): after marking a service done, a toast slides up from bottom with "[Service] marked done" text and "Undo" button. Blue progress bar counts down 15 seconds then auto-dismisses. Undo reopens the service clock (clears `endTime`), removes service from `completedServices`, clears clock-out on backend via `updateTimeEntry` with empty `clockOut`, and dismisses the reassignment wizard if open. Only one undo active at a time — new completion replaces previous. State: `undoServiceData`, `undoToastTimer`. Functions: `showUndoServiceToast()`, `dismissUndoToast()`, `undoCompleteService()`. CSS: `.undo-toast` with `@keyframes undoCountdown`.
+  - **Offline queuing**: `queueableFetch()` wrapper sends POST immediately when online, queues to `localStorage` (`crewOfflineQueue` key) when offline. Orange "No signal" banner with queued count (`#crew-offline-banner`) when offline. Green "Back online" banner on reconnect, auto-flushes queue in FIFO order via `flushOfflineQueue()`. Fire-and-forget calls (skip, service clock-out, GPS updates) use `queueableFetch`; response-dependent calls (`saveTimeEntry` needing `entryId`) keep direct `fetch`.
+  - **Skip entire property**: "Skip" button on property group card header for non-active, non-completed, non-skipped groups when day is started. Prompts for reason via `prompt()`, then skips all non-completed tickets in the group via `updateTicketStatus`. Uses existing `.skipped` CSS for muted styling. Function: `skipProperty()`.
 - **Requests Tab** — customer request management: open/completed filtering, request detail view, status updates, completion photos
 - SMS deep-linking for customer communication (iOS-specific `sms:/open` URL handling)
 - Request acknowledgement tracking with timestamps
@@ -80,7 +107,7 @@ The platform supports four divisions, each representing a distinct revenue strea
 - iOS design system: SF Pro typography, exact system colors, dark mode, frosted glass tab bar with `backdrop-filter`, iOS spring animations, 44px touch targets, `prefers-reduced-motion` support
 - Bottom tab bar: Schedule (home) | Requests | Report Issue | Reports
 
-**estimate.html — Bidding & Estimating Tool (~16,000 lines)**
+**estimate.html — Bidding & Estimating Tool (~16,250 lines)**
 - **Division: Maintenance (MNT) fully built** — Irrigation, Construction, and Enhancement divisions planned, will reuse the same engine with division-specific catalogs and takeoffs
 - Three-panel Google Workspace layout (sidebar, main content, summary panel)
 - **Bid Builder**: Spreadsheet-style table with columns: Item, OCC, QTY, Unit, P/H, AH, TH, P/P, TP, GM%
@@ -99,6 +126,7 @@ The platform supports four divisions, each representing a distinct revenue strea
 - **Template System**: Save/load estimate structures (services, tiers, visits, travel %, contract duration), excludes property-specific data
 - **Contract Settings**: Start/end dates, duration, payment months, price increase %, payment terms (Net 30, etc.)
 - **Payment Schedule Generator**: Monthly payment distribution with penny rounding algorithm
+- **Estimate Revision & Re-Finalize Workflow**: Three-status lifecycle (Draft → Finalized → Revision → Finalized). When a finalized estimate is reopened and edited, status transitions to "Revision" (amber badge) instead of resetting to Draft. Re-finalizing updates the existing contract row and regenerates only future scheduled tickets — completed, skipped, and today's tickets are never touched. `revisionCount` tracks how many times a contract has been revised. The "Revise Estimate" button enters revision mode explicitly; "Update Contract" opens the finalize modal with revision-aware text ("Update Contract & Regenerate Tickets"). First-time finalization is unchanged.
 - **Weekly Reports**: per-property visit summaries with services performed, dates, notes, customer email — send individually or batch send to all customers
 - **Service Offers in Weekly Reports**: attach recommended services with catalog pricing and photos to weekly reports — customer approves with one tap from their email
 - **Contacts (Lite CRM)**: Lightweight contact management built into estimate.html as a placeholder until HubSpot integration. Contacts have lifecycle stages (Lead → Prospect → Customer), are linked to estimates via `contactId`, and auto-promote to "Customer" when an estimate is finalized. Searchable by name, email, phone, address. Contact picker in the estimate builder auto-fills property address. Stored in a "Contacts" Google Sheet. The `contactId` foreign key pattern survives the HubSpot migration — the field becomes `hubspot_contact_id` but the linking pattern is the same.
@@ -113,7 +141,7 @@ The platform supports four divisions, each representing a distinct revenue strea
 
 #### Combined Apps Script Endpoints
 
-**GET endpoints (15):**
+**GET endpoints (16):**
 | Endpoint | Source | Description |
 |----------|--------|-------------|
 | `getItemCatalog` | Estimating | Returns item catalog with production rates |
@@ -131,9 +159,10 @@ The platform supports four divisions, each representing a distinct revenue strea
 | `getSavedReports` | Crew | Returns JSON report files from Drive for a property |
 | `getReportData` | Crew | Reads JSON report data from Drive by fileId |
 | `getPhotoBase64` | Crew | Reads photo from Drive, returns base64 |
-| `getCrewSchedule` | Crew | Auth by phone → returns crew members, today's tickets (with travelHours), time entries |
+| `getCrewSchedule` | Crew | Auth by phone → returns crew members, today's tickets (with travelHours, completedServices for partial), time entries |
+| `verifyPin` | Crew | Validates 4-digit PIN against Crew Members sheet, returns {success, name, role, crew} |
 
-**POST endpoints (23):**
+**POST endpoints (26):**
 | Endpoint | Source | Description |
 |----------|--------|-------------|
 | `saveContact` | Estimating | Creates a new contact in the Contacts sheet with auto-generated C-{timestamp} ID |
@@ -141,7 +170,9 @@ The platform supports four divisions, each representing a distinct revenue strea
 | `deleteContact` | Estimating | Deletes a contact by contactId |
 | `uploadEstimateJson` | Estimating | Saves estimate JSON to Drive |
 | `createContract` | Estimating | Creates contract row |
+| `updateContract` | Estimating | Updates existing contract row by contractId (crew, day, dates, months, payment) — used during estimate revision |
 | `saveTickets` | Estimating | Batch-creates scheduled tickets |
+| `deleteFutureTickets` | Estimating | Deletes future scheduled tickets for a contractId (status='scheduled' AND eventDate > afterDate) — used during estimate revision to regenerate tickets |
 | `updateTicketStatus` | Estimating | Updates ticket status/completed date |
 | `rescheduleTicket` | Estimating | Moves ticket to new date |
 | `saveBid` | Estimating | Creates new bid row |
@@ -151,8 +182,9 @@ The platform supports four divisions, each representing a distinct revenue strea
 | `deleteTemplate` | Estimating | Deletes template by ID |
 | `deleteBid` | Estimating | Deletes bid by ID |
 | `saveTimeEntry` | Crew | Creates time entry (day_clock, job, indirect) |
-| `updateTimeEntry` | Crew | Updates existing time entry (fills in clockOut/duration) |
-| `completeJob` | Crew | Marks ticket completed + updates time entry in one call |
+| `updateTimeEntry` | Crew | Updates existing time entry (fills in clockOut/duration/crewMembers/memberCount). Supports clearing clockOut (empty string) for undo operations. Finds by entryId or by crew+date+type fallback |
+| `deleteTimeEntry` | Crew | Deletes a time entry row by entryId. Used by cancel-ticket and undo flows |
+| `completeJob` | Crew | Marks ticket completed/partial + updates time entry. Supports `partial: true` with `completedServices` array for partial carry-over |
 | `uploadPhoto` | Crew | General photo upload to Drive |
 | `updateAcknowledged` | Crew | Marks request as acknowledged |
 | `updateStatus` | Crew | Updates request status |
@@ -168,8 +200,8 @@ The platform supports four divisions, each representing a distinct revenue strea
 - The UX patterns and workflows are production-quality — crew uses them daily
 - Deep domain knowledge encoded in the calculation engine (production rates, takeoff pipeline, difficulty adjustments, material coverage, payment schedules)
 - iOS design quality on crew.html is genuinely native-feeling
-- Bilingual support is baked in, not bolted on
-- Offline resilience (index.html queues requests, crew.html has localStorage fallback)
+- Bilingual support (English/Spanish) is baked into both index.html and crew.html, not bolted on — shared `preferredLang` localStorage key persists choice across apps
+- Offline resilience (index.html queues requests, crew.html has `queueableFetch` with localStorage queue + auto-flush on reconnect)
 
 ### What Won't Scale
 - Google Sheets as a database (no relationships, slow at volume, concurrent write issues)
@@ -479,7 +511,7 @@ kits (
 bids (
   id, tenant_id, property_id, customer_id, created_by,
   division,                       -- 'MNT', 'IRR', 'CON', 'ENH'
-  bid_date, status, -- draft, sent, accepted, rejected, expired, finalized
+  bid_date, status, -- draft, sent, accepted, rejected, expired, finalized, revision
   property_type, -- residential, commercial
   contract_start_date, contract_end_date, contract_months,
   labor_rate, labor_markup, material_markup, sub_markup,
@@ -819,12 +851,26 @@ This is the central data flow that connects bidding to daily crew operations. Ea
 ### Step 1: Contract Activation (estimate.html / Management Platform)
 
 When an estimate is accepted, the "Accept Estimate → Create Contract" action:
-1. Locks the estimate (prevents edits)
+1. Locks the estimate (prevents edits — status becomes "Finalized")
 2. Creates a contract record with property, customer, crew, dates, monthly payment
 3. Creates contract_services — one per service with visit count and **schedule type**
 4. Generates scheduled event tickets distributed across the contract period
 5. Calculates **earned value** per ticket (the billed cost of the items on that ticket)
 6. Optionally syncs events to Google Calendar
+
+**Revision workflow (re-finalization):** If a finalized estimate is reopened and edited, the status transitions to "Revision" instead of Draft. The estimate retains its `contractId` link. When the user clicks "Update Contract," the system:
+1. Updates the existing contract row (crew, dates, payment) — no duplicate contract created
+2. Deletes future scheduled tickets (status='scheduled' AND eventDate > today)
+3. Regenerates future tickets from the updated estimate
+4. Preserves all completed, skipped, and today's tickets untouched
+5. Sets status back to "Finalized" and increments `revisionCount`
+
+| Ticket Status | Date | On Revision |
+|---|---|---|
+| completed | Any | NEVER touched |
+| skipped | Any | NEVER touched |
+| scheduled | Today | Preserved (strict `>` date comparison) |
+| scheduled | Tomorrow+ | Deleted and regenerated |
 
 **Item-level scheduling:** Each line item within a service can have its own visit count (`itemVisits`). If not set, it follows the service's visit count. This means a "Weekly Grounds Maintenance" service (42 visits) can contain Blade Edge at 52 visits (weekly all year) and Weed Control at 12 visits (monthly). Each ticket only lists the items actually due that day.
 
@@ -938,7 +984,7 @@ Three levels of tracking:
 
 GPS captured at clock-in/out for verification.
 
-**Man-hours vs. crew-hours:** Production rates in the item catalog are per-person (man-hours). Tickets store `totalEstHours` as man-hours and `travelHours` as budgeted indirect man-hours. At display time, both values are divided by crew size to show crew-hours — the actual wall-clock time the crew should expect on-site. A 2-person crew with a 1 man-hour ticket sees "30m" not "1h". The stored man-hours are never modified — the division happens only in the UI.
+**Man-hours vs. crew-hours (two-tier division):** Production rates in the item catalog are per-person (man-hours). Tickets store `totalEstHours` as man-hours and `travelHours` as budgeted indirect man-hours. At display time, values are divided by crew count to show crew-hours — the actual wall-clock time expected. **Property-group level** uses full crew size (`getCrewSize()`) because that's the site visit duration. **Ticket level** (expanded stop card target, timer-turns-red threshold, clock-out modal) uses `at.assignedMembers.length` because only assigned crew are working that ticket. A 4-person crew with 2 assigned to a 1 man-hour ticket sees "30m" target, not "15m". The stored man-hours are never modified — the division happens only in the UI.
 
 **Budgeted vs. actual indirect time:** Each ticket now carries `travelHours` (production man-hours × travel %). The day summary compares actual indirect time (gaps between job clocks) against budgeted indirect time (sum of `travelHours` ÷ crew size). This gives crew leaders immediate feedback: "50m indirect / 36m budget — 14m over."
 
@@ -1724,40 +1770,48 @@ Service offers can be priced three ways:
 
 Before the full React/PostgreSQL migration, the ticket generation and schedule features can be built into the existing prototype to validate the workflow. This is the fastest path to crew-usable scheduling.
 
-### Phase A: Contract + Ticket Generation (estimate.html) — ✅ Backend Built
+### Phase A: Contract + Ticket Generation (estimate.html) — ✅ Built
 1. ✅ Contract creation endpoint (`createContract`) — saves to Contracts sheet
-2. ✅ Ticket batch save endpoint (`saveTickets`) — saves to Scheduled Tickets sheet
-3. ✅ Ticket status update (`updateTicketStatus`) and reschedule (`rescheduleTicket`) endpoints
-4. ⬜ "Finalize Estimate" UI flow — locks estimate, opens modal for crew/day/dates
-5. ⬜ Build `generateSeasonalMowingDates()` with weekly/biweekly seasonal logic
-6. ⬜ Build `generateWeeklyDates()` for items with ~52 visits (every week all year)
-7. ⬜ Build `generateSimpleScheduleDates()` for evenly distributed services
-8. ⬜ **Item-level scheduling**: each line item can override the service visit count (`itemVisits`)
-9. ⬜ Ticket bundling — group same-date services into one property visit, listing only items due that day
-10. ⬜ Calculate **earned value** per ticket from bid rates/markups
-11. ⬜ Preview: show ticket count and item-level breakdown before creating
-12. ⬜ Optional: Google Calendar event creation via Apps Script `CalendarApp`
+2. ✅ Contract update endpoint (`updateContract`) — updates existing contract row during revision
+3. ✅ Ticket batch save endpoint (`saveTickets`) — saves to Scheduled Tickets sheet
+4. ✅ Delete future tickets endpoint (`deleteFutureTickets`) — removes future scheduled tickets during revision
+5. ✅ Ticket status update (`updateTicketStatus`) and reschedule (`rescheduleTicket`) endpoints
+6. ✅ "Finalize Estimate" UI flow — locks estimate, opens modal for crew/day/dates, generates contract + tickets
+7. ✅ **Estimate Revision workflow** — Finalized → Revision → Update Contract → re-Finalized. Updates existing contract, deletes/regenerates future tickets, preserves completed tickets, increments `revisionCount`
+8. ⬜ Build `generateSeasonalMowingDates()` with weekly/biweekly seasonal logic
+9. ⬜ Build `generateWeeklyDates()` for items with ~52 visits (every week all year)
+10. ⬜ Build `generateSimpleScheduleDates()` for evenly distributed services
+11. ⬜ **Item-level scheduling**: each line item can override the service visit count (`itemVisits`)
+12. ⬜ Ticket bundling — group same-date services into one property visit, listing only items due that day
+13. ⬜ Calculate **earned value** per ticket from bid rates/markups
+14. ⬜ Preview: show ticket count and item-level breakdown before creating
+15. ⬜ Optional: Google Calendar event creation via Apps Script `CalendarApp`
 
 ### Phase B: Schedule Tab (crew.html) — ✅ Built
 1. ✅ Schedule tab as default home screen with 4-tab bottom navigation
 2. ✅ Existing request dashboard relocated to Requests tab
 3. ✅ Today's Route view — `getCrewSchedule` fetches tickets for today + assigned crew
-4. ✅ Crew check-in modal — checkboxes for active crew members, stored in time entry
-5. ✅ Day clock UI (Start Day → running timer → End Day)
+4. ✅ **PIN-based crew check-in** — each member verifies with 4-digit PIN via `verifyPin` endpoint. Supports "Add Member" for subs from other crews. `checkedInMembers` stored as objects with backward compat.
+5. ✅ Day clock UI (Start Day requires 1+ verified PIN → running HH:MM:SS timer → End Day)
 6. ✅ Property stop cards with service list and estimated hours
-7. ✅ Request alert: checks for open customer requests when starting a job at a property
-8. ✅ Resume support: detects open time entries and resumes timers after app restart
+7. ✅ **Multi-ticket simultaneous clocking** — Start button on ALL scheduled/partial tickets. `activeTickets` map tracks multiple concurrent timers.
+8. ✅ **Member assignment overlay** — select crew subset per ticket, edit mid-ticket
+9. ✅ Request alert: checks for open customer requests when starting a job at a property
+10. ✅ Resume support: detects ALL open time entries and resumes multi-ticket timers after app restart
 
 ### Phase C: Time Clock (crew.html) — ✅ Built
-1. ✅ Job clock: start/stop timer per property stop with blue active-job banner
+1. ✅ Job clock: multi-ticket timers with HH:MM:SS elapsed + static target in stop cards
 2. ⬜ GPS capture at clock in/out
-3. ✅ Service completion checklist per stop (in Complete Job modal)
-4. ✅ **Indirect time auto-capture**: day total minus job totals = indirect time
-5. ⬜ **Indirect category picker**: quick-tap to categorize (travel, shop, dump run, fuel, break, meeting, equipment, other)
-6. ✅ Save time entries to Time Entries sheet (day_clock, job entries; `saveTimeEntry` + `updateTimeEntry`)
-7. ✅ Actual vs. estimated comparison display in Complete Job modal
-8. ✅ **Day summary screen**: direct hours, indirect hours, total, direct %, crew members
-9. ✅ Job completion flow (notes, service checklist, auto-advance to next stop)
+3. ✅ **Per-service clocking with crew assignment**: start/complete individual services within a ticket with per-service member selection from parent ticket's assigned crew. Saved as `service` entry type with `serviceName`, per-service `crewMembers`, and `memberCount`
+4. ✅ **Clock-out decision modal**: est vs actual, service status, "Complete" or "Return Later" (partial)
+5. ✅ **Partial ticket carry-over**: partial tickets show orange, carry completed services, "Start (Return)" resumes
+6. ~~Active tickets panel~~: removed — redundant with property-grouped stop cards that auto-expand for active tickets
+7. ✅ **Indirect time auto-capture**: day total minus job totals = indirect time
+8. ✅ **Indirect category picker**: quick-tap to categorize (travel, shop, dump run, fuel, break, meeting, equipment, other)
+9. ✅ Save time entries to Time Entries sheet (day_clock, job, indirect, service entries; `saveTimeEntry` + `updateTimeEntry`)
+10. ✅ Actual vs. estimated comparison display in Clock-Out modal
+11. ✅ **Day summary screen**: direct hours, indirect hours, total, direct %, crew members
+12. ✅ Job completion flow (notes, service checklist, partial/complete decision)
 
 ### Phase D: Route Management (estimate.html / management view) — ⬜ Not Started
 1. ⬜ Weekly route view — list of stops per day
@@ -1782,7 +1836,7 @@ All sheets live in one spreadsheet with one Code.gs serving both estimate.html a
 | Item Catalog | Production rates by item, unit, difficulty (Easy/Medium/Hard) |
 | Service Catalog | Service definitions with line items, visits, billing tiers |
 | Settings | Key-value pairs for bid defaults |
-| Bids | Saved estimates with financials |
+| Bids | Saved estimates with financials (includes contractId, revisionCount, and status: Draft/Revision/Finalized) |
 | Templates | Reusable estimate structures |
 | Properties | Property addresses, crew assignments, customer PINs, crew phone |
 | Requests | Customer requests and internal tickets |
@@ -1790,10 +1844,10 @@ All sheets live in one spreadsheet with one Code.gs serving both estimate.html a
 **New Sheets (Built):**
 | Sheet | Purpose |
 |-------|---------|
-| Contracts | contractId, bidId, propertyAddress, assignedCrew, preferredDay, startDate, endDate, contractMonths, monthlyPayment, status, createdDate |
-| Scheduled Tickets | ticketId, contractId, propertyAddress, assignedCrew, eventDate, servicesJson, totalEstHours, travelHours, status, completedDate, notes, createdDate |
-| Crew Members | name, phone, role (Leader/Member), crew (MNT Crew 1), status (Active/Inactive) |
-| Time Entries | entryId, crew, date, entryType (day_clock/job/indirect), ticketId, propertyAddress, indirectCategory, clockIn, clockOut, durationMinutes, crewMembers (JSON), notes, createdDate |
+| Contracts | contractId, bidId, propertyAddress, assignedCrew, preferredDay, startDate, endDate, contractMonths, monthlyPayment, status, createdDate (updatable via `updateContract` during revision) |
+| Scheduled Tickets | ticketId, contractId, propertyAddress, assignedCrew, eventDate, servicesJson, totalEstHours, travelHours, status, completedDate, notes, completedServices (JSON array of completed service names for partial tickets), createdDate |
+| Crew Members | name, phone, role (Leader/Member), crew (MNT Crew 1), pin (4-digit identity PIN), status (Active/Inactive) |
+| Time Entries | entryId, crew, date, entryType (day_clock/job/indirect/service), ticketId, propertyAddress, serviceName, indirectCategory, clockIn, clockOut, durationMinutes, crewMembers (JSON), memberCount, notes, createdDate |
 
 **Drive Folder Structure:**
 ```
@@ -2043,13 +2097,16 @@ You don't have to stop using the current app while you build the new one. Here's
 3. **Finish the prototype pipeline**:
    - ✅ Combined Apps Script (Estimating + Text My Team in one spreadsheet)
    - ✅ Crew Members sheet with crew naming (MNT Crew 1)
-   - ✅ Schedule tab with day clock, job clock, stop cards, request alerts, day summary
-   - ✅ Time Entries sheet with saveTimeEntry + updateTimeEntry
+   - ✅ Schedule tab with day clock, multi-ticket job clocks, stop cards, request alerts, day summary
+   - ✅ **PIN-based crew check-in** with `verifyPin` endpoint, sub member support, object-based `checkedInMembers`
+   - ✅ **Multi-ticket simultaneous clocking** with per-service tracking, partial carry-over, elapsed timers in stop cards
+   - ✅ **Clock-out decision modal** with Complete/Return Later, per-service audit trail
+   - ✅ Time Entries sheet with saveTimeEntry + updateTimeEntry (day_clock, job, indirect, service)
    - ✅ Crew-hours display (man-hours ÷ crew size) + budgeted indirect time from travelHours
-   - ⬜ **Next: Contract finalization UI in estimate.html** — "Finalize Estimate" flow that generates tickets from bid services
+   - ✅ **Contract finalization UI in estimate.html** — "Finalize Estimate" flow that generates tickets from bid services
+   - ✅ **Estimate Revision & Re-Finalize workflow** — three-status lifecycle (Draft/Revision/Finalized), contract update instead of duplicate, future ticket regeneration, revision count tracking
    - ⬜ **Next: Ticket generation logic** — seasonal mowing dates, weekly dates, simple schedule dates, ticket bundling
    - ⬜ **Next: GPS capture** at clock in/out for verification
-   - ⬜ **Next: Indirect time category picker** — quick-tap categorization between job stops
    - ⬜ **Next: Route management view** — weekly route view, bulk skip for weather days
    - ⬜ **Next: Earned revenue dashboard** — earned vs. invoiced comparison
 4. **Decide on cloud provider** — AWS or Azure. The architecture works on either. Pick based on your comfort level or your dev's experience.

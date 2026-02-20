@@ -57,6 +57,8 @@ function doGet(e) {
         return jsonResponse(getRouteOrder(e.parameter.crew, e.parameter.dayOfWeek));
       case 'getWeeklyReportData':
         return jsonResponse(getWeeklyReportData(e.parameter.weekOf));
+      case 'verifyPin':
+        return verifyPin(e.parameter.pin);
 
       // ─── Contacts ───
       case 'getContacts':
@@ -83,6 +85,12 @@ function doPost(e) {
     }
     if (data.saveTickets) {
       return jsonResponse(saveTickets(data));
+    }
+    if (data.updateContract) {
+      return jsonResponse(updateContract(data));
+    }
+    if (data.deleteFutureTickets) {
+      return jsonResponse(deleteFutureTickets(data));
     }
     if (data.updateTicketStatus) {
       return jsonResponse(updateTicketStatus(data));
@@ -115,6 +123,9 @@ function doPost(e) {
     }
     if (data.updateTimeEntry) {
       return jsonResponse(updateTimeEntry(data));
+    }
+    if (data.deleteTimeEntry) {
+      return jsonResponse(deleteTimeEntry(data));
     }
     if (data.completeJob) {
       return jsonResponse(completeJob(data));
@@ -409,7 +420,8 @@ function getBids() {
     'Status': 'status',
     'Notes': 'notes',
     'estimateFileID': 'estimateFileId',
-    'Contract ID': 'contractId'
+    'Contract ID': 'contractId',
+    'Revision Count': 'revisionCount'
   };
 
   for (var i = 1; i < data.length; i++) {
@@ -458,7 +470,8 @@ function saveBid(bidData) {
     'status': 'Status',
     'notes': 'Notes',
     'estimateFileId': 'estimateFileID',
-    'contractId': 'Contract ID'
+    'contractId': 'Contract ID',
+    'revisionCount': 'Revision Count'
   };
 
   // Reverse map: header to property
@@ -534,7 +547,8 @@ function updateBid(bidData) {
     'status': 'Status',
     'notes': 'Notes',
     'estimateFileId': 'estimateFileID',
-    'contractId': 'Contract ID'
+    'contractId': 'Contract ID',
+    'revisionCount': 'Revision Count'
   };
 
   var headerToProperty = {};
@@ -776,6 +790,82 @@ function createContract(data) {
   sheet.appendRow(row);
 
   return { success: true, contractId: contractId };
+}
+
+function updateContract(data) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Contracts');
+  if (!sheet) return { success: false, error: 'Contracts sheet not found' };
+
+  var rows = sheet.getDataRange().getValues();
+  var headers = rows[0];
+
+  var contractIdCol = headers.indexOf('Contract ID');
+  if (contractIdCol === -1) contractIdCol = headers.indexOf('contractId');
+  if (contractIdCol === -1) return { success: false, error: 'Contract ID column not found' };
+
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][contractIdCol]) === String(data.contractId)) {
+      var fieldsToUpdate = {
+        'Assigned Crew': data.assignedCrew,
+        'Preferred Day': data.preferredDay,
+        'Start Date': data.startDate,
+        'End Date': data.endDate,
+        'Contract Months': data.contractMonths,
+        'Monthly Payment': data.monthlyPayment,
+        'Status': data.status || 'active'
+      };
+
+      for (var field in fieldsToUpdate) {
+        var col = headers.indexOf(field);
+        if (col >= 0 && fieldsToUpdate[field] !== undefined) {
+          sheet.getRange(i + 1, col + 1).setValue(fieldsToUpdate[field]);
+        }
+      }
+
+      return { success: true, contractId: data.contractId };
+    }
+  }
+
+  return { success: false, error: 'Contract not found: ' + data.contractId };
+}
+
+function deleteFutureTickets(data) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Scheduled Tickets');
+  if (!sheet) return { success: false, error: 'Scheduled Tickets sheet not found' };
+
+  var rows = sheet.getDataRange().getValues();
+  var headers = rows[0];
+
+  var contractIdCol = headers.indexOf('contractId');
+  if (contractIdCol === -1) contractIdCol = headers.indexOf('Contract ID');
+  var statusCol = headers.indexOf('status');
+  if (statusCol === -1) statusCol = headers.indexOf('Status');
+  var dateCol = headers.indexOf('eventDate');
+  if (dateCol === -1) dateCol = headers.indexOf('Event Date');
+
+  var afterDate = data.afterDate;
+  var deletedCount = 0;
+
+  for (var i = rows.length - 1; i >= 1; i--) {
+    var rowContractId = String(rows[i][contractIdCol]);
+    var rowStatus = String(rows[i][statusCol]).toLowerCase();
+    var rowDate = rows[i][dateCol];
+
+    if (rowDate instanceof Date) {
+      rowDate = Utilities.formatDate(rowDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    } else {
+      rowDate = String(rowDate);
+    }
+
+    if (rowContractId === String(data.contractId) && rowDate > afterDate && rowStatus === 'scheduled') {
+      sheet.deleteRow(i + 1);
+      deletedCount++;
+    }
+  }
+
+  return { success: true, deletedCount: deletedCount };
 }
 
 function getContracts() {
@@ -1021,7 +1111,7 @@ function getTickets(e) {
         if (!rawStatus) return 'scheduled';
         var s = String(rawStatus).toLowerCase().trim();
         // Only accept valid status values
-        if (s === 'scheduled' || s === 'completed' || s === 'skipped' || s === 'rescheduled') return s;
+        if (s === 'scheduled' || s === 'completed' || s === 'skipped' || s === 'rescheduled' || s === 'partial') return s;
         return 'scheduled';
       })(),
       completedDate: colMap.completedDate !== -1 ? (row[colMap.completedDate] || '') : '',
@@ -1801,8 +1891,11 @@ function getCrewSchedule(phone, dateStr) {
       status: tHeaders.indexOf('Status'),
       completedDate: tHeaders.indexOf('Completed Date'),
       notes: tHeaders.indexOf('Notes'),
-      stopOrder: tHeaders.indexOf('Stop Order')
+      stopOrder: tHeaders.indexOf('Stop Order'),
+      completedServices: tHeaders.indexOf('Completed Services')
     };
+
+    var addedTicketIds = {};
 
     for (var t = 1; t < tData.length; t++) {
       var ticketCrew = String(tData[t][tColIdx.assignedCrew !== -1 ? tColIdx.assignedCrew : 3] || '');
@@ -1822,28 +1915,45 @@ function getCrewSchedule(phone, dateStr) {
         }
       }
 
-      if (ticketCrew === crewName && ticketDate === targetDate) {
+      // Validate status value
+      var rawStatus = tColIdx.status !== -1 ? tData[t][tColIdx.status] : '';
+      var validStatus = 'scheduled';
+      if (rawStatus) {
+        var s = String(rawStatus).toLowerCase().trim();
+        if (s === 'scheduled' || s === 'completed' || s === 'skipped' || s === 'rescheduled' || s === 'partial') {
+          validStatus = s;
+        }
+      }
+
+      // Include: today's tickets for this crew, OR partial tickets from any date for this crew
+      var isToday = (ticketCrew === crewName && ticketDate === targetDate);
+      var isPartialCarryover = (ticketCrew === crewName && validStatus === 'partial');
+
+      if (isToday || isPartialCarryover) {
+        var tid = tColIdx.ticketId !== -1 ? (tData[t][tColIdx.ticketId] || '') : '';
+        if (addedTicketIds[tid]) continue; // avoid duplicates
+        addedTicketIds[tid] = true;
+
         var services = tColIdx.services !== -1 ? (tData[t][tColIdx.services] || '[]') : '[]';
         if (typeof services === 'string') {
           try { services = JSON.parse(services); } catch(e) { services = []; }
         }
 
-        // Validate status value
-        var rawStatus = tColIdx.status !== -1 ? tData[t][tColIdx.status] : '';
-        var validStatus = 'scheduled';
-        if (rawStatus) {
-          var s = String(rawStatus).toLowerCase().trim();
-          if (s === 'scheduled' || s === 'completed' || s === 'skipped' || s === 'rescheduled') {
-            validStatus = s;
+        // Parse completedServices JSON
+        var completedServices = [];
+        if (tColIdx.completedServices !== -1) {
+          var csRaw = tData[t][tColIdx.completedServices] || '';
+          if (csRaw && typeof csRaw === 'string') {
+            try { completedServices = JSON.parse(csRaw); } catch(e) { completedServices = []; }
           }
         }
 
         tickets.push({
-          ticketId: tColIdx.ticketId !== -1 ? (tData[t][tColIdx.ticketId] || '') : '',
+          ticketId: tid,
           contractId: tColIdx.contractId !== -1 ? (tData[t][tColIdx.contractId] || '') : '',
           propertyAddress: tColIdx.propertyAddress !== -1 ? (tData[t][tColIdx.propertyAddress] || '') : '',
           assignedCrew: ticketCrew,
-          eventDate: targetDate,
+          eventDate: isPartialCarryover && !isToday ? ticketDate : targetDate,
           services: services,
           totalEstHours: tColIdx.totalEstHours !== -1 ? (tData[t][tColIdx.totalEstHours] || 0) : 0,
           travelHours: tColIdx.travelHours !== -1 ? (parseFloat(tData[t][tColIdx.travelHours]) || 0) : 0,
@@ -1851,14 +1961,18 @@ function getCrewSchedule(phone, dateStr) {
           internalCost: tColIdx.internalCost !== -1 ? (parseFloat(tData[t][tColIdx.internalCost]) || 0) : 0,
           status: validStatus,
           completedDate: tColIdx.completedDate !== -1 ? (tData[t][tColIdx.completedDate] || '') : '',
+          completedServices: completedServices,
           notes: tColIdx.notes !== -1 ? (tData[t][tColIdx.notes] || '') : '',
           stopOrder: tColIdx.stopOrder !== -1 ? tData[t][tColIdx.stopOrder] : null
         });
       }
     }
 
-    // Sort tickets by stopOrder (nulls last)
+    // Sort: partial tickets first, then by stopOrder (nulls last)
     tickets.sort(function(a, b) {
+      var aPartial = a.status === 'partial' ? 0 : 1;
+      var bPartial = b.status === 'partial' ? 0 : 1;
+      if (aPartial !== bPartial) return aPartial - bPartial;
       var orderA = a.stopOrder !== undefined && a.stopOrder !== null && a.stopOrder !== '' ? parseInt(a.stopOrder) : 999;
       var orderB = b.stopOrder !== undefined && b.stopOrder !== null && b.stopOrder !== '' ? parseInt(b.stopOrder) : 999;
       return orderA - orderB;
@@ -1948,6 +2062,54 @@ function getCrewMembers(phone) {
 }
 
 /**
+ * Verify a 4-digit PIN against the Crew Members sheet.
+ * Called with: ?action=verifyPin&pin=1234
+ * Returns: { success, name, role, crew, pin }
+ */
+function verifyPin(pin) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Crew Members');
+  if (!sheet) {
+    return ContentService.createTextOutput(JSON.stringify({
+      success: false, error: 'Crew Members sheet not found'
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  var rows = sheet.getDataRange().getValues();
+  var headers = rows[0];
+
+  var pinCol = findCol(headers, ['pin', 'Pin', 'PIN']);
+  var nameCol = findCol(headers, ['name', 'Name']);
+  var roleCol = findCol(headers, ['role', 'Role']);
+  var crewCol = findCol(headers, ['crew', 'Crew']);
+  var statusCol = findCol(headers, ['status', 'Status']);
+
+  if (pinCol === -1) {
+    return ContentService.createTextOutput(JSON.stringify({
+      success: false, error: 'PIN column not found in Crew Members sheet'
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  for (var i = 1; i < rows.length; i++) {
+    var memberStatus = statusCol !== -1 ? String(rows[i][statusCol]).toLowerCase() : 'active';
+    if (String(rows[i][pinCol]) === String(pin) && memberStatus === 'active') {
+      return ContentService.createTextOutput(JSON.stringify({
+        success: true,
+        name: nameCol !== -1 ? rows[i][nameCol] : '',
+        role: roleCol !== -1 ? rows[i][roleCol] : '',
+        crew: crewCol !== -1 ? rows[i][crewCol] : '',
+        pin: pin
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
+  return ContentService.createTextOutput(JSON.stringify({
+    success: false,
+    error: 'Invalid PIN'
+  })).setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
  * Get all unique active crews for dropdown population.
  * Called with: ?action=getCrews
  */
@@ -2019,7 +2181,19 @@ function saveTimeEntry(data) {
       sheet.getRange(1, nextCol, 1, 4).setValues([['Lat In', 'Lng In', 'Lat Out', 'Lng Out']]);
       sheet.getRange(1, nextCol, 1, 4).setFontWeight('bold');
     }
+    // Auto-upgrade: add Service Name and Member Count columns if missing
+    headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    if (headerRow.indexOf('Service Name') === -1) {
+      var nextCol2 = sheet.getLastColumn() + 1;
+      sheet.getRange(1, nextCol2, 1, 2).setValues([['Service Name', 'Member Count']]);
+      sheet.getRange(1, nextCol2, 1, 2).setFontWeight('bold');
+    }
   }
+
+  // Re-read headers after potential upgrade
+  var currentHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var serviceNameCol = currentHeaders.indexOf('Service Name');
+  var memberCountCol = currentHeaders.indexOf('Member Count');
 
   // Generate entry ID
   var existingData = sheet.getDataRange().getValues();
@@ -2036,11 +2210,12 @@ function saveTimeEntry(data) {
   var now = new Date();
   var createdDate = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
-  sheet.appendRow([
+  // Build row with correct number of columns
+  var baseRow = [
     entryId,
     data.crew || '',
     data.date || now.toISOString().split('T')[0],
-    data.entryType || '',           // day_clock, job, indirect
+    data.entryType || '',           // day_clock, job, indirect, service
     data.ticketId || '',
     data.propertyAddress || '',
     data.indirectCategory || '',    // travel, shop, dump_run, fuel, break, meeting, equipment, other
@@ -2054,7 +2229,16 @@ function saveTimeEntry(data) {
     data.lngIn || '',
     data.latOut || '',
     data.lngOut || ''
-  ]);
+  ];
+
+  // Pad row to match header count and set serviceName/memberCount
+  while (baseRow.length < currentHeaders.length) {
+    baseRow.push('');
+  }
+  if (serviceNameCol !== -1) baseRow[serviceNameCol] = data.serviceName || '';
+  if (memberCountCol !== -1) baseRow[memberCountCol] = data.memberCount || '';
+
+  sheet.appendRow(baseRow);
 
   return { success: true, entryId: entryId };
 }
@@ -2065,15 +2249,48 @@ function saveTimeEntry(data) {
  *          durationMinutes, crewMembers, servicesCompleted, notes, photoUrl }
  */
 function completeJob(data) {
-  // Update ticket status
-  var statusResult = updateTicketStatus({
-    ticketId: data.ticketId,
-    status: 'completed',
-    completedDate: data.date || new Date().toISOString().split('T')[0],
-    notes: data.notes || ''
-  });
+  var isPartial = data.partial === true;
 
-  if (!statusResult.success) return statusResult;
+  // Update ticket status + completedServices
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Scheduled Tickets');
+  if (sheet) {
+    var sheetData = sheet.getDataRange().getValues();
+    var headers = sheetData[0];
+    var ticketIdCol = headers.indexOf('Ticket ID');
+    var statusCol = headers.indexOf('Status');
+    var completedDateCol = headers.indexOf('Completed Date');
+    var notesCol = headers.indexOf('Notes');
+
+    // Auto-upgrade: add Completed Services column if missing
+    var completedServicesCol = headers.indexOf('Completed Services');
+    if (completedServicesCol === -1) {
+      var nextCol = sheet.getLastColumn() + 1;
+      sheet.getRange(1, nextCol).setValue('Completed Services');
+      sheet.getRange(1, nextCol).setFontWeight('bold');
+      completedServicesCol = nextCol - 1;
+    }
+
+    if (ticketIdCol === -1) ticketIdCol = 0;
+
+    for (var i = 1; i < sheetData.length; i++) {
+      if (sheetData[i][ticketIdCol] === data.ticketId) {
+        if (statusCol !== -1) {
+          sheet.getRange(i + 1, statusCol + 1).setValue(isPartial ? 'partial' : 'completed');
+        }
+        if (!isPartial && completedDateCol !== -1) {
+          sheet.getRange(i + 1, completedDateCol + 1).setValue(data.date || new Date().toISOString().split('T')[0]);
+        }
+        if (data.notes && notesCol !== -1) {
+          sheet.getRange(i + 1, notesCol + 1).setValue(data.notes);
+        }
+        if (data.completedServices && completedServicesCol !== -1) {
+          sheet.getRange(i + 1, completedServicesCol + 1).setValue(JSON.stringify(data.completedServices));
+        }
+        break;
+      }
+    }
+  }
 
   // Update existing open time entry (don't create a new one)
   var entryResult = updateTimeEntry({
@@ -2111,7 +2328,7 @@ function updateTimeEntry(data) {
       if (String(sheetData[i][idCol]) === String(data.entryId)) {
         // Update Clock Out
         var clockOutCol = headers.indexOf('Clock Out');
-        if (clockOutCol !== -1 && data.clockOut) {
+        if (clockOutCol !== -1 && data.clockOut !== undefined) {
           sheet.getRange(i + 1, clockOutCol + 1).setValue(data.clockOut);
         }
         // Update Duration
@@ -2146,6 +2363,17 @@ function updateTimeEntry(data) {
         if (lngOutCol !== -1 && data.lngOut !== undefined) {
           sheet.getRange(i + 1, lngOutCol + 1).setValue(data.lngOut);
         }
+        // Update Crew Members
+        var crewMembersCol = headers.indexOf('Crew Members');
+        if (crewMembersCol !== -1 && data.crewMembers !== undefined) {
+          var membersVal = typeof data.crewMembers === 'string' ? data.crewMembers : JSON.stringify(data.crewMembers || []);
+          sheet.getRange(i + 1, crewMembersCol + 1).setValue(membersVal);
+        }
+        // Update Member Count
+        var memberCountCol = headers.indexOf('Member Count');
+        if (memberCountCol !== -1 && data.memberCount !== undefined) {
+          sheet.getRange(i + 1, memberCountCol + 1).setValue(data.memberCount);
+        }
         return { success: true };
       }
     }
@@ -2158,6 +2386,7 @@ function updateTimeEntry(data) {
   var typeCol = headers.indexOf('Entry Type');
   var clockOutCol = headers.indexOf('Clock Out');
   var ticketCol = headers.indexOf('Ticket ID');
+  var serviceNameCol = headers.indexOf('Service Name');
 
   for (var j = sheetData.length - 1; j >= 1; j--) {
     var row = sheetData[j];
@@ -2166,8 +2395,13 @@ function updateTimeEntry(data) {
     var matchesType = String(row[typeCol]) === String(data.entryType);
     var isOpen = !row[clockOutCol] || String(row[clockOutCol]).trim() === '';
     var matchesTicket = !data.ticketId || String(row[ticketCol]) === String(data.ticketId);
+    // For service entries, also match on serviceName
+    var matchesService = true;
+    if (data.entryType === 'service' && data.serviceName && serviceNameCol !== -1) {
+      matchesService = String(row[serviceNameCol]) === String(data.serviceName);
+    }
 
-    if (matchesCrew && matchesDate && matchesType && isOpen && matchesTicket) {
+    if (matchesCrew && matchesDate && matchesType && isOpen && matchesTicket && matchesService) {
       if (data.clockOut) {
         sheet.getRange(j + 1, clockOutCol + 1).setValue(data.clockOut);
       }
@@ -2201,11 +2435,45 @@ function updateTimeEntry(data) {
       if (lngOutCol2 !== -1 && data.lngOut !== undefined) {
         sheet.getRange(j + 1, lngOutCol2 + 1).setValue(data.lngOut);
       }
+      // Update Crew Members
+      var crewMembersCol2 = headers.indexOf('Crew Members');
+      if (crewMembersCol2 !== -1 && data.crewMembers !== undefined) {
+        var membersVal2 = typeof data.crewMembers === 'string' ? data.crewMembers : JSON.stringify(data.crewMembers || []);
+        sheet.getRange(j + 1, crewMembersCol2 + 1).setValue(membersVal2);
+      }
+      // Update Member Count
+      var memberCountCol2 = headers.indexOf('Member Count');
+      if (memberCountCol2 !== -1 && data.memberCount !== undefined) {
+        sheet.getRange(j + 1, memberCountCol2 + 1).setValue(data.memberCount);
+      }
       return { success: true, entryId: row[headers.indexOf('Entry ID')] };
     }
   }
 
   return { success: false, error: 'Open entry not found' };
+}
+
+/**
+ * POST: { deleteTimeEntry: true, entryId: 'TE-0001' }
+ * Deletes a time entry row by Entry ID.
+ */
+function deleteTimeEntry(data) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Time Entries');
+  if (!sheet) return { success: false, error: 'Time Entries sheet not found' };
+
+  var rows = sheet.getDataRange().getValues();
+  var headers = rows[0];
+  var idCol = headers.indexOf('Entry ID');
+  if (idCol === -1) return { success: false, error: 'Entry ID column not found' };
+
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][idCol]) === String(data.entryId)) {
+      sheet.deleteRow(i + 1);
+      return { success: true };
+    }
+  }
+  return { success: false, error: 'Entry not found: ' + data.entryId };
 }
 
 

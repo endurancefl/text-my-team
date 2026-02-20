@@ -4,22 +4,60 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Endurance Services — Text My Team</title>
+  <meta name="description" content="Contact the Endurance Services landscape crew at your property. Submit requests, attach photos, and get issues resolved quickly.">
+
+  <!-- Open Graph tags for link previews -->
+  <meta property="og:title" content="Text My Team — Endurance Services">
+  <meta property="og:description" content="Contact our landscape crew directly. Submit a request and we'll handle it.">
+  <meta property="og:image" content="images/logo-stacked-fullcolor.png">
+  <meta property="og:type" content="website">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="images/icon.png">
+  <link rel="apple-touch-icon" href="images/icon.png">
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Text My Team">
+  <meta name="theme-color" content="#3A5F4B">
+
+  <link rel="preconnect" href="https://script.google.com" crossorigin>
   <style>
     :root {
-      --green-dark: #2D4A3E;
-      --green-primary: #3A5F4B;
-      --green-light: #4A7C5C;
-      --green-accent: #6B9E7A;
-      --green-pale: #E8F0EB;
-      --cream: #F7FAF8;
-      --text-dark: #1A2E24;
-      --text-medium: #3D5A4A;
-      --text-light: #6B8A78;
-      --white: #FFFFFF;
-      --shadow-sm: 0 1px 3px rgba(45, 74, 62, 0.12);
-      --shadow-md: 0 4px 12px rgba(45, 74, 62, 0.15);
-      --shadow-lg: 0 8px 30px rgba(45, 74, 62, 0.2);
+      /* Brand */
+      --tint: #3A5F4B;
+      --tint-dark: #2D4A3E;
+
+      /* iOS System Colors */
+      --ios-bg: #F2F2F7;
+      --ios-card: #FFFFFF;
+      --ios-separator: rgba(60, 60, 67, 0.12);
+      --ios-blue: #007AFF;
+      --ios-orange: #FF9500;
+      --ios-green: #34C759;
+      --ios-red: #FF3B30;
+
+      /* Text Hierarchy */
+      --text-primary: #000000;
+      --text-secondary: #8E8E93;
+      --text-tertiary: #C7C7CC;
+      --text-placeholder: rgba(60, 60, 67, 0.3);
+
+      /* Surfaces */
+      --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
       --radius: 12px;
+      --radius-sm: 10px;
+
+      /* Legacy mappings for JS compatibility */
+      --green-primary: #3A5F4B;
+      --green-dark: #2D4A3E;
+      --cream: #F2F2F7;
+      --white: #FFFFFF;
+      --text-dark: #000000;
+      --text-medium: #8E8E93;
+      --text-light: #8E8E93;
     }
 
     * {
@@ -29,129 +67,390 @@
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      background: var(--cream);
-      color: var(--text-dark);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif;
+      font-size: 17px;
+      line-height: 1.47;
+      background: var(--ios-bg);
+      color: var(--text-primary);
       min-height: 100vh;
       min-height: 100dvh;
-      display: flex;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      /* Safe area insets for notch/Dynamic Island */
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
+    }
+
+    /* Step container with iOS-style transitions */
+    .step {
+      display: none;
+      min-height: 100vh;
+      min-height: 100dvh;
       flex-direction: column;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      opacity: 0;
+      transform: translateX(100%);
+      transition: opacity 0.35s cubic-bezier(0.25, 0.1, 0.25, 1),
+                  transform 0.35s cubic-bezier(0.25, 0.1, 0.25, 1);
     }
 
-    /* Top green bar */
-    .top-bar {
-      background: linear-gradient(135deg, var(--green-dark) 0%, var(--green-primary) 100%);
-      padding: 8px 0;
-      text-align: center;
+    .step.active {
+      display: flex;
+      position: relative;
+      opacity: 1;
+      transform: translateX(0);
     }
 
-    .top-bar-text {
-      color: var(--green-accent);
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 2px;
-      text-transform: uppercase;
+    .step.slide-out-left {
+      transform: translateX(-30%);
+      opacity: 0;
     }
 
-    /* Header / Logo */
+    .step.slide-in-right {
+      transform: translateX(100%);
+    }
+
+    .step.slide-out-right {
+      transform: translateX(30%);
+      opacity: 0;
+    }
+
+    .step.slide-in-left {
+      transform: translateX(-100%);
+    }
+
+    /* Skeleton loading animation - iOS style */
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    .skeleton {
+      background: linear-gradient(90deg,
+        rgba(0, 0, 0, 0.04) 25%,
+        rgba(0, 0, 0, 0.08) 50%,
+        rgba(0, 0, 0, 0.04) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.2s ease-in-out infinite;
+      border-radius: 6px;
+    }
+
+    .skeleton-text {
+      height: 14px;
+      margin-bottom: 10px;
+    }
+
+    .skeleton-text.short {
+      width: 40%;
+    }
+
+    .skeleton-text.medium {
+      width: 70%;
+    }
+
+    .skeleton-text.long {
+      width: 90%;
+    }
+
+    .skeleton-card {
+      background: var(--ios-card);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: var(--card-shadow);
+    }
+
+    /* Header - iOS navigation bar style */
     .header {
-      background: var(--white);
-      padding: 28px 20px 24px;
+      background: rgba(255, 255, 255, 0.92);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      backdrop-filter: saturate(180%) blur(20px);
+      padding: 12px 16px;
       text-align: center;
-      border-bottom: 1px solid var(--green-pale);
-      box-shadow: var(--shadow-sm);
+      border-bottom: 0.5px solid var(--ios-separator);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .header.has-nav {
+      justify-content: space-between;
+    }
+
+    .header .nav-back {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--ios-blue);
+      font-size: 17px;
+      font-weight: 400;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 8px 4px;
+      margin-left: -4px;
+      min-width: 80px;
+      min-height: 44px;
+      justify-content: flex-start;
+      transition: opacity 0.15s;
+    }
+
+    .header .nav-back:active {
+      opacity: 0.4;
+    }
+
+    .header .nav-back svg {
+      width: 8px;
+      height: 13px;
+      stroke-width: 2.5;
+      flex-shrink: 0;
+    }
+
+    .header .nav-title {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--text-primary);
+      letter-spacing: -0.4px;
+      white-space: nowrap;
+    }
+
+    .header .nav-right {
+      min-width: 80px;
+      display: flex;
+      justify-content: flex-end;
     }
 
     .logo {
-      max-width: 200px;
+      max-width: 140px;
       height: auto;
+      transition: transform 0.1s cubic-bezier(0.25, 0.1, 0.25, 1);
+    }
+
+    .logo:active {
+      transform: scale(0.97);
+    }
+
+    /* Language toggle - iOS pill button style */
+    .lang-toggle {
+      position: absolute;
+      top: 50%;
+      right: 16px;
+      transform: translateY(-50%);
+      background: rgba(58, 95, 75, 0.1);
+      border: none;
+      padding: 7px 14px;
+      border-radius: 16px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--tint);
+      cursor: pointer;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      transition: background 0.15s cubic-bezier(0.25, 0.1, 0.25, 1),
+                  transform 0.1s cubic-bezier(0.25, 0.1, 0.25, 1);
+    }
+
+    .lang-toggle:hover {
+      background: rgba(58, 95, 75, 0.15);
+    }
+
+    .lang-toggle:active {
+      transform: translateY(-50%) scale(0.97);
+      background: rgba(58, 95, 75, 0.2);
+    }
+
+    /* Progress bar - iOS style */
+    .progress-bar {
+      display: flex;
+      padding: 12px 24px 16px;
+      gap: 8px;
+      background: var(--ios-card);
+    }
+
+    .progress-dot {
+      flex: 1;
+      height: 6px;
+      background: var(--ios-bg);
+      border-radius: 3px;
+      transition: background 0.3s cubic-bezier(0.25, 0.1, 0.25, 1),
+                  transform 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+    }
+
+    .progress-dot.completed {
+      background: var(--tint);
+    }
+
+    .progress-dot.current {
+      background: var(--tint);
+      transform: scaleY(1.1);
     }
 
     /* Main content */
     .main {
       flex: 1;
-      padding: 24px 20px 32px;
+      padding: 24px 20px 40px;
       max-width: 480px;
       margin: 0 auto;
       width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
     }
 
-    /* Search section */
-    .section-label {
-      font-size: 13px;
+    .step-icon {
+      width: 60px;
+      height: 60px;
+      color: var(--tint);
+      margin-bottom: 20px;
+      padding: 14px;
+      background: rgba(58, 95, 75, 0.08);
+      border-radius: 16px;
+    }
+
+    .step-title {
+      font-size: 34px;
       font-weight: 700;
-      color: var(--text-light);
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
-      margin-bottom: 10px;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+      letter-spacing: -0.7px;
+      line-height: 1.2;
     }
 
+    .step-subtitle {
+      font-size: 15px;
+      color: var(--text-secondary);
+      line-height: 1.47;
+      margin-bottom: 28px;
+      max-width: 320px;
+    }
+
+    /* Form elements - iOS style */
+    .form-group {
+      width: 100%;
+      text-align: left;
+      margin-bottom: 16px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 400;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 8px;
+      margin-left: 4px;
+    }
+
+    .form-input {
+      width: 100%;
+      height: 50px;
+      padding: 0 16px;
+      font-size: 17px;
+      font-family: inherit;
+      border: none;
+      border-radius: var(--radius);
+      background: var(--ios-card);
+      color: var(--text-primary);
+      outline: none;
+      transition: box-shadow 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+      -webkit-appearance: none;
+      box-shadow: none;
+    }
+
+    .form-input:focus {
+      box-shadow: inset 0 0 0 1px var(--tint),
+                  0 0 0 3px rgba(58, 95, 75, 0.1);
+    }
+
+    .form-input::placeholder {
+      color: var(--text-placeholder);
+    }
+
+    .form-textarea {
+      height: auto;
+      min-height: 100px;
+      padding: 14px 16px;
+      resize: none;
+      line-height: 1.47;
+    }
+
+    /* Search / Autocomplete - iOS style */
     .search-container {
       position: relative;
-      margin-bottom: 24px;
+      width: 100%;
     }
 
     .search-icon {
       position: absolute;
-      left: 16px;
+      left: 12px;
       top: 50%;
       transform: translateY(-50%);
-      width: 20px;
-      height: 20px;
-      color: var(--text-light);
+      width: 18px;
+      height: 18px;
+      color: var(--text-secondary);
       pointer-events: none;
-      z-index: 2;
     }
 
     .search-input {
-      width: 100%;
-      padding: 16px 16px 16px 48px;
-      font-size: 16px;
-      border: 2px solid var(--green-pale);
-      border-radius: var(--radius);
-      background: var(--white);
-      color: var(--text-dark);
-      outline: none;
-      transition: border-color 0.2s, box-shadow 0.2s;
-      -webkit-appearance: none;
+      padding-left: 40px;
+      background: rgba(118, 118, 128, 0.12);
+      border-radius: var(--radius-sm);
     }
 
     .search-input:focus {
-      border-color: var(--green-primary);
-      box-shadow: 0 0 0 3px rgba(58, 95, 75, 0.15);
+      background: var(--ios-card);
     }
 
-    .search-input::placeholder {
-      color: var(--text-light);
-    }
-
-    /* Autocomplete dropdown */
     .autocomplete-list {
       position: absolute;
-      top: 100%;
+      top: calc(100% + 8px);
       left: 0;
       right: 0;
-      background: var(--white);
-      border: 2px solid var(--green-primary);
-      border-top: none;
-      border-radius: 0 0 var(--radius) var(--radius);
-      max-height: 200px;
+      background: var(--ios-card);
+      border-radius: var(--radius);
+      max-height: 240px;
       overflow-y: auto;
       z-index: 10;
       display: none;
-      box-shadow: var(--shadow-md);
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15),
+                  0 0 0 0.5px rgba(0, 0, 0, 0.05);
     }
 
     .autocomplete-list.active {
       display: block;
+      animation: dropdownFade 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+    }
+
+    @keyframes dropdownFade {
+      from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
     }
 
     .autocomplete-item {
-      padding: 14px 16px;
+      padding: 12px 16px;
       cursor: pointer;
-      font-size: 15px;
-      color: var(--text-dark);
-      border-bottom: 1px solid var(--green-pale);
+      font-size: 17px;
+      color: var(--text-primary);
+      border-bottom: 0.5px solid var(--ios-separator);
+      text-align: left;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
       transition: background 0.15s;
     }
 
@@ -161,521 +460,1591 @@
 
     .autocomplete-item:hover,
     .autocomplete-item:active {
-      background: var(--green-pale);
+      background: rgba(0, 0, 0, 0.04);
     }
 
     .autocomplete-item .highlight {
-      font-weight: 700;
-      color: var(--green-primary);
+      font-weight: 600;
+      color: var(--tint);
     }
 
-    /* Selected property card */
+    /* Selected property card - iOS grouped cell style */
     .property-card {
-      background: var(--white);
+      position: relative;
+      width: 100%;
+      background: var(--ios-card);
       border-radius: var(--radius);
-      padding: 20px;
-      margin-bottom: 24px;
-      box-shadow: var(--shadow-md);
-      border-left: 4px solid var(--green-primary);
-      display: none;
+      padding: 16px;
+      margin-bottom: 20px;
+      box-shadow: var(--card-shadow);
+      text-align: left;
+      animation: slideUpFade 0.25s cubic-bezier(0.25, 0.1, 0.25, 1);
     }
 
-    .property-card.active {
-      display: block;
-      animation: slideIn 0.3s ease;
-    }
-
-    @keyframes slideIn {
-      from { opacity: 0; transform: translateY(-8px); }
+    @keyframes slideUpFade {
+      from { opacity: 0; transform: translateY(8px); }
       to { opacity: 1; transform: translateY(0); }
     }
 
     .property-address {
       font-size: 17px;
-      font-weight: 700;
-      color: var(--text-dark);
-      margin-bottom: 6px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+      letter-spacing: -0.2px;
     }
 
     .crew-info {
-      font-size: 14px;
-      color: var(--text-medium);
+      font-size: 15px;
+      color: var(--text-secondary);
     }
 
     .crew-info strong {
-      color: var(--green-primary);
+      color: var(--tint);
+      font-weight: 600;
     }
 
-    /* Info message */
-    .info-message {
-      background: var(--green-pale);
-      border-radius: var(--radius);
-      padding: 20px;
-      margin-bottom: 24px;
-      font-size: 15px;
-      line-height: 1.6;
-      color: var(--text-medium);
-      display: none;
-    }
-
-    .info-message.active {
-      display: block;
-      animation: slideIn 0.3s ease 0.1s both;
-    }
-
-    /* Customer info fields */
-    .customer-fields {
-      margin-bottom: 24px;
-      display: none;
-    }
-
-    .customer-fields.active {
-      display: block;
-      animation: slideIn 0.3s ease 0.12s both;
-    }
-
-    .field-row {
-      margin-bottom: 16px;
-    }
-
-    .field-row:last-child {
-      margin-bottom: 0;
-    }
-
-    .field-label {
-      font-size: 13px;
-      font-weight: 700;
-      color: var(--text-light);
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
-      margin-bottom: 10px;
-    }
-
-    .field-input {
-      width: 100%;
-      padding: 16px;
-      font-size: 16px;
-      font-family: inherit;
-      border: 2px solid var(--green-pale);
-      border-radius: var(--radius);
-      background: var(--white);
-      color: var(--text-dark);
-      outline: none;
-      transition: border-color 0.2s, box-shadow 0.2s;
-      -webkit-appearance: none;
-    }
-
-    .field-input:focus {
-      border-color: var(--green-primary);
-      box-shadow: 0 0 0 3px rgba(58, 95, 75, 0.15);
-    }
-
-    .field-input::placeholder {
-      color: var(--text-light);
-    }
-
-    /* Message text area */
-    .message-container {
-      margin-bottom: 28px;
-      display: none;
-    }
-
-    .message-container.active {
-      display: block;
-      animation: slideIn 0.3s ease 0.18s both;
-    }
-
-    .message-label {
-      font-size: 13px;
-      font-weight: 700;
-      color: var(--text-light);
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
-      margin-bottom: 10px;
-    }
-
-    .message-input {
-      width: 100%;
-      padding: 16px;
-      font-size: 16px;
-      font-family: inherit;
-      border: 2px solid var(--green-pale);
-      border-radius: var(--radius);
-      background: var(--white);
-      color: var(--text-dark);
-      outline: none;
-      resize: vertical;
-      min-height: 100px;
-      transition: border-color 0.2s, box-shadow 0.2s;
-      -webkit-appearance: none;
-    }
-
-    .message-input:focus {
-      border-color: var(--green-primary);
-      box-shadow: 0 0 0 3px rgba(58, 95, 75, 0.15);
-    }
-
-    .message-input::placeholder {
-      color: var(--text-light);
-    }
-
-    /* Photo upload */
-    .photo-container {
-      margin-bottom: 28px;
-      display: none;
-    }
-
-    .photo-container.active {
-      display: block;
-      animation: slideIn 0.3s ease 0.21s both;
-    }
-
-    .photo-label {
-      font-size: 13px;
-      font-weight: 700;
-      color: var(--text-light);
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
-      margin-bottom: 10px;
-    }
-
+    /* Photo upload - iOS style */
     .photo-upload-btn {
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 10px;
       width: 100%;
-      padding: 16px;
-      font-size: 16px;
-      font-weight: 600;
+      height: 50px;
+      padding: 0 20px;
+      font-size: 17px;
+      font-weight: 500;
       font-family: inherit;
-      color: var(--green-primary);
-      background: var(--white);
-      border: 2px dashed var(--green-accent);
+      color: var(--tint);
+      background: var(--ios-card);
+      border: none;
       border-radius: var(--radius);
       cursor: pointer;
-      transition: background 0.2s, border-color 0.2s;
+      margin-bottom: 12px;
+      box-shadow: var(--card-shadow);
+      transition: background 0.15s cubic-bezier(0.25, 0.1, 0.25, 1),
+                  transform 0.1s cubic-bezier(0.25, 0.1, 0.25, 1);
     }
 
-    .photo-upload-btn:hover,
     .photo-upload-btn:active {
-      background: var(--green-pale);
-      border-color: var(--green-primary);
+      background: rgba(58, 95, 75, 0.06);
+      transform: scale(0.97);
     }
 
     .photo-upload-btn svg {
       width: 22px;
       height: 22px;
-      flex-shrink: 0;
     }
 
     .photo-preview {
-      display: none;
-      margin-top: 12px;
+      width: 100%;
       position: relative;
+      margin-bottom: 16px;
+      display: none;
     }
 
     .photo-preview.active {
       display: block;
+      animation: slideUpFade 0.25s cubic-bezier(0.25, 0.1, 0.25, 1);
     }
 
     .photo-preview img {
       width: 100%;
       border-radius: var(--radius);
-      box-shadow: var(--shadow-md);
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
     }
 
     .photo-remove {
       position: absolute;
-      top: 8px;
-      right: 8px;
-      width: 32px;
-      height: 32px;
+      top: 10px;
+      right: 10px;
+      width: 28px;
+      height: 28px;
       border-radius: 50%;
-      background: rgba(0, 0, 0, 0.6);
+      background: rgba(0, 0, 0, 0.5);
+      -webkit-backdrop-filter: blur(4px);
+      backdrop-filter: blur(4px);
       border: none;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      color: var(--white);
+      color: var(--ios-card);
       font-size: 18px;
+      font-weight: 300;
       line-height: 1;
+      transition: transform 0.1s;
     }
 
-    .photo-hint {
-      font-size: 13px;
-      color: var(--text-light);
-      margin-top: 8px;
+    .photo-remove:active {
+      transform: scale(0.95);
     }
 
-    /* Text My Team button */
-    .cta-container {
-      display: none;
+    /* Photo annotation canvas */
+    .photo-canvas-wrap {
+      width: 100%;
+      border-radius: var(--radius);
+      overflow: hidden;
+      position: relative;
+      touch-action: auto;
+      user-select: none;
+      -webkit-user-select: none;
+      background: #1a1a1a;
     }
 
-    .cta-container.active {
+    .photo-canvas-wrap canvas {
       display: block;
-      animation: slideIn 0.3s ease 0.2s both;
+      width: 100%;
     }
 
-    .cta-button {
+    .photo-annotate-controls {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+      margin-bottom: 8px;
+    }
+
+    .photo-annotate-controls button {
+      flex: 1;
+      min-height: 44px;
+      padding: 10px 12px;
+      font-size: 15px;
+      font-weight: 500;
+      border: none;
+      border-radius: var(--radius-sm);
+      background: rgba(58, 95, 75, 0.1);
+      color: var(--tint);
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+
+    .photo-annotate-controls button:active {
+      background: rgba(58, 95, 75, 0.2);
+      transform: scale(0.97);
+    }
+
+    .photo-annotate-controls button.draw-on {
+      background: var(--ios-red);
+      color: white;
+    }
+
+    /* Buttons - iOS style */
+    .btn {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 12px;
+      gap: 8px;
       width: 100%;
-      padding: 20px 32px;
-      font-size: 20px;
-      font-weight: 700;
-      color: var(--white);
-      background: linear-gradient(135deg, var(--green-primary) 0%, var(--green-light) 100%);
+      max-width: 300px;
+      height: 50px;
+      padding: 0 24px;
+      font-size: 17px;
+      font-weight: 600;
+      font-family: inherit;
       border: none;
       border-radius: var(--radius);
       cursor: pointer;
       text-decoration: none;
-      box-shadow: var(--shadow-lg);
-      transition: transform 0.15s, box-shadow 0.15s, opacity 0.2s;
+      margin-bottom: 10px;
+      transition: transform 0.1s cubic-bezier(0.25, 0.1, 0.25, 1),
+                  opacity 0.15s,
+                  background 0.15s;
       -webkit-tap-highlight-color: transparent;
-      letter-spacing: 0.5px;
     }
 
-    .cta-button.disabled {
-      opacity: 0.5;
+    .btn-primary {
+      color: #FFFFFF;
+      background: var(--tint);
+    }
+
+    .btn-primary:hover {
+      background: var(--tint-dark);
+    }
+
+    .btn-primary:active {
+      transform: scale(0.97);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.4;
       pointer-events: none;
     }
 
-    .cta-button:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 10px 36px rgba(45, 74, 62, 0.28);
+    .btn-secondary {
+      color: var(--tint);
+      background: transparent;
+      border: none;
     }
 
-    .cta-button:active {
-      transform: translateY(1px);
-      box-shadow: var(--shadow-md);
+    .btn-secondary:hover {
+      background: rgba(58, 95, 75, 0.08);
     }
 
-    .cta-button svg {
-      width: 26px;
-      height: 26px;
-      flex-shrink: 0;
+    .btn-secondary:active {
+      transform: scale(0.97);
+      background: rgba(58, 95, 75, 0.12);
     }
 
-    /* Empty state */
-    .empty-state {
-      text-align: center;
-      padding: 40px 20px;
-      color: var(--text-light);
+    .btn svg {
+      width: 20px;
+      height: 20px;
     }
 
-    .empty-state svg {
-      width: 64px;
-      height: 64px;
-      margin-bottom: 16px;
-      color: var(--green-accent);
-      opacity: 0.5;
+    /* Focus states for accessibility */
+    .btn:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(58, 95, 75, 0.3);
     }
 
-    .empty-state p {
-      font-size: 15px;
-      line-height: 1.5;
+    /* iOS-style back link */
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--ios-blue);
+      font-size: 17px;
+      font-weight: 400;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 12px 4px;
+      margin-top: 12px;
+      min-height: 44px;
+      transition: opacity 0.15s;
+    }
+    .back-link:active {
+      opacity: 0.4;
+    }
+    .back-link svg {
+      width: 8px;
+      height: 13px;
+      stroke-width: 2.5;
+      margin-right: 0;
+    }
+
+    /* Review summary - iOS grouped list style */
+    .review-card {
+      width: 100%;
+      background: var(--ios-card);
+      border-radius: var(--radius);
+      padding: 0;
+      margin-bottom: 20px;
+      box-shadow: var(--card-shadow);
+      text-align: left;
+      overflow: hidden;
+    }
+
+    .review-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      border-bottom: 0.5px solid var(--ios-separator);
+      font-size: 17px;
+      min-height: 44px;
+      margin-left: 16px;
+      padding-left: 0;
+    }
+
+    .review-row:first-child {
+      margin-left: 0;
+      padding-left: 16px;
+    }
+
+    .review-row:last-child {
+      border-bottom: none;
+    }
+
+    .review-label {
+      color: var(--text-secondary);
+      font-weight: 400;
+      text-transform: none;
+      font-size: 17px;
+      letter-spacing: 0;
+    }
+
+    .review-value {
+      color: var(--text-primary);
+      text-align: right;
+      max-width: 55%;
+      font-weight: 400;
+      font-size: 17px;
     }
 
     /* Footer */
     .footer {
       text-align: center;
-      padding: 16px 20px 24px;
-      font-size: 12px;
-      color: var(--text-light);
+      padding: 20px 20px;
+      font-size: 13px;
+      color: var(--text-tertiary);
+      letter-spacing: 0;
     }
 
     .footer a {
-      color: var(--green-primary);
+      color: var(--tint);
       text-decoration: none;
+      font-weight: 500;
     }
 
-    /* Responsive fine-tuning */
-    @media (min-width: 600px) {
-      .main {
-        padding: 32px 24px 40px;
+    /* Button row for back/next */
+    .btn-row {
+      display: flex;
+      gap: 12px;
+      width: 100%;
+      max-width: 300px;
+    }
+
+    .btn-row .btn {
+      flex: 1;
+      margin-bottom: 0;
+    }
+
+    /* Character counter */
+    .char-counter {
+      font-size: 13px;
+      color: var(--text-secondary);
+      text-align: right;
+      margin-top: 8px;
+      margin-right: 4px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* SMS Preview - iOS iMessage bubble style */
+    .sms-preview {
+      width: 100%;
+      background: #E9E9EB;
+      border-radius: 18px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      text-align: left;
+      font-size: 17px;
+      line-height: 1.4;
+      color: #000;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .sms-preview-label {
+      font-size: 13px;
+      font-weight: 400;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+      text-align: center;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+
+    /* Start over link - iOS destructive text button */
+    .start-over {
+      color: var(--ios-red);
+      font-size: 15px;
+      text-decoration: none;
+      cursor: pointer;
+      margin-top: 12px;
+      padding: 8px 12px;
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      transition: opacity 0.15s;
+    }
+
+    .start-over:active {
+      opacity: 0.4;
+    }
+
+    /* Skip link - iOS text button style */
+    .skip-link {
+      color: var(--ios-blue);
+      font-size: 15px;
+      text-decoration: none;
+      cursor: pointer;
+      margin-top: 8px;
+      padding: 8px 12px;
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      transition: opacity 0.15s;
+    }
+
+    .skip-link:active {
+      opacity: 0.4;
+    }
+
+    /* Check status link */
+    .check-status-link {
+      color: var(--ios-blue);
+      font-size: 15px;
+      text-decoration: none;
+      cursor: pointer;
+      margin-top: 20px;
+      padding: 8px 12px;
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      transition: opacity 0.15s;
+    }
+
+    .check-status-link:active {
+      opacity: 0.4;
+    }
+
+    /* Status cards - iOS list style */
+    .status-card {
+      width: 100%;
+      background: var(--ios-card);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      margin-bottom: 10px;
+      box-shadow: var(--card-shadow);
+      text-align: left;
+      transition: transform 0.1s cubic-bezier(0.25, 0.1, 0.25, 1);
+    }
+
+    .status-card:active {
+      transform: scale(0.98);
+    }
+
+    .status-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .status-card-date {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .status-badge {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 10px;
+    }
+
+    .status-badge.open {
+      background: rgba(255, 149, 0, 0.15);
+      color: #C77700;
+    }
+
+    .status-badge.in-progress {
+      background: rgba(0, 122, 255, 0.12);
+      color: #0066CC;
+    }
+
+    .status-badge.completed {
+      background: rgba(52, 199, 89, 0.15);
+      color: #248A3D;
+    }
+
+    .status-card-property {
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--text-primary);
+      letter-spacing: -0.2px;
+      margin-bottom: 2px;
+    }
+
+    .status-card-message {
+      font-size: 15px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Empty state - iOS style */
+    .no-requests {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--text-secondary);
+    }
+
+    .no-requests-icon {
+      width: 48px;
+      height: 48px;
+      margin: 0 auto 12px;
+      opacity: 0.35;
+      color: var(--text-primary);
+    }
+
+    .no-requests-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--text-primary);
+      letter-spacing: -0.3px;
+      margin-bottom: 6px;
+    }
+
+    .no-requests p {
+      font-size: 15px;
+      line-height: 1.47;
+      color: var(--text-secondary);
+    }
+
+    /* Touch targets (Apple HIG: 44x44pt minimum) */
+    .btn, .photo-upload-btn, .skip-link, .autocomplete-item, .lang-toggle {
+      min-height: 44px;
+    }
+
+    .photo-remove {
+      min-width: 44px;
+      min-height: 44px;
+      width: 44px;
+      height: 44px;
+    }
+
+    /* Pull to refresh indicator */
+    .pull-refresh-indicator {
+      position: fixed;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%) translateY(-100%);
+      background: var(--tint);
+      color: white;
+      padding: 12px 20px;
+      border-radius: 0 0 12px 12px;
+      font-size: 14px;
+      font-weight: 600;
+      transition: transform 0.3s;
+      z-index: 1000;
+    }
+
+    .pull-refresh-indicator.visible {
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* Reduce Motion - respect accessibility setting */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
       }
-      .logo {
-        max-width: 240px;
+    }
+
+    /* Dark Mode - iOS style */
+    @media (prefers-color-scheme: dark) {
+      :root {
+        /* Brand */
+        --tint: #6BB87A;
+        --tint-dark: #5A9E6C;
+
+        /* iOS System Colors - Dark */
+        --ios-bg: #000000;
+        --ios-card: #1C1C1E;
+        --ios-separator: rgba(84, 84, 88, 0.65);
+        --ios-blue: #0A84FF;
+        --ios-orange: #FF9F0A;
+        --ios-green: #30D158;
+        --ios-red: #FF453A;
+
+        /* Text Hierarchy - Dark */
+        --text-primary: #FFFFFF;
+        --text-secondary: #8E8E93;
+        --text-tertiary: #48484A;
+        --text-placeholder: rgba(235, 235, 245, 0.3);
+
+        /* Surfaces */
+        --card-shadow: none;
+
+        /* Legacy mappings */
+        --green-primary: #6BB87A;
+        --cream: #000000;
+        --white: #1C1C1E;
+        --text-dark: #FFFFFF;
+        --text-medium: #8E8E93;
+        --text-light: #8E8E93;
       }
+
+      body {
+        background: var(--ios-bg);
+      }
+
+      .header {
+        background: rgba(28, 28, 30, 0.92);
+        border-bottom-color: var(--ios-separator);
+      }
+
+      .header .nav-back {
+        color: var(--ios-blue);
+      }
+
+      .header .nav-title {
+        color: #FFFFFF;
+      }
+
+      .progress-bar {
+        background: var(--ios-card);
+      }
+
+      .progress-dot {
+        background: #2C2C2E;
+      }
+
+      .form-input {
+        background: #2C2C2E;
+        color: #FFFFFF;
+      }
+
+      .form-input:focus {
+        box-shadow: inset 0 0 0 1px var(--tint),
+                    0 0 0 3px rgba(107, 184, 122, 0.2);
+      }
+
+      .form-input::placeholder {
+        color: var(--text-placeholder);
+      }
+
+      .search-input {
+        background: rgba(118, 118, 128, 0.24);
+      }
+
+      .search-input:focus {
+        background: #2C2C2E;
+      }
+
+      .step-icon {
+        background: rgba(107, 184, 122, 0.15);
+      }
+
+      .property-card,
+      .review-card,
+      .status-card {
+        background: var(--ios-card);
+      }
+
+      .photo-annotate-controls button {
+        background: rgba(255, 255, 255, 0.1);
+        color: #FFFFFF;
+      }
+
+      .photo-annotate-controls button:active {
+        background: rgba(255, 255, 255, 0.15);
+      }
+
+      .autocomplete-list {
+        background: #2C2C2E;
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+      }
+
+      .autocomplete-item {
+        color: #FFFFFF;
+        border-bottom-color: var(--ios-separator);
+      }
+
+      .autocomplete-item:hover,
+      .autocomplete-item:active {
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .sms-preview {
+        background: #3A3A3C;
+        color: #FFFFFF;
+      }
+
+      .status-badge.open {
+        background: rgba(255, 159, 10, 0.2);
+        color: #FF9F0A;
+      }
+
+      .status-badge.in-progress {
+        background: rgba(10, 132, 255, 0.2);
+        color: #0A84FF;
+      }
+
+      .status-badge.completed {
+        background: rgba(48, 209, 88, 0.2);
+        color: #30D158;
+      }
+
+      .btn-secondary {
+        background: transparent;
+      }
+
+      .btn-secondary:hover {
+        background: rgba(107, 184, 122, 0.15);
+      }
+
+      .btn-secondary:active {
+        background: rgba(107, 184, 122, 0.2);
+      }
+
+      #offline-banner {
+        background: rgba(255, 159, 10, 0.2) !important;
+        color: #FF9F0A !important;
+      }
+
+      .lang-toggle {
+        background: rgba(107, 184, 122, 0.15);
+      }
+
+      .lang-toggle:hover {
+        background: rgba(107, 184, 122, 0.2);
+      }
+
+      .lang-toggle:active {
+        background: rgba(107, 184, 122, 0.25);
+      }
+
+      .footer {
+        color: var(--text-tertiary);
+      }
+
+      .char-counter {
+        color: var(--text-secondary);
+      }
+    }
+
+    /* Visually hidden for screen readers */
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    /* Toast notifications - iOS style */
+    #toast-container {
+      position: fixed;
+      bottom: calc(20px + env(safe-area-inset-bottom));
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1001;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+      max-width: calc(100% - 40px);
+    }
+
+    .toast {
+      background: rgba(0, 0, 0, 0.85);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      backdrop-filter: saturate(180%) blur(20px);
+      color: #FFFFFF;
+      padding: 14px 20px;
+      border-radius: 14px;
+      font-size: 15px;
+      font-weight: 500;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+      animation: toastSlideUp 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+      pointer-events: auto;
+    }
+
+    .toast-warning {
+      background: rgba(255, 149, 0, 0.95);
+      color: #FFFFFF;
+    }
+
+    .toast-error {
+      background: rgba(255, 59, 48, 0.95);
+      color: #FFFFFF;
+    }
+
+    .toast-success {
+      background: rgba(52, 199, 89, 0.95);
+      color: #FFFFFF;
+    }
+
+    @keyframes toastSlideUp {
+      from { opacity: 0; transform: translateY(16px) scale(0.95); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* Error state for properties loading */
+    .error-state {
+      text-align: center;
+      padding: 24px;
+      color: var(--text-secondary);
+    }
+
+    .error-state p {
+      margin-bottom: 16px;
+      font-size: 15px;
+    }
+
+    .error-state .btn {
+      margin: 0 auto;
+    }
+
+    /* Autocomplete ARIA highlighting */
+    .autocomplete-item.highlighted {
+      background: rgba(58, 95, 75, 0.08);
+    }
+
+    /* Full-screen transition screens - iOS style */
+    .screen-overlay {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      min-height: 100dvh;
+      background: var(--ios-bg);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif;
+      text-align: center;
+      padding: 40px 20px;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 50;
+      animation: screenFadeIn 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+    }
+
+    @keyframes screenFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .screen-overlay.active {
+      display: flex;
+    }
+
+    .screen-overlay .screen-icon {
+      width: 56px;
+      height: 56px;
+      margin-bottom: 16px;
+      color: var(--tint);
+    }
+
+    .screen-overlay h2 {
+      color: var(--text-primary);
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      letter-spacing: -0.5px;
+    }
+
+    .screen-overlay p {
+      color: var(--text-secondary);
+      font-size: 17px;
+      line-height: 1.47;
+      max-width: 300px;
+    }
+
+    .screen-overlay .btn {
+      margin-top: 28px;
+    }
+
+    /* Focus visible styles for keyboard navigation */
+    *:focus-visible {
+      outline: 2px solid var(--tint);
+      outline-offset: 2px;
+    }
+
+    input:focus-visible,
+    textarea:focus-visible {
+      outline: none;
     }
   </style>
 </head>
 <body>
 
-  <header class="header">
-    <img src="images/logo-stacked-fullcolor.png" alt="Endurance — A Landscape Company" class="logo">
-  </header>
+  <!-- Offline Banner - iOS style -->
+  <div id="offline-banner" style="display:none;position:fixed;top:0;left:0;right:0;background:rgba(255,149,0,0.95);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);color:#fff;padding:10px 20px;padding-top:calc(10px + env(safe-area-inset-top));text-align:center;font-size:14px;font-weight:500;z-index:1000;">
+    <span id="offline-message">You're offline — we'll send your request when you reconnect</span>
+  </div>
 
-  <main class="main">
-    <label class="section-label" for="property-search">Select Your Property</label>
+  <!-- Toast Container for notifications -->
+  <div id="toast-container" aria-live="polite"></div>
 
-    <div class="search-container">
-      <!-- Search icon -->
-      <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <circle cx="11" cy="11" r="7"/>
-        <path d="M21 21l-4.35-4.35" stroke-linecap="round"/>
+  <!-- Status announcer for screen readers -->
+  <div id="status-announcer" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- SVG Templates -->
+  <template id="icon-camera">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z"/>
+      <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z"/>
+    </svg>
+  </template>
+  <template id="icon-upload">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+    </svg>
+  </template>
+  <template id="icon-check-circle">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+    </svg>
+  </template>
+  <template id="icon-message">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+    </svg>
+  </template>
+  <template id="icon-plus">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+    </svg>
+  </template>
+
+  <!-- Uploading Screen -->
+  <div id="screen-uploading" class="screen-overlay">
+    <svg class="screen-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+    </svg>
+    <h2 data-i18n="finishingUp">Finishing up...</h2>
+    <p data-i18n="almostReady">Almost ready</p>
+  </div>
+
+  <!-- Submitting Screen -->
+  <div id="screen-submitting" class="screen-overlay">
+    <svg class="screen-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/>
+    </svg>
+    <h2 data-i18n="submitting">Submitting...</h2>
+    <p data-i18n="almostReady">Almost ready</p>
+  </div>
+
+  <!-- Confirmation Screen -->
+  <div id="screen-confirmation" class="screen-overlay">
+    <svg class="screen-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+    </svg>
+    <h2 data-i18n="thankYou">Thank You!</h2>
+    <p id="confirmation-message"></p>
+    <button id="new-request-after-confirm" class="btn btn-secondary">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
       </svg>
+      <span data-i18n="newRequest">New Request</span>
+    </button>
+  </div>
 
-      <input
-        type="text"
-        id="property-search"
-        class="search-input"
-        placeholder="Search your address..."
-        autocomplete="off"
-      >
-      <div id="autocomplete-list" class="autocomplete-list"></div>
-    </div>
-
-    <!-- Empty state (shown before selection) -->
-    <div id="empty-state" class="empty-state">
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"/>
-        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 0115 0z"/>
+  <!-- Home Page -->
+  <div id="home-page" class="step active">
+    <header class="header">
+      <button id="lang-toggle" class="lang-toggle" data-i18n="langToggle">Español</button>
+      <img src="images/logo-stacked-fullcolor.png" alt="Endurance Services" class="logo">
+    </header>
+    <main class="main">
+      <svg class="step-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
       </svg>
-      <p>Start typing your property address above<br>to connect with your crew.</p>
-    </div>
+      <h1 class="step-title" data-i18n="textMyTeam">Text My Team</h1>
+      <p id="home-greeting" class="step-subtitle" data-i18n="enterPinToStart">Enter your PIN to get started</p>
 
-    <!-- Selected property info -->
-    <div id="property-card" class="property-card">
-      <div class="property-address" id="card-address"></div>
-      <div class="crew-info">Crew Leader: <strong id="card-crew"></strong></div>
-    </div>
-
-    <!-- Info message -->
-    <div id="info-message" class="info-message">
-      Please text the team, and the onsite crew leader will handle your request during today's service, or the office will follow up with a more detailed plan. Thank you!
-      <br><br>
-      ✅ Tip: You can attach photos in your text message to show us the issue.
-    </div>
-
-    <!-- Customer name and phone -->
-    <div id="customer-fields" class="customer-fields">
-      <div class="field-row">
-        <label class="field-label" for="customer-name">Your Name</label>
-        <input
-          type="text"
-          id="customer-name"
-          class="field-input"
-          placeholder="First and last name"
-          autocomplete="name"
-        >
+      <!-- PIN Entry -->
+      <div id="pin-section" class="form-group" style="width:100%;max-width:200px;">
+        <input type="tel" id="pin-input" class="form-input" placeholder="Enter PIN" maxlength="4" style="text-align:center;font-size:24px;letter-spacing:8px;padding:16px;" autocomplete="off">
+        <p id="pin-error" style="color:var(--ios-red);font-size:14px;margin-top:8px;display:none;">PIN not found. Please check your PIN or contact the office.</p>
       </div>
-      <div class="field-row">
-        <label class="field-label" for="customer-phone">Your Phone Number</label>
-        <input
-          type="tel"
-          id="customer-phone"
-          class="field-input"
-          placeholder="(407) 555-1234"
-          autocomplete="tel"
-        >
+
+      <!-- Property Selection (shown when multiple properties match PIN) -->
+      <div id="pin-properties-list" style="display:none;width:100%;margin-top:16px;"></div>
+
+      <!-- Property Card (shown after PIN match) -->
+      <div id="home-property-card" class="property-card" style="display:none;">
+        <button type="button" id="home-property-clear" class="photo-remove" style="top:12px;right:12px;" aria-label="Change PIN">&times;</button>
+        <div class="property-address" id="home-card-address"></div>
+        <div class="crew-info">Crew Leader: <strong id="home-card-crew"></strong></div>
       </div>
-    </div>
 
-    <!-- Message text area -->
-    <div id="message-container" class="message-container">
-      <label class="message-label" for="user-message">Your Request</label>
-      <textarea
-        id="user-message"
-        class="message-input"
-        placeholder="Describe your request..."
-        rows="4"
-      ></textarea>
-    </div>
+      <!-- Continue button (shown after property selected) -->
+      <button id="pin-continue-btn" class="btn btn-primary" style="display:none;">
+        <span data-i18n="continue">Continue</span>
+      </button>
 
-    <!-- Photo upload -->
-    <div id="photo-container" class="photo-container">
-      <div class="photo-label">Attach a Photo (Optional)</div>
-      <input type="file" id="photo-input" accept="image/*" capture="environment" style="display:none;">
-      <button type="button" id="photo-upload-btn" class="photo-upload-btn">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <!-- Check Status Link -->
+      <a href="#" id="check-status-link" style="margin-top:24px;color:var(--ios-blue);font-size:15px;" data-i18n="checkRequestStatus">Check Request Status</a>
+    </main>
+    <footer class="footer">
+      &copy; 2026 Endurance Services
+    </footer>
+  </div>
+
+  <!-- Step 1: Take Photo -->
+  <div id="step-1" class="step">
+    <header class="header has-nav">
+      <button id="step1-back-link" class="nav-back">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 8 13" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 1L1 6.5L7 12"/></svg>
+        <span data-i18n="home">Home</span>
+      </button>
+      <span class="nav-title" data-i18n="photoTitle">Photo</span>
+      <span class="nav-right"></span>
+    </header>
+    <div class="progress-bar" role="group" aria-label="Form progress">
+      <div class="progress-dot current" aria-label="Step 1 of 3: Photo, current"></div>
+      <div class="progress-dot" aria-label="Step 2 of 3: Details"></div>
+      <div class="progress-dot" aria-label="Step 3 of 3: Review"></div>
+    </div>
+    <main class="main">
+      <h1 class="step-title" data-i18n="photoOfIssue">Photo of the Issue</h1>
+      <p class="step-subtitle" data-i18n="photoInstructions" style="text-align:left;">Please follow these prompts, and the onsite crew leader will handle your request during today's service, or the office will follow up with a plan to address the issue.</p>
+      <input type="file" id="camera-input" accept="image/*" capture="environment" style="display:none;">
+      <input type="file" id="library-input" accept="image/*" style="display:none;">
+      <div id="step1-photo-preview" class="photo-preview">
+        <div class="photo-canvas-wrap" id="photo-canvas-wrap">
+          <canvas id="photo-canvas"></canvas>
+        </div>
+        <button type="button" id="step1-photo-remove" class="photo-remove" aria-label="Remove photo">&times;</button>
+        <div class="photo-annotate-controls">
+          <button type="button" id="draw-toggle">Draw: OFF</button>
+          <button type="button" id="draw-undo">Undo</button>
+          <button type="button" id="draw-clear">Clear</button>
+        </div>
+      </div>
+      <button id="take-photo-btn" class="btn btn-primary">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:22px;height:22px;">
           <path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z"/>
           <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z"/>
         </svg>
-        Take or Choose Photo
+        <span data-i18n="takePhoto">Take Photo</span>
       </button>
-      <div id="photo-preview" class="photo-preview">
-        <img id="photo-preview-img" src="" alt="Photo preview">
-        <button type="button" id="photo-remove" class="photo-remove">&times;</button>
-      </div>
-      <div id="photo-hint" class="photo-hint" style="display:none;"></div>
-    </div>
-
-    <!-- CTA Button -->
-    <div id="cta-container" class="cta-container">
-      <a id="sms-link" href="#" class="cta-button disabled">
-        <!-- Chat bubble icon -->
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+      <button id="choose-photo-btn" class="btn btn-secondary">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:22px;height:22px;">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/>
         </svg>
-        Text My Team
-      </a>
-    </div>
-  </main>
+        <span data-i18n="chooseFromLibrary">Choose from Library</span>
+      </button>
+      <button id="step1-next-btn" class="btn btn-primary" style="display:none;" data-i18n="next">Next</button>
+      <button id="no-photo-btn" class="btn btn-secondary" data-i18n="skipNoPhoto">Skip - No Photo Needed</button>
+    </main>
+    <footer class="footer">
+      &copy; 2026 Endurance Services
+    </footer>
+  </div>
 
-  <footer class="footer">
-    &copy; 2026 Endurance Services &middot; <a href="tel:+14075794403">(407) 579-4403</a>
-  </footer>
+  <!-- Status Check Page -->
+  <div id="status-page" class="step">
+    <header class="header has-nav">
+      <button id="status-back" class="nav-back">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 8 13" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 1L1 6.5L7 12"/></svg>
+        <span data-i18n="home">Home</span>
+      </button>
+      <span class="nav-title" data-i18n="statusTitle">Status</span>
+      <span class="nav-right"></span>
+    </header>
+    <main class="main">
+      <h1 class="step-title" data-i18n="checkStatus">Check Request Status</h1>
+      <p class="step-subtitle">Enter your phone number to see your requests.</p>
+      <div class="form-group">
+        <input type="tel" id="status-phone" class="form-input" placeholder="(407) 555-1234">
+      </div>
+      <button id="status-search-btn" class="btn btn-primary" disabled>Search</button>
+      <div id="status-results" style="width:100%;margin-top:20px;"></div>
+    </main>
+    <footer class="footer">
+      &copy; 2026 Endurance Services
+    </footer>
+  </div>
+
+  <!-- Step 2: Contact Info & Request (Combined) -->
+  <div id="step-2" class="step">
+    <header class="header has-nav">
+      <button id="step-2-back" class="nav-back">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 8 13" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 1L1 6.5L7 12"/></svg>
+        <span data-i18n="photoTitle">Photo</span>
+      </button>
+      <span class="nav-title" data-i18n="detailsTitle">Details</span>
+      <span class="nav-right"></span>
+    </header>
+    <div class="progress-bar" role="group" aria-label="Form progress">
+      <div class="progress-dot completed" aria-label="Step 1 of 3: Photo, completed"></div>
+      <div class="progress-dot current" aria-label="Step 2 of 3: Details, current"></div>
+      <div class="progress-dot" aria-label="Step 3 of 3: Review"></div>
+    </div>
+    <main class="main">
+      <h1 class="step-title">Your Details</h1>
+      <div class="form-group">
+        <label class="form-label" for="customer-name">Your Name</label>
+        <input type="text" id="customer-name" class="form-input" placeholder="First and last name" autocomplete="name">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="customer-phone">Your Phone Number</label>
+        <input type="tel" id="customer-phone" class="form-input" placeholder="(407) 555-1234" autocomplete="tel">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="user-message">Describe the Issue</label>
+        <textarea id="user-message" class="form-input form-textarea" placeholder="What do you need help with?" rows="3" maxlength="500"></textarea>
+        <div class="char-counter"><span id="char-count">0</span>/500</div>
+      </div>
+      <button id="step-2-next" class="btn btn-primary" disabled>Next</button>
+    </main>
+    <footer class="footer">
+      &copy; 2026 Endurance Services
+    </footer>
+  </div>
+
+  <!-- Step 3: Review & Send -->
+  <div id="step-3" class="step">
+    <header class="header has-nav">
+      <button id="step-3-back" class="nav-back">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 8 13" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 1L1 6.5L7 12"/></svg>
+        <span data-i18n="detailsTitle">Details</span>
+      </button>
+      <span class="nav-title" data-i18n="reviewTitle">Review</span>
+      <span class="nav-right"></span>
+    </header>
+    <div class="progress-bar" role="group" aria-label="Form progress">
+      <div class="progress-dot completed" aria-label="Step 1 of 3: Photo, completed"></div>
+      <div class="progress-dot completed" aria-label="Step 2 of 3: Details, completed"></div>
+      <div class="progress-dot completed" aria-label="Step 3 of 3: Review, completed"></div>
+    </div>
+    <main class="main">
+      <h1 class="step-title">Review & Send</h1>
+      <div class="review-card">
+        <div class="review-row">
+          <span class="review-label">Property</span>
+          <span class="review-value" id="review-property"></span>
+        </div>
+        <div class="review-row">
+          <span class="review-label">Name</span>
+          <span class="review-value" id="review-name"></span>
+        </div>
+        <div class="review-row">
+          <span class="review-label">Phone</span>
+          <span class="review-value" id="review-phone"></span>
+        </div>
+        <div class="review-row">
+          <span class="review-label">Request</span>
+          <span class="review-value" id="review-message"></span>
+        </div>
+        <div class="review-row" id="review-photo-row" style="display:none;">
+          <span class="review-label">Photo</span>
+          <span class="review-value">Attached ✓</span>
+        </div>
+      </div>
+      <button id="submit-request-btn" class="btn btn-primary">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/>
+        </svg>
+        <span data-i18n="submitRequest">Submit Request</span>
+      </button>
+      <span id="start-over" class="start-over">Start Over</span>
+    </main>
+    <footer class="footer">
+      &copy; 2026 Endurance Services
+    </footer>
+  </div>
+
+  <!-- Phone Confirmation Modal - iOS alert style -->
+  <div id="phone-confirm-overlay" role="dialog" aria-modal="true" aria-labelledby="phone-confirm-title" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);z-index:100;align-items:center;justify-content:center;">
+    <div style="background:rgba(255,255,255,0.95);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-radius:14px;padding:20px 16px 16px;margin:20px;max-width:280px;width:calc(100% - 40px);text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+      <p id="phone-confirm-title" style="font-size:17px;font-weight:600;color:var(--text-dark);margin-bottom:4px;">Confirm Phone Number</p>
+      <p id="phone-confirm-number" style="font-size:22px;font-weight:700;color:var(--text-dark);margin:12px 0;letter-spacing:0.5px;font-variant-numeric:tabular-nums;"></p>
+      <p style="font-size:13px;color:rgba(60,60,67,0.6);margin-bottom:16px;line-height:1.4;">We'll use this to send you updates about your request.</p>
+      <button id="phone-confirm-yes" class="btn btn-primary" style="margin-bottom:8px;max-width:100%;">Yes, that's correct</button>
+      <button id="phone-confirm-edit" class="btn btn-secondary" style="max-width:100%;">Edit Number</button>
+    </div>
+  </div>
 
   <script>
     // --- Google Sheets Configuration ---
-    // Replace this URL with your deployed Google Apps Script Web App URL.
-    // See setup instructions below.
-    const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbyNtry07NpwHvf_7etuHclmou6FxsWtFNAgXyugJnmBmMx-JqsXJGBNKRffNla8oDnv/exec";
+    const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbygkHGZmIYUj9F91u-3eF3_V9mC7xZ03PfCJt6AD_VnpSXheLlEvt6h1obmqUf4JkRg/exec";
 
-    // --- Property Data ---
-    const properties = [
-      {
-        address: "916 Seville Place, Orlando, FL 32804",
-        crewLeader: "Douglas McMahon",
-        crewPhone: "4074064466"
-      },
-      {
-        address: "2586 N Orange Blossom Trail, Orlando, FL 32804",
-        crewLeader: "Jack McMahon",
-        crewPhone: "4073424650"
-      },
-      {
-        address: "723 Maryland Ave, Winter Park, FL 32789",
-        crewLeader: "Molly McMahon",
-        crewPhone: "4077125560"
+    // --- Utility Functions ---
+
+    // Announce message to screen readers
+    function announce(message) {
+      document.getElementById('status-announcer').textContent = message;
+    }
+
+    // Show toast notification
+    function showToast(message, type) {
+      type = type || 'info';
+      var toast = document.createElement('div');
+      toast.className = 'toast toast-' + type;
+      toast.textContent = message;
+      document.getElementById('toast-container').appendChild(toast);
+      setTimeout(function() { toast.remove(); }, 5000);
+    }
+
+    // Fetch with timeout wrapper
+    function fetchWithTimeout(url, options, timeout) {
+      timeout = timeout || 15000;
+      return Promise.race([
+        fetch(url, options),
+        new Promise(function(_, reject) {
+          setTimeout(function() { reject(new Error('Request timed out')); }, timeout);
+        })
+      ]);
+    }
+
+    // Format phone input with cursor preservation
+    function formatPhoneInput(inputElement) {
+      var rawCursorPos = inputElement.selectionStart;
+      var rawValue = inputElement.value;
+      var digitsBeforeCursor = rawValue.substring(0, rawCursorPos).replace(/\D/g, "").length;
+      var digits = rawValue.replace(/\D/g, "").substring(0, 10);
+
+      var formatted = "";
+      if (digits.length > 0) {
+        formatted = "(" + digits.substring(0, 3);
       }
-    ];
+      if (digits.length >= 3) {
+        formatted += ") " + digits.substring(3, 6);
+      }
+      if (digits.length >= 6) {
+        formatted += "-" + digits.substring(6, 10);
+      }
 
-    const OFFICE_PHONE = "4075794403";
+      inputElement.value = formatted;
 
-    // --- DOM refs ---
-    const searchInput      = document.getElementById("property-search");
-    const acList           = document.getElementById("autocomplete-list");
-    const emptyState       = document.getElementById("empty-state");
-    const propertyCard     = document.getElementById("property-card");
-    const cardAddress      = document.getElementById("card-address");
-    const cardCrew         = document.getElementById("card-crew");
-    const infoMessage      = document.getElementById("info-message");
-    const customerFields   = document.getElementById("customer-fields");
-    const customerName     = document.getElementById("customer-name");
-    const customerPhone    = document.getElementById("customer-phone");
-    const messageContainer = document.getElementById("message-container");
-    const userMessage      = document.getElementById("user-message");
-    const photoContainer   = document.getElementById("photo-container");
-    const photoInput       = document.getElementById("photo-input");
-    const photoUploadBtn   = document.getElementById("photo-upload-btn");
-    const photoPreview     = document.getElementById("photo-preview");
-    const photoPreviewImg  = document.getElementById("photo-preview-img");
-    const photoRemove      = document.getElementById("photo-remove");
-    const photoHint        = document.getElementById("photo-hint");
-    const ctaContainer     = document.getElementById("cta-container");
-    const smsLink          = document.getElementById("sms-link");
+      var newCursorPos = 0;
+      var digitsSeen = 0;
+      for (var i = 0; i < formatted.length; i++) {
+        if (/\d/.test(formatted[i])) {
+          digitsSeen++;
+          if (digitsSeen === digitsBeforeCursor) {
+            newCursorPos = i + 1;
+            break;
+          }
+        }
+      }
+      if (digitsBeforeCursor > digitsSeen) {
+        newCursorPos = formatted.length;
+      }
 
+      inputElement.setSelectionRange(newCursorPos, newCursorPos);
+      return digits.length;
+    }
+
+    // Input validation helpers
+    function validateName(name) {
+      return name.trim().length >= 2 && /\s/.test(name.trim());
+    }
+
+    function validatePhone(digits) {
+      return digits.length === 10 && /^[2-9]\d{2}[2-9]\d{6}$/.test(digits);
+    }
+
+    // Get icon from template
+    function getIcon(name) {
+      var template = document.getElementById('icon-' + name);
+      return template ? template.content.cloneNode(true) : null;
+    }
+
+    // --- State ---
+    let properties = [];
+    let propertiesLoaded = false;
     let selectedProperty = null;
-    let photoBase64 = null; // stores resized image as base64 data URL
+    let photoBase64 = null;
+    var currentStepNum = 1;
+    var acSelectedIndex = -1;
+    var lastFocusedElement = null;
+    var currentLang = localStorage.getItem('preferredLang') || 'en';
 
-    // --- Load saved customer info from localStorage ---
+    // Photo annotation state
+    var photoState = {
+      originalBase64: null,
+      imgWidth: 0,
+      imgHeight: 0,
+      rects: [],
+      isDrawing: false,
+      drawStart: null,
+      drawCurrent: null
+    };
+    var drawModeOn = false;
+
+    // --- ALL DOM References (consolidated) ---
+
+    // Home Page
+    const homePage = document.getElementById("home-page");
+    const pinInput = document.getElementById("pin-input");
+    const pinError = document.getElementById("pin-error");
+    const pinPropertiesList = document.getElementById("pin-properties-list");
+    const homePropertyCard = document.getElementById("home-property-card");
+    const homeCardAddress = document.getElementById("home-card-address");
+    const homeCardCrew = document.getElementById("home-card-crew");
+    const homePropertyClear = document.getElementById("home-property-clear");
+    const pinContinueBtn = document.getElementById("pin-continue-btn");
+    const checkStatusLink = document.getElementById("check-status-link");
+
+    // Step containers
+    const steps = {
+      1: document.getElementById("step-1"),
+      2: document.getElementById("step-2"),
+      3: document.getElementById("step-3")
+    };
+
+    // Step 1: Photo
+    const takePhotoBtn = document.getElementById("take-photo-btn");
+    const choosePhotoBtn = document.getElementById("choose-photo-btn");
+    const cameraInput = document.getElementById("camera-input");
+    const libraryInput = document.getElementById("library-input");
+    const step1PhotoPreview = document.getElementById("step1-photo-preview");
+    const step1PhotoRemove = document.getElementById("step1-photo-remove");
+    const step1NextBtn = document.getElementById("step1-next-btn");
+    const noPhotoBtn = document.getElementById("no-photo-btn");
+
+    // Photo annotation canvas
+    const photoCanvas = document.getElementById("photo-canvas");
+    const photoCanvasWrap = document.getElementById("photo-canvas-wrap");
+    const photoCtx = photoCanvas.getContext("2d");
+    const drawToggle = document.getElementById("draw-toggle");
+    const drawUndo = document.getElementById("draw-undo");
+    const drawClear = document.getElementById("draw-clear");
+
+    // Step 2: Contact Info + Message
+    const customerName = document.getElementById("customer-name");
+    const customerPhone = document.getElementById("customer-phone");
+    const userMessage = document.getElementById("user-message");
+    const charCount = document.getElementById("char-count");
+    const step2Back = document.getElementById("step-2-back");
+    const step2Next = document.getElementById("step-2-next");
+
+    // Step 3: Review
+    const reviewProperty = document.getElementById("review-property");
+    const reviewName = document.getElementById("review-name");
+    const reviewPhone = document.getElementById("review-phone");
+    const reviewMessage = document.getElementById("review-message");
+    const reviewPhotoRow = document.getElementById("review-photo-row");
+    const step3Back = document.getElementById("step-3-back");
+    const submitRequestBtn = document.getElementById("submit-request-btn");
+    const startOver = document.getElementById("start-over");
+
+    // Status Page
+    const statusPage = document.getElementById("status-page");
+    const statusPhone = document.getElementById("status-phone");
+    const statusSearchBtn = document.getElementById("status-search-btn");
+    const statusResults = document.getElementById("status-results");
+    const statusBack = document.getElementById("status-back");
+
+    // Phone Confirmation Modal
+    const phoneConfirmOverlay = document.getElementById("phone-confirm-overlay");
+    const phoneConfirmNumber = document.getElementById("phone-confirm-number");
+    const phoneConfirmYes = document.getElementById("phone-confirm-yes");
+    const phoneConfirmEdit = document.getElementById("phone-confirm-edit");
+
+    // Transition Screens
+    const screenUploading = document.getElementById("screen-uploading");
+    const screenSubmitting = document.getElementById("screen-submitting");
+    const screenConfirmation = document.getElementById("screen-confirmation");
+    const confirmationMessage = document.getElementById("confirmation-message");
+    const newRequestAfterConfirm = document.getElementById("new-request-after-confirm");
+
+    // Offline/Online
+    const offlineBanner = document.getElementById("offline-banner");
+    const offlineMessage = document.getElementById("offline-message");
+
+    // --- Load Properties (lazy-loaded on demand) ---
+
+    function ensurePropertiesLoaded() {
+      if (propertiesLoaded) return;
+      propertiesLoaded = true;
+      loadProperties();
+    }
+
+    function loadProperties() {
+      fetchWithTimeout(GOOGLE_SHEETS_URL + "?action=getProperties", {}, 15000)
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+          if (data.properties && data.properties.length > 0) {
+            properties = data.properties.map(function(p) {
+              return {
+                address: p.address,
+                crewLeader: p.crew,
+                crewPhone: p.phone,
+                pin: p.pin || ''
+              };
+            });
+            announce('Properties loaded');
+
+            // Check for saved PIN and auto-load
+            var savedPin = localStorage.getItem("customerPin");
+            if (savedPin) {
+              pinInput.value = savedPin;
+              validatePin(savedPin);
+            }
+            personalizeHomePage();
+          }
+        })
+        .catch(function(err) {
+          console.error("Failed to load properties:", err);
+          announce('Failed to load properties.');
+        });
+    }
+
+    // --- PIN Validation ---
+
+    function validatePin(pin) {
+      if (pin.length !== 4) {
+        pinError.style.display = 'none';
+        homePropertyCard.style.display = 'none';
+        pinPropertiesList.style.display = 'none';
+        pinContinueBtn.style.display = 'none';
+        return;
+      }
+
+      var matches = properties.filter(function(p) {
+        return p.pin === pin;
+      });
+
+      if (matches.length === 0) {
+        // No match
+        pinError.style.display = 'block';
+        homePropertyCard.style.display = 'none';
+        pinPropertiesList.style.display = 'none';
+        pinContinueBtn.style.display = 'none';
+        selectedProperty = null;
+      } else if (matches.length === 1) {
+        // Single match - auto-select
+        pinError.style.display = 'none';
+        pinPropertiesList.style.display = 'none';
+        selectPropertyFromPin(matches[0]);
+        localStorage.setItem("customerPin", pin);
+      } else {
+        // Multiple matches - show list
+        pinError.style.display = 'none';
+        homePropertyCard.style.display = 'none';
+        pinContinueBtn.style.display = 'none';
+        showPropertyList(matches);
+        localStorage.setItem("customerPin", pin);
+      }
+    }
+
+    function selectPropertyFromPin(prop) {
+      selectedProperty = prop;
+      homeCardAddress.textContent = prop.address;
+      homeCardCrew.textContent = prop.crewLeader;
+      homePropertyCard.style.display = 'block';
+      pinPropertiesList.style.display = 'none';
+      pinContinueBtn.style.display = 'flex';
+      localStorage.setItem("lastPropertyAddress", prop.address);
+      announce('Property selected: ' + prop.address);
+    }
+
+    function showPropertyList(matchingProperties) {
+      pinPropertiesList.innerHTML = '';
+      pinPropertiesList.style.display = 'block';
+
+      matchingProperties.forEach(function(prop) {
+        var item = document.createElement('div');
+        item.className = 'property-card';
+        item.style.cursor = 'pointer';
+        item.style.marginBottom = '12px';
+        item.innerHTML = '<div class="property-address">' + escapeHtml(prop.address) + '</div>' +
+                        '<div class="crew-info">Crew Leader: <strong>' + escapeHtml(prop.crewLeader) + '</strong></div>';
+        item.addEventListener('click', function() {
+          selectPropertyFromPin(prop);
+        });
+        pinPropertiesList.appendChild(item);
+      });
+    }
+
+    function clearPinSelection() {
+      selectedProperty = null;
+      pinInput.value = '';
+      homePropertyCard.style.display = 'none';
+      pinPropertiesList.style.display = 'none';
+      pinContinueBtn.style.display = 'none';
+      pinError.style.display = 'none';
+      localStorage.removeItem("customerPin");
+      localStorage.removeItem("lastPropertyAddress");
+      pinInput.focus();
+    }
+
+    // PIN input handler
+    pinInput.addEventListener('input', function() {
+      var pin = this.value.replace(/\D/g, '').substring(0, 4);
+      this.value = pin;
+      validatePin(pin);
+    });
+
+    // Clear PIN selection
+    homePropertyClear.addEventListener('click', clearPinSelection);
+
+    // Continue button - go to Step 1 (Photo)
+    pinContinueBtn.addEventListener('click', function() {
+      if (selectedProperty) {
+        // Start background photo upload prep
+        if (photoBase64 && !uploadedPhotoUrl && !photoUploadPromise) {
+          startBackgroundPhotoUpload();
+        }
+        goFromHome(steps[1]);
+        currentStepNum = 1;
+      }
+    });
+
+    // Check status link
+    checkStatusLink.addEventListener('click', function(e) {
+      e.preventDefault();
+      goFromHome(statusPage);
+    });
+
+    // --- Navigation ---
+
+    function goToStep(n) {
+      var goingForward = n > currentStepNum;
+      var oldStep = steps[currentStepNum];
+      var newStep = steps[n];
+
+      // Remove active from all
+      Object.values(steps).forEach(s => {
+        s.classList.remove("active", "slide-out-left", "slide-in-right", "slide-out-right", "slide-in-left");
+      });
+
+      // Animate transition
+      if (oldStep && newStep && oldStep !== newStep) {
+        oldStep.style.display = "flex";
+        if (goingForward) {
+          oldStep.classList.add("slide-out-left");
+          newStep.classList.add("slide-in-right");
+        } else {
+          oldStep.classList.add("slide-out-right");
+          newStep.classList.add("slide-in-left");
+        }
+        newStep.classList.add("active");
+        setTimeout(function() {
+          oldStep.style.display = "";
+          oldStep.classList.remove("slide-out-left", "slide-in-right", "slide-out-right", "slide-in-left");
+          newStep.classList.remove("slide-out-left", "slide-in-right", "slide-out-right", "slide-in-left");
+        }, 300);
+      } else {
+        newStep.classList.add("active");
+      }
+
+      currentStepNum = n;
+      window.scrollTo(0, 0);
+
+      // Auto-focus inputs
+      setTimeout(function() {
+        if (n === 2) customerName.focus();
+      }, 350);
+    }
+
+    // Smooth transition: Home → Step/Page
+    function goFromHome(target) {
+      homePage.style.display = "flex";
+      homePage.classList.add("slide-out-left");
+      target.classList.add("slide-in-right", "active");
+
+      setTimeout(function() {
+        homePage.classList.remove("active", "slide-out-left");
+        homePage.style.display = "";
+        target.classList.remove("slide-in-right");
+      }, 300);
+      window.scrollTo(0, 0);
+    }
+
+    // Smooth transition: Step/Page → Home (going back)
+    function goToHome(source) {
+      homePage.classList.add("active", "slide-in-left");
+      source.style.display = "flex";
+      source.classList.add("slide-out-right");
+
+      setTimeout(function() {
+        source.classList.remove("active", "slide-out-right");
+        source.style.display = "";
+        homePage.classList.remove("slide-in-left");
+        currentStepNum = 1;
+      }, 300);
+      window.scrollTo(0, 0);
+    }
+
+    // --- Load saved customer info ---
     if (localStorage.getItem("customerName")) {
       customerName.value = localStorage.getItem("customerName");
     }
@@ -683,194 +2052,438 @@
       customerPhone.value = localStorage.getItem("customerPhone");
     }
 
-    // Save customer info as they type
-    customerName.addEventListener("input", function () {
-      localStorage.setItem("customerName", this.value);
-      updateButtonState();
-    });
-    customerPhone.addEventListener("input", function () {
-      localStorage.setItem("customerPhone", this.value);
-      updateButtonState();
-    });
+    // --- Step 1: Take Photo ---
+    let photoUploadPromise = null;  // Tracks background upload
+    let uploadedPhotoUrl = null;    // Stores URL once uploaded
 
-    // --- Photo handling ---
-    photoUploadBtn.addEventListener("click", function () {
-      photoInput.click();
-    });
-
-    photoInput.addEventListener("change", function () {
-      var file = this.files[0];
+    function processPhoto(file) {
       if (!file) return;
 
-      // Resize image to max 1200px wide to keep payload small
       var reader = new FileReader();
-      reader.onload = function (e) {
+      reader.onload = function(e) {
         var img = new Image();
-        img.onload = function () {
-          var maxWidth = 1200;
+        img.onload = function() {
+          var maxWidth = 1000;
           var width = img.width;
           var height = img.height;
           if (width > maxWidth) {
             height = Math.round(height * maxWidth / width);
             width = maxWidth;
           }
-          var canvas = document.createElement("canvas");
-          canvas.width = width;
-          canvas.height = height;
-          var ctx = canvas.getContext("2d");
-          ctx.drawImage(img, 0, 0, width, height);
-          photoBase64 = canvas.toDataURL("image/jpeg", 0.8);
+          var tempCanvas = document.createElement("canvas");
+          tempCanvas.width = width;
+          tempCanvas.height = height;
+          var tempCtx = tempCanvas.getContext("2d");
+          tempCtx.drawImage(img, 0, 0, width, height);
 
-          // Show preview
-          photoPreviewImg.src = photoBase64;
-          photoPreview.classList.add("active");
-          photoUploadBtn.style.display = "none";
-          photoHint.textContent = "Photo attached and will be saved with your request.";
-          photoHint.style.display = "block";
+          // Store original for annotations
+          photoState.originalBase64 = tempCanvas.toDataURL("image/jpeg", 0.8);
+          photoState.imgWidth = width;
+          photoState.imgHeight = height;
+          photoState.rects = [];
+          photoState.isDrawing = false;
+          photoState.drawStart = null;
+          photoState.drawCurrent = null;
+
+          // Reset draw mode
+          drawModeOn = false;
+          drawToggle.textContent = 'Draw: OFF';
+          drawToggle.classList.remove('draw-on');
+          photoCanvasWrap.style.touchAction = 'auto';
+
+          // Render to canvas
+          renderPhotoCanvas();
+
+          step1PhotoPreview.classList.add("active");
+
+          // Haptic feedback for photo captured
+          if ('vibrate' in navigator) navigator.vibrate([10, 50, 20]);
+          takePhotoBtn.style.display = "none";
+          choosePhotoBtn.style.display = "none";
+          step1NextBtn.style.display = "flex";
+          noPhotoBtn.style.display = "none";
         };
         img.src = e.target.result;
       };
       reader.readAsDataURL(file);
-    });
+    }
 
-    photoRemove.addEventListener("click", function () {
-      photoBase64 = null;
-      photoInput.value = "";
-      photoPreview.classList.remove("active");
-      photoUploadBtn.style.display = "flex";
-      photoHint.style.display = "none";
-    });
+    // Render photo with annotations to canvas
+    function renderPhotoCanvas() {
+      if (!photoState.originalBase64) return;
 
-    // --- Autocomplete ---
-    searchInput.addEventListener("input", function () {
-      const query = this.value.trim().toLowerCase();
-      acList.innerHTML = "";
+      var img = new Image();
+      img.onload = function() {
+        var wrapW = photoCanvasWrap.clientWidth || 300;
+        var scale = wrapW / photoState.imgWidth;
+        var displayH = Math.round(photoState.imgHeight * scale);
 
-      if (query.length === 0) {
-        acList.classList.remove("active");
-        return;
-      }
+        photoCanvas.width = wrapW;
+        photoCanvas.height = displayH;
+        photoCanvas.style.height = displayH + 'px';
 
-      const matches = properties.filter(p =>
-        p.address.toLowerCase().includes(query)
-      );
+        // Draw image
+        photoCtx.clearRect(0, 0, photoCanvas.width, photoCanvas.height);
+        photoCtx.drawImage(img, 0, 0, photoCanvas.width, photoCanvas.height);
 
-      if (matches.length === 0) {
-        acList.classList.remove("active");
-        return;
-      }
+        // Draw saved rectangles
+        photoCtx.strokeStyle = 'red';
+        photoCtx.lineWidth = 3;
+        photoState.rects.forEach(function(r) {
+          photoCtx.strokeRect(r.x * scale, r.y * scale, r.w * scale, r.h * scale);
+        });
 
-      matches.forEach(prop => {
-        const item = document.createElement("div");
-        item.classList.add("autocomplete-item");
-
-        // Highlight matching text
-        const idx = prop.address.toLowerCase().indexOf(query);
-        if (idx >= 0) {
-          item.innerHTML =
-            escapeHtml(prop.address.substring(0, idx)) +
-            '<span class="highlight">' + escapeHtml(prop.address.substring(idx, idx + query.length)) + '</span>' +
-            escapeHtml(prop.address.substring(idx + query.length));
-        } else {
-          item.textContent = prop.address;
+        // Draw in-progress rectangle
+        if (photoState.isDrawing && photoState.drawStart && photoState.drawCurrent) {
+          photoCtx.setLineDash([6, 4]);
+          var sx = photoState.drawStart.x, sy = photoState.drawStart.y;
+          var cx = photoState.drawCurrent.x, cy = photoState.drawCurrent.y;
+          photoCtx.strokeRect(sx, sy, cx - sx, cy - sy);
+          photoCtx.setLineDash([]);
         }
 
-        item.addEventListener("click", () => selectProperty(prop));
-        acList.appendChild(item);
+        // Update photoBase64 with annotations composited
+        updatePhotoBase64WithAnnotations();
+      };
+      img.src = photoState.originalBase64;
+    }
+
+    // Composite annotations onto photo for upload
+    function updatePhotoBase64WithAnnotations() {
+      if (!photoState.originalBase64) return;
+
+      var img = new Image();
+      img.onload = function() {
+        var c = document.createElement('canvas');
+        c.width = photoState.imgWidth;
+        c.height = photoState.imgHeight;
+        var ctx = c.getContext('2d');
+        ctx.drawImage(img, 0, 0, photoState.imgWidth, photoState.imgHeight);
+
+        // Draw rectangles at full resolution
+        ctx.strokeStyle = 'red';
+        ctx.lineWidth = 4;
+        photoState.rects.forEach(function(r) {
+          ctx.strokeRect(r.x, r.y, r.w, r.h);
+        });
+
+        photoBase64 = c.toDataURL('image/jpeg', 0.7);
+      };
+      img.src = photoState.originalBase64;
+    }
+
+    // Get canvas position from event
+    function getCanvasPos(e) {
+      var rect = photoCanvas.getBoundingClientRect();
+      var clientX, clientY;
+      if (e.touches) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+      } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+      }
+      return { x: clientX - rect.left, y: clientY - rect.top };
+    }
+
+    // Drawing event handlers
+    function startDraw(e) {
+      if (!drawModeOn) return;
+      e.preventDefault();
+      photoState.isDrawing = true;
+      photoState.drawStart = getCanvasPos(e);
+      photoState.drawCurrent = photoState.drawStart;
+    }
+
+    function moveDraw(e) {
+      if (!drawModeOn || !photoState.isDrawing) return;
+      e.preventDefault();
+      photoState.drawCurrent = getCanvasPos(e);
+      renderPhotoCanvas();
+    }
+
+    function endDraw(e) {
+      if (!drawModeOn || !photoState.isDrawing) return;
+      photoState.isDrawing = false;
+      if (!photoState.drawStart || !photoState.drawCurrent) return;
+
+      var wrapW = photoCanvasWrap.clientWidth;
+      var scale = wrapW / photoState.imgWidth;
+
+      var sx = photoState.drawStart.x / scale;
+      var sy = photoState.drawStart.y / scale;
+      var ex = photoState.drawCurrent.x / scale;
+      var ey = photoState.drawCurrent.y / scale;
+      var rw = Math.abs(ex - sx);
+      var rh = Math.abs(ey - sy);
+
+      // Only add rectangle if it's big enough
+      if (rw >= 10 && rh >= 10) {
+        photoState.rects.push({ x: Math.min(sx, ex), y: Math.min(sy, ey), w: rw, h: rh });
+
+        // Turn off draw mode after drawing one rectangle
+        drawModeOn = false;
+        drawToggle.textContent = 'Draw: OFF';
+        drawToggle.classList.remove('draw-on');
+        photoCanvasWrap.style.touchAction = 'auto';
+      }
+
+      photoState.drawStart = null;
+      photoState.drawCurrent = null;
+      renderPhotoCanvas();
+    }
+
+    // Canvas event listeners
+    photoCanvas.addEventListener('mousedown', startDraw);
+    photoCanvas.addEventListener('mousemove', moveDraw);
+    photoCanvas.addEventListener('mouseup', endDraw);
+    photoCanvas.addEventListener('mouseleave', endDraw);
+    photoCanvas.addEventListener('touchstart', startDraw, { passive: false });
+    photoCanvas.addEventListener('touchmove', moveDraw, { passive: false });
+    photoCanvas.addEventListener('touchend', endDraw);
+
+    // Draw toggle button
+    drawToggle.addEventListener('click', function() {
+      drawModeOn = !drawModeOn;
+      drawToggle.textContent = drawModeOn ? 'Draw: ON' : 'Draw: OFF';
+      drawToggle.classList.toggle('draw-on', drawModeOn);
+      photoCanvasWrap.style.touchAction = drawModeOn ? 'none' : 'auto';
+    });
+
+    // Undo button
+    drawUndo.addEventListener('click', function() {
+      if (photoState.rects.length > 0) {
+        photoState.rects.pop();
+        renderPhotoCanvas();
+      }
+    });
+
+    // Clear button
+    drawClear.addEventListener('click', function() {
+      if (photoState.rects.length > 0) {
+        photoState.rects = [];
+        renderPhotoCanvas();
+      }
+    });
+
+    function startBackgroundPhotoUpload() {
+      uploadedPhotoUrl = null;
+
+      // Build filename with street address and date
+      var now = new Date();
+      var dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      var address = selectedProperty ? selectedProperty.address.split(',')[0] : '';
+      var filename = address ? (address + " - " + dateStr) : dateStr;
+
+      photoUploadPromise = fetch(GOOGLE_SHEETS_URL, {
+        method: "POST",
+        body: JSON.stringify({ photoOnly: true, photo: photoBase64, filename: filename, property: selectedProperty ? selectedProperty.address : '', internal: false })
+      })
+      .then(function(response) { return response.json(); })
+      .then(function(data) {
+        uploadedPhotoUrl = data.photoUrl || null;
+        return uploadedPhotoUrl;
+      })
+      .catch(function(err) {
+        console.error("Background photo upload failed:", err);
+        return null;
       });
+    }
 
-      acList.classList.add("active");
+    takePhotoBtn.addEventListener("click", function() {
+      cameraInput.click();
     });
 
-    // Close dropdown when clicking outside
-    document.addEventListener("click", function (e) {
-      if (!e.target.closest(".search-container")) {
-        acList.classList.remove("active");
+    choosePhotoBtn.addEventListener("click", function() {
+      libraryInput.click();
+    });
+
+    cameraInput.addEventListener("change", function() {
+      processPhoto(this.files[0]);
+    });
+
+    libraryInput.addEventListener("change", function() {
+      processPhoto(this.files[0]);
+    });
+
+    step1NextBtn.addEventListener("click", function() {
+      // Start photo upload in background
+      if (photoBase64 && !uploadedPhotoUrl && !photoUploadPromise) {
+        startBackgroundPhotoUpload();
       }
+      goToStep(2);
     });
 
-    // --- Update button state based on all required fields ---
-    function updateButtonState() {
-      const hasName    = customerName.value.trim().length > 0;
-      const hasPhone   = customerPhone.value.trim().length > 0;
+    step1PhotoRemove.addEventListener("click", function() {
+      photoBase64 = null;
+      photoUploadPromise = null;
+      uploadedPhotoUrl = null;
+      cameraInput.value = "";
+      libraryInput.value = "";
+      step1PhotoPreview.classList.remove("active");
+      takePhotoBtn.style.display = "flex";
+      choosePhotoBtn.style.display = "flex";
+      step1NextBtn.style.display = "none";
+      noPhotoBtn.style.display = "flex";
+
+      // Reset annotation state
+      photoState.originalBase64 = null;
+      photoState.rects = [];
+      drawModeOn = false;
+      drawToggle.textContent = 'Draw: OFF';
+      drawToggle.classList.remove('draw-on');
+    });
+
+    noPhotoBtn.addEventListener("click", function() {
+      photoBase64 = null;
+      goToStep(2);
+    });
+
+    document.getElementById("step1-back-link").addEventListener("click", function() {
+      goToHome(document.getElementById("step-1"));
+    });
+
+    // --- Step 2: Contact Info + Message ---
+
+    step2Back.addEventListener("click", function() {
+      goToStep(1);
+    });
+
+    step2Next.addEventListener("click", function() {
+      // Save focus for when modal closes
+      lastFocusedElement = document.activeElement;
+      // Show phone confirmation
+      phoneConfirmNumber.textContent = formatPhone(customerPhone.value.trim());
+      phoneConfirmOverlay.style.display = "flex";
+      // Focus the first button in the modal
+      phoneConfirmYes.focus();
+      announce(currentLang === 'es' ? '¿Es este tu número de teléfono?' : 'Is this your phone number?');
+    });
+
+    function updateStep2Button() {
+      const hasName = customerName.value.trim().length > 0;
+      const hasPhone = customerPhone.value.trim().length > 0;
       const hasMessage = userMessage.value.trim().length > 0;
-      if (selectedProperty && hasName && hasPhone && hasMessage) {
-        smsLink.classList.remove("disabled");
-        smsLink.href = buildSmsUrl(selectedProperty, userMessage.value.trim());
-      } else {
-        smsLink.classList.add("disabled");
-        smsLink.href = "#";
+      step2Next.disabled = !(hasName && hasPhone && hasMessage);
+      charCount.textContent = userMessage.value.length;
+    }
+
+    customerName.addEventListener("input", function() {
+      localStorage.setItem("customerName", this.value);
+      updateStep2Button();
+    });
+
+    customerPhone.addEventListener("input", function(e) {
+      formatPhoneInput(this);
+      localStorage.setItem("customerPhone", this.value);
+      updateStep2Button();
+    });
+
+    userMessage.addEventListener("input", updateStep2Button);
+
+    // Enter key navigation
+    customerName.addEventListener("keydown", function(e) {
+      if (e.key === "Enter") { e.preventDefault(); customerPhone.focus(); }
+    });
+    customerPhone.addEventListener("keydown", function(e) {
+      if (e.key === "Enter") { e.preventDefault(); userMessage.focus(); }
+    });
+    // Ctrl/Cmd+Enter to continue from message
+    userMessage.addEventListener("keydown", function(e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && !step2Next.disabled) {
+        e.preventDefault();
+        step2Next.click();
+      }
+    });
+
+    // --- Step 3: Review ---
+
+    step3Back.addEventListener("click", function() {
+      goToStep(2);
+    });
+
+    // Close modal helper (defined before use)
+    function closePhoneModal() {
+      phoneConfirmOverlay.style.display = "none";
+      if (lastFocusedElement) {
+        lastFocusedElement.focus();
+        lastFocusedElement = null;
       }
     }
 
-    // Update button state and SMS link as user types
-    userMessage.addEventListener("input", updateButtonState);
+    phoneConfirmYes.addEventListener("click", function() {
+      closePhoneModal();
+      goToStep(3);
+      populateReview();
+    });
 
-    // --- Select a property ---
-    function selectProperty(prop) {
-      selectedProperty = prop;
-      searchInput.value = prop.address;
-      acList.classList.remove("active");
+    phoneConfirmEdit.addEventListener("click", function() {
+      closePhoneModal();
+      customerPhone.focus();
+      customerPhone.select();
+    });
 
-      // Show card
-      cardAddress.textContent = prop.address;
-      cardCrew.textContent = prop.crewLeader;
-      propertyCard.classList.add("active");
+    // Close on overlay click
+    phoneConfirmOverlay.addEventListener("click", function(e) {
+      if (e.target === phoneConfirmOverlay) {
+        closePhoneModal();
+      }
+    });
 
-      // Show info message
-      infoMessage.classList.add("active");
-
-      // Show customer fields
-      customerFields.classList.add("active");
-
-      // Show message text area
-      messageContainer.classList.add("active");
-
-      // Show photo upload
-      photoContainer.classList.add("active");
-
-      // Show CTA
-      ctaContainer.classList.add("active");
-
-      // Hide empty state
-      emptyState.style.display = "none";
-
-      // Update button state
-      updateButtonState();
-    }
-
-    // --- Build SMS URL (handles iOS vs Android) ---
-    function buildSmsUrl(prop, message) {
-      const now = new Date();
-      const dateStr = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-      const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-
-      const name = customerName.value.trim();
-      const phone = customerPhone.value.trim();
-
-      let bodyText = "Customer: " + name + " (" + phone + ")" +
-                     "\nProperty: " + prop.address +
-                     "\nCrew Leader: " + prop.crewLeader +
-                     "\nDate: " + dateStr + " at " + timeStr;
-
-      if (message) {
-        bodyText += "\n\n" + message;
+    // Close on Escape key and trap focus
+    phoneConfirmOverlay.addEventListener("keydown", function(e) {
+      if (e.key === "Escape") {
+        closePhoneModal();
+        return;
       }
 
-      const body = encodeURIComponent(bodyText);
-      const recipients = OFFICE_PHONE + "," + prop.crewPhone;
+      // Focus trap
+      if (e.key === "Tab") {
+        var focusableElements = phoneConfirmOverlay.querySelectorAll('button');
+        var firstElement = focusableElements[0];
+        var lastElement = focusableElements[focusableElements.length - 1];
 
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-                    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-
-      if (isIOS) {
-        return "sms:/open?addresses=" + recipients + "&body=" + body;
-      } else {
-        return "sms:" + recipients + "?body=" + body;
+        if (e.shiftKey && document.activeElement === firstElement) {
+          e.preventDefault();
+          lastElement.focus();
+        } else if (!e.shiftKey && document.activeElement === lastElement) {
+          e.preventDefault();
+          firstElement.focus();
+        }
       }
+    });
+
+    startOver.addEventListener("click", function() {
+      // Reset everything
+      photoBase64 = null;
+      photoUploadPromise = null;
+      uploadedPhotoUrl = null;
+      selectedProperty = null;
+      cameraInput.value = "";
+      libraryInput.value = "";
+      step1PhotoPreview.classList.remove("active");
+      takePhotoBtn.style.display = "flex";
+      choosePhotoBtn.style.display = "flex";
+      step1NextBtn.style.display = "none";
+      noPhotoBtn.style.display = "flex";
+      userMessage.value = "";
+      charCount.textContent = "0";
+      step2Next.disabled = true;
+      // Reset PIN selection
+      clearPinSelection();
+      // Go to home page with transition
+      goToHome(steps[3]);
+    });
+
+    function populateReview() {
+      reviewProperty.textContent = selectedProperty.address;
+      reviewName.textContent = customerName.value.trim();
+      reviewPhone.textContent = formatPhone(customerPhone.value.trim());
+      reviewMessage.textContent = userMessage.value.trim();
+      reviewPhotoRow.style.display = photoBase64 ? "flex" : "none";
     }
 
-    // --- Format 10-digit phone as (XXX) XXX-XXXX ---
+    // --- Format phone ---
     function formatPhone(num) {
       var digits = num.replace(/\D/g, "");
       if (digits.length === 10) {
@@ -880,63 +2493,134 @@
     }
 
     // --- Google Sheets logging ---
-    function logToGoogleSheets(prop, message) {
+    function logToGoogleSheets(prop, message, existingPhotoUrl) {
       const now = new Date();
-      const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
-      const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      const dateStr = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true, timeZoneName: 'short' });
 
       var payload = {
         customerName: customerName.value.trim(),
-        customerPhone: customerPhone.value.trim(),
+        customerPhone: formatPhone(customerPhone.value.trim()),
         propertyAddress: prop.address,
         crewLeader: prop.crewLeader,
         crewLeaderPhone: formatPhone(prop.crewPhone),
         date: dateStr,
         time: timeStr,
         message: message,
-        status: "Open"
+        status: "Open",
+        type: "External"
       };
 
-      // Include photo if one was attached
-      if (photoBase64) {
+      // If photo was already uploaded in background, use that URL
+      if (existingPhotoUrl) {
+        payload.photoUrl = existingPhotoUrl;
+      } else if (photoBase64) {
+        // Fallback: send photo for upload (shouldn't happen with background upload)
         payload.photo = photoBase64;
       }
 
       return fetch(GOOGLE_SHEETS_URL, {
         method: "POST",
         body: JSON.stringify(payload)
-      }).then(function (res) {
-        console.log("Google Sheets response:", res.status);
+      })
+      .then(function(response) {
+        return response.json();
+      })
+      .then(function(data) {
+        return existingPhotoUrl || data.photoUrl || null;
       });
     }
 
-    // --- Handle CTA button click ---
-    smsLink.addEventListener("click", function (e) {
-      if (smsLink.classList.contains("disabled")) {
-        e.preventDefault();
+    // --- Handle final submit ---
+    var isSubmitting = false;
+    submitRequestBtn.addEventListener("click", function(e) {
+      e.preventDefault();
+
+      // Prevent double-tap
+      if (isSubmitting) return;
+      isSubmitting = true;
+
+      const message = userMessage.value.trim();
+
+      // Check if offline
+      if (!navigator.onLine) {
+        // Save request to send later
+        savePendingRequest(selectedProperty, message, uploadedPhotoUrl);
+        showConfirmationScreen();
         return;
       }
 
-      // Refresh the SMS link with current time right before opening
-      const message = userMessage.value.trim();
-      smsLink.href = buildSmsUrl(selectedProperty, message);
+      // If there's a photo and upload isn't done yet, show submitting screen
+      if (photoBase64 && !uploadedPhotoUrl && photoUploadPromise) {
+        // Upload in progress - show "Submitting..." screen
+        showScreen('submitting');
 
-      // Log to Google Sheets (fire-and-forget, don't block SMS)
-      logToGoogleSheets(selectedProperty, message).catch(function (err) {
-        console.error("Google Sheets logging failed:", err);
+        // Wait for background upload to complete, then log and show confirmation
+        photoUploadPromise.then(function(photoUrl) {
+          logToGoogleSheets(selectedProperty, message, photoUrl)
+            .then(function() {
+              showConfirmationScreen();
+            })
+            .catch(function(err) {
+              console.error("Google Sheets logging failed:", err);
+              showToast(t('requestSavedLocally') || 'Request saved locally - will sync when possible', 'warning');
+              showConfirmationScreen();
+            });
+        });
+      } else {
+        // Photo already uploaded or no photo - log and show confirmation directly
+        logToGoogleSheets(selectedProperty, message, uploadedPhotoUrl)
+          .then(function() {
+            showConfirmationScreen();
+          })
+          .catch(function(err) {
+            console.error("Google Sheets logging failed:", err);
+            showToast(t('requestSavedLocally') || 'Request saved locally - will sync when possible', 'warning');
+            showConfirmationScreen();
+          });
+      }
+    });
+
+    // Helper to hide all screens and show one
+    function showScreen(screenName) {
+      // Hide all overlay screens
+      screenUploading.classList.remove('active');
+      screenSubmitting.classList.remove('active');
+      screenConfirmation.classList.remove('active');
+      // Hide main steps
+      homePage.classList.remove('active');
+      Object.values(steps).forEach(function(step) {
+        step.classList.remove('active');
       });
+      statusPage.classList.remove('active');
 
-      // After a short delay, replace page with a confirmation screen
-      setTimeout(function () {
-        document.body.innerHTML =
-          '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;min-height:100dvh;background:var(--cream);font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif;text-align:center;padding:40px 20px;">' +
-            '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="#3A5F4B" stroke-width="2" style="width:64px;height:64px;margin-bottom:20px;">' +
-              '<path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>' +
-            '</svg>' +
-            '<h2 style="color:#1A2E24;font-size:22px;margin-bottom:8px;">Request Sent!</h2>' +
-            '<p style="color:#3D5A4A;font-size:16px;line-height:1.5;">Your message has been logged.<br>You can close this tab.</p>' +
-          '</div>';
-      }, 500);
+      // Show the requested screen
+      if (screenName === 'uploading') {
+        screenUploading.classList.add('active');
+        announce(t('finishingUp') || 'Finishing up...');
+      } else if (screenName === 'submitting') {
+        screenSubmitting.classList.add('active');
+        announce(t('submitting') || 'Submitting...');
+      } else if (screenName === 'confirmation') {
+        screenConfirmation.classList.add('active');
+        announce(t('thankYou') || 'Thank you! Your request has been submitted.');
+      }
+    }
+
+    function showConfirmationScreen() {
+      // Success haptic
+      if ('vibrate' in navigator) navigator.vibrate([10, 50, 20, 50, 30]);
+      var crewName = selectedProperty ? selectedProperty.crewLeader : (currentLang === 'es' ? 'nuestro equipo' : 'our team');
+      var msgText = currentLang === 'es'
+        ? crewName + ' y el equipo de Endurance han recibido su solicitud y la atenderán durante su próxima visita de servicio, o se comunicarán con un plan.'
+        : crewName + ' and the Endurance team have received your request and will handle it during your next service visit, or follow up with a plan.';
+      confirmationMessage.textContent = msgText;
+      showScreen('confirmation');
+    }
+
+    // Handle New Request button on confirmation screen
+    newRequestAfterConfirm.addEventListener("click", function() {
+      location.reload();
     });
 
     // --- Utility ---
@@ -945,105 +2629,457 @@
       div.appendChild(document.createTextNode(str));
       return div.innerHTML;
     }
+
+    // --- Status Check ---
+    statusBack.addEventListener("click", function() {
+      goToHome(statusPage);
+      statusResults.innerHTML = "";
+    });
+
+    statusPhone.addEventListener("input", function(e) {
+      var digitCount = formatPhoneInput(this);
+      statusSearchBtn.disabled = digitCount < 10;
+    });
+
+    statusPhone.addEventListener("keydown", function(e) {
+      if (e.key === "Enter" && !statusSearchBtn.disabled) {
+        e.preventDefault();
+        statusSearchBtn.click();
+      }
+    });
+
+    statusSearchBtn.addEventListener("click", function() {
+      var phone = statusPhone.value;
+      statusResults.innerHTML = '<p style="text-align:center;color:var(--text-light);">' + t('searching') + '</p>';
+      announce(t('searching') || 'Searching...');
+
+      fetchWithTimeout(GOOGLE_SHEETS_URL + "?action=getRequests&phone=" + encodeURIComponent(phone), {}, 15000)
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+          // Only show external (customer) requests
+          var externalRequests = (data.requests || []).filter(function(req) {
+            return req.type !== 'Internal';
+          });
+          if (externalRequests.length > 0) {
+            var html = "";
+            externalRequests.forEach(function(req) {
+              var statusClass = "open";
+              var statusText = req.status || "Open";
+              if (statusText.toLowerCase().includes("progress")) statusClass = "in-progress";
+              if (statusText.toLowerCase().includes("complete")) statusClass = "completed";
+
+              html += '<div class="status-card">' +
+                '<div class="status-card-header">' +
+                  '<span class="status-card-date">' + escapeHtml(req.date) + '</span>' +
+                  '<span class="status-badge ' + statusClass + '">' + escapeHtml(statusText) + '</span>' +
+                '</div>' +
+                '<div class="status-card-property">' + escapeHtml(req.property) + '</div>' +
+                '<div class="status-card-message">' + escapeHtml(req.message || t('noMessage')) + '</div>' +
+              '</div>';
+            });
+            statusResults.innerHTML = html;
+            announce(externalRequests.length + ' ' + (currentLang === 'es' ? 'solicitudes encontradas' : 'requests found'));
+          } else {
+            statusResults.innerHTML = '<div class="no-requests">' + t('noRequests') + '</div>';
+            announce(t('noRequests') || 'No requests found');
+          }
+        })
+        .catch(function(err) {
+          console.error("Status check failed:", err);
+          var errorMsg = err.message === 'Request timed out'
+            ? (currentLang === 'es' ? 'La solicitud tardó demasiado. Intente de nuevo.' : 'Request timed out. Please try again.')
+            : t('statusError');
+          statusResults.innerHTML = '<div class="no-requests">' + errorMsg + '</div>';
+          announce(errorMsg);
+        });
+    });
+
+    // --- Language Support ---
+    var translations = {
+      en: {
+        langToggle: 'Español',
+        textMyTeam: 'Text My Team',
+        enterPinToStart: 'Enter your PIN to get started',
+        continue: 'Continue',
+        howCanWeHelp: 'How can we help you today?',
+        submitNewRequest: 'Submit a New Request',
+        checkRequestStatus: 'Check Request Status',
+        photoOfIssue: 'Photo of the Issue',
+        photoInstructions: 'Please follow these prompts, and the onsite crew leader will handle your request during today\'s service, or the office will follow up with a plan to address the issue.',
+        takePhoto: 'Take Photo',
+        chooseFromLibrary: 'Choose from Library',
+        skipNoPhoto: 'Skip - No Photo Needed',
+        back: 'Back',
+        next: 'Next',
+        selectProperty: 'Select Your Property',
+        searchAddress: 'Search your address...',
+        crewLeader: 'Crew Leader',
+        yourDetails: 'Your Details',
+        yourName: 'Your Name',
+        firstLastName: 'First and last name',
+        yourPhone: 'Your Phone Number',
+        describeIssue: 'Describe the Issue',
+        describePlaceholder: 'What do you need help with?',
+        reviewSend: 'Review & Send',
+        property: 'Property',
+        name: 'Name',
+        phone: 'Phone',
+        request: 'Request',
+        photo: 'Photo',
+        attached: 'Attached ✓',
+        submitRequest: 'Submit Request',
+        startOver: 'Start Over',
+        checkStatus: 'Check Request Status',
+        enterPhone: 'Enter your phone number to see your requests.',
+        search: 'Search',
+        searching: 'Searching...',
+        noRequests: 'No requests found for this phone number.',
+        noMessage: 'No message',
+        statusError: 'Unable to check status. Please try again.',
+        submitting: 'Submitting...',
+        finishingUp: 'Finishing up...',
+        almostReady: 'Almost ready',
+        thankYou: 'Thank You!',
+        newRequest: 'New Request',
+        requestSavedLocally: 'Request saved locally - will sync when possible',
+        unableToLoadProperties: 'Unable to load properties',
+        tryAgain: 'Try Again',
+        requestTimedOut: 'Request timed out. Please try again.',
+        home: 'Home',
+        photoTitle: 'Photo',
+        propertyTitle: 'Property',
+        detailsTitle: 'Details',
+        reviewTitle: 'Review',
+        statusTitle: 'Status'
+      },
+      es: {
+        langToggle: 'English',
+        textMyTeam: 'Mensaje al Equipo',
+        enterPinToStart: 'Ingrese su PIN para comenzar',
+        continue: 'Continuar',
+        howCanWeHelp: '¿Cómo podemos ayudarle hoy?',
+        submitNewRequest: 'Enviar Nueva Solicitud',
+        checkRequestStatus: 'Ver Estado de Solicitud',
+        photoOfIssue: 'Foto del Problema',
+        photoInstructions: 'Por favor siga estos pasos, y el líder del equipo atenderá su solicitud durante el servicio de hoy, o la oficina se comunicará con un plan para resolver el problema.',
+        takePhoto: 'Tomar Foto',
+        chooseFromLibrary: 'Elegir de la Galería',
+        skipNoPhoto: 'Omitir - Sin Foto',
+        back: 'Atrás',
+        next: 'Siguiente',
+        selectProperty: 'Seleccione Su Propiedad',
+        searchAddress: 'Buscar su dirección...',
+        crewLeader: 'Líder del Equipo',
+        yourDetails: 'Sus Datos',
+        yourName: 'Su Nombre',
+        firstLastName: 'Nombre y apellido',
+        yourPhone: 'Su Número de Teléfono',
+        describeIssue: 'Describa el Problema',
+        describePlaceholder: '¿En qué podemos ayudarle?',
+        reviewSend: 'Revisar y Enviar',
+        property: 'Propiedad',
+        name: 'Nombre',
+        phone: 'Teléfono',
+        request: 'Solicitud',
+        photo: 'Foto',
+        attached: 'Adjunta ✓',
+        submitRequest: 'Enviar Solicitud',
+        startOver: 'Empezar de Nuevo',
+        checkStatus: 'Ver Estado de Solicitud',
+        enterPhone: 'Ingrese su número de teléfono para ver sus solicitudes.',
+        search: 'Buscar',
+        searching: 'Buscando...',
+        noRequests: 'No se encontraron solicitudes para este número.',
+        noMessage: 'Sin mensaje',
+        statusError: 'No se pudo verificar el estado. Intente de nuevo.',
+        submitting: 'Enviando...',
+        finishingUp: 'Finalizando...',
+        almostReady: 'Casi listo',
+        thankYou: '¡Gracias!',
+        newRequest: 'Nueva Solicitud',
+        requestSavedLocally: 'Solicitud guardada localmente - se sincronizará cuando sea posible',
+        unableToLoadProperties: 'No se pudieron cargar las propiedades',
+        tryAgain: 'Intentar de Nuevo',
+        requestTimedOut: 'La solicitud tardó demasiado. Intente de nuevo.',
+        home: 'Inicio',
+        photoTitle: 'Foto',
+        propertyTitle: 'Propiedad',
+        detailsTitle: 'Detalles',
+        reviewTitle: 'Revisar',
+        statusTitle: 'Estado'
+      }
+    };
+
+    function t(key) {
+      return translations[currentLang][key] || key;
+    }
+
+    function updateLanguage() {
+      // Update all elements with data-i18n attribute
+      document.querySelectorAll('[data-i18n]').forEach(function(el) {
+        var key = el.getAttribute('data-i18n');
+        if (translations[currentLang][key]) {
+          el.textContent = translations[currentLang][key];
+        }
+      });
+
+      // Handle placeholder translations
+      document.querySelectorAll('[data-i18n-placeholder]').forEach(function(el) {
+        var key = el.getAttribute('data-i18n-placeholder');
+        if (translations[currentLang][key]) {
+          el.placeholder = translations[currentLang][key];
+        }
+      });
+
+      // Special cases that need innerHTML preservation or dynamic content
+      customerName.placeholder = t('firstLastName');
+      userMessage.placeholder = t('describePlaceholder');
+
+      // Home page crew leader label (keeping the crew name)
+      if (selectedProperty) {
+        document.getElementById('home-card-crew').textContent = selectedProperty.crewLeader;
+      }
+
+      // Step 2 labels and title (Your Details)
+      document.querySelector('#step-2 .step-title').textContent = t('yourDetails');
+      document.querySelector('label[for="customer-name"]').textContent = t('yourName');
+      document.querySelector('label[for="customer-phone"]').textContent = t('yourPhone');
+      document.querySelector('label[for="user-message"]').textContent = t('describeIssue');
+
+      // Step 3 review labels (Review & Send)
+      document.querySelector('#step-3 .step-title').textContent = t('reviewSend');
+      document.querySelectorAll('#step-3 .review-label')[0].textContent = t('property');
+      document.querySelectorAll('#step-3 .review-label')[1].textContent = t('name');
+      document.querySelectorAll('#step-3 .review-label')[2].textContent = t('phone');
+      document.querySelectorAll('#step-3 .review-label')[3].textContent = t('request');
+      document.querySelectorAll('#step-3 .review-label')[4].textContent = t('photo');
+      document.querySelectorAll('#step-3 .review-value')[4].textContent = t('attached');
+      startOver.textContent = t('startOver');
+
+      // Status page
+      document.querySelector('#status-page .step-subtitle').textContent = t('enterPhone');
+      statusSearchBtn.textContent = t('search');
+
+      // Back buttons
+      step2Back.textContent = t('back');
+      step3Back.textContent = t('back');
+      statusBack.textContent = t('back');
+
+      // Next button
+      step2Next.textContent = t('next');
+    }
+
+    document.getElementById('lang-toggle').addEventListener('click', function() {
+      currentLang = currentLang === 'en' ? 'es' : 'en';
+      localStorage.setItem('preferredLang', currentLang);
+      updateLanguage();
+      personalizeHomePage();  // Update greeting in new language
+    });
+
+    // Apply saved language preference on load
+    if (currentLang !== 'en') {
+      updateLanguage();
+    }
+
+    // --- Personalization for returning users ---
+    function personalizeHomePage() {
+      var savedName = localStorage.getItem('customerName');
+      var greeting = document.getElementById('home-greeting');
+
+      // Personalized greeting
+      if (savedName) {
+        var firstName = savedName.trim().split(' ')[0];
+        greeting.textContent = currentLang === 'es'
+          ? '¡Bienvenido de nuevo, ' + firstName + '!'
+          : 'Welcome back, ' + firstName + '!';
+      }
+    }
+
+    // Run personalization on load
+    personalizeHomePage();
+
+    // Load properties on page load so PIN validation works
+    ensurePropertiesLoaded();
+
+    // --- Offline Detection & Handling ---
+    var pendingRequest = null;
+
+    function updateOnlineStatus() {
+      if (navigator.onLine) {
+        offlineBanner.style.display = 'none';
+        // Check if there's a pending request to send
+        if (pendingRequest) {
+          offlineMessage.textContent = currentLang === 'es'
+            ? 'Conexión restaurada — enviando solicitud...'
+            : 'Back online — sending your request...';
+          offlineBanner.style.background = '#D1FAE5';
+          offlineBanner.style.color = '#065F46';
+          offlineBanner.style.display = 'block';
+
+          // Send the pending request
+          sendPendingRequest();
+        }
+      } else {
+        offlineMessage.textContent = currentLang === 'es'
+          ? 'Sin conexión — enviaremos tu solicitud cuando vuelvas a conectarte'
+          : "You're offline — we'll send your request when you reconnect";
+        offlineBanner.style.background = '#FEF3C7';
+        offlineBanner.style.color = '#92400E';
+        offlineBanner.style.display = 'block';
+      }
+    }
+
+    function savePendingRequest(prop, message, photoUrl) {
+      pendingRequest = {
+        property: prop,
+        message: message,
+        photoUrl: photoUrl,
+        customerName: customerName.value.trim(),
+        customerPhone: customerPhone.value.trim(),
+        timestamp: new Date().toISOString()
+      };
+      localStorage.setItem('pendingRequest', JSON.stringify(pendingRequest));
+    }
+
+    function sendPendingRequest() {
+      var saved = localStorage.getItem('pendingRequest');
+      if (!saved) {
+        pendingRequest = null;
+        offlineBanner.style.display = 'none';
+        return;
+      }
+
+      var req = JSON.parse(saved);
+      var now = new Date();
+      var dateStr = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      var timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true, timeZoneName: 'short' });
+
+      var payload = {
+        customerName: req.customerName,
+        customerPhone: formatPhone(req.customerPhone),
+        propertyAddress: req.property.address,
+        crewLeader: req.property.crewLeader,
+        crewLeaderPhone: formatPhone(req.property.crewPhone),
+        date: dateStr,
+        time: timeStr,
+        message: req.message,
+        status: "Open"
+      };
+
+      if (req.photoUrl) {
+        payload.photoUrl = req.photoUrl;
+      }
+
+      fetch(GOOGLE_SHEETS_URL, {
+        method: "POST",
+        body: JSON.stringify(payload)
+      })
+      .then(function() {
+        localStorage.removeItem('pendingRequest');
+        pendingRequest = null;
+        offlineMessage.textContent = currentLang === 'es'
+          ? '¡Solicitud enviada!'
+          : 'Request sent!';
+        setTimeout(function() {
+          offlineBanner.style.display = 'none';
+        }, 3000);
+      })
+      .catch(function() {
+        // Still offline or error, keep pending
+        offlineBanner.style.display = 'none';
+      });
+    }
+
+    // Listen for online/offline events
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+
+    // Check on load
+    updateOnlineStatus();
+
+    // Check for pending request on load
+    if (localStorage.getItem('pendingRequest')) {
+      pendingRequest = JSON.parse(localStorage.getItem('pendingRequest'));
+      if (navigator.onLine) {
+        sendPendingRequest();
+      }
+    }
+
+    // --- #3 Haptic Feedback ---
+    function haptic(style) {
+      if ('vibrate' in navigator) {
+        if (style === 'light') navigator.vibrate(10);
+        else if (style === 'medium') navigator.vibrate(20);
+        else if (style === 'success') navigator.vibrate([10, 50, 20]);
+      }
+    }
+
+    // Add haptic to buttons
+    document.querySelectorAll('.btn').forEach(function(btn) {
+      btn.addEventListener('touchstart', function() { haptic('light'); });
+    });
+
+    // --- #6 Swipe Back Gesture ---
+    var touchStartX = 0;
+    var touchStartY = 0;
+    var currentStep = null;
+
+    document.addEventListener('touchstart', function(e) {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+
+    document.addEventListener('touchend', function(e) {
+      var touchEndX = e.changedTouches[0].clientX;
+      var touchEndY = e.changedTouches[0].clientY;
+      var deltaX = touchEndX - touchStartX;
+      var deltaY = Math.abs(touchEndY - touchStartY);
+
+      // Swipe from left edge (within 30px), moving right at least 80px, more horizontal than vertical
+      if (touchStartX < 30 && deltaX > 80 && deltaY < 100) {
+        haptic('light');
+        // Find which step is active and go back
+        if (steps[3] && steps[3].classList.contains('active')) {
+          goToStep(2);
+        } else if (steps[2] && steps[2].classList.contains('active')) {
+          goToStep(1);
+        } else if (steps[1] && steps[1].classList.contains('active')) {
+          goToHome(steps[1]);
+        } else if (statusPage.classList.contains('active')) {
+          goToHome(statusPage);
+          statusResults.innerHTML = '';
+        }
+      }
+    }, { passive: true });
+
+    // --- #5 Pull to Refresh (Status Page) ---
+    var pullStartY = 0;
+    var isPulling = false;
+
+    statusPage.addEventListener('touchstart', function(e) {
+      if (statusPage.scrollTop === 0) {
+        pullStartY = e.touches[0].clientY;
+        isPulling = true;
+      }
+    }, { passive: true });
+
+    statusPage.addEventListener('touchmove', function(e) {
+      if (!isPulling) return;
+      var pullDistance = e.touches[0].clientY - pullStartY;
+      if (pullDistance > 80 && statusPhone.value.length >= 10) {
+        // Show pull indicator could go here
+      }
+    }, { passive: true });
+
+    statusPage.addEventListener('touchend', function(e) {
+      if (!isPulling) return;
+      var pullDistance = e.changedTouches[0].clientY - pullStartY;
+      if (pullDistance > 80 && statusPhone.value.replace(/\D/g, '').length >= 10) {
+        haptic('medium');
+        statusSearchBtn.click(); // Trigger refresh
+      }
+      isPulling = false;
+    }, { passive: true });
   </script>
-
-  <!--
-  ============================================================
-  GOOGLE SHEETS SETUP INSTRUCTIONS
-  ============================================================
-
-  To connect this page to Google Sheets for logging, follow these steps:
-
-  1. CREATE A GOOGLE SHEET
-     - Go to https://sheets.google.com and create a new spreadsheet
-     - In Row 1, add these column headers:
-       A1: Customer Name
-       B1: Customer Phone
-       C1: Property Address
-       D1: Crew Leader
-       E1: Crew Leader Phone
-       F1: Date
-       G1: Time
-       H1: Message
-       I1: Photo
-       J1: Status
-
-  2. ADD THE APPS SCRIPT
-     - In your Google Sheet, go to Extensions > Apps Script
-     - Delete any existing code and paste the following:
-
-     ─────────────────────────────────────────
-     function doPost(e) {
-       var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-       var data = JSON.parse(e.postData.contents);
-
-       // Save photo to Google Drive if included
-       var photoUrl = "";
-       if (data.photo) {
-         try {
-           var base64 = data.photo.split(",")[1];
-           var blob = Utilities.newBlob(
-             Utilities.base64Decode(base64),
-             "image/jpeg",
-             data.customerName + " - " + data.date + ".jpg"
-           );
-
-           // Create or find a folder for photos
-           var folders = DriveApp.getFoldersByName("Text My Team Photos");
-           var folder;
-           if (folders.hasNext()) {
-             folder = folders.next();
-           } else {
-             folder = DriveApp.createFolder("Text My Team Photos");
-           }
-
-           var file = folder.createFile(blob);
-           file.setSharing(
-             DriveApp.Access.ANYONE_WITH_LINK,
-             DriveApp.Permission.VIEW
-           );
-           photoUrl = file.getUrl();
-         } catch (err) {
-           photoUrl = "Upload failed: " + err.message;
-         }
-       }
-
-       sheet.appendRow([
-         data.customerName,
-         data.customerPhone,
-         data.propertyAddress,
-         data.crewLeader,
-         data.crewLeaderPhone,
-         data.date,
-         data.time,
-         data.message,
-         photoUrl,
-         data.status
-       ]);
-
-       return ContentService
-         .createTextOutput(JSON.stringify({ status: "success" }))
-         .setMimeType(ContentService.MimeType.JSON);
-     }
-     ─────────────────────────────────────────
-
-  3. DEPLOY AS WEB APP
-     - Click "Deploy" > "New deployment"
-     - Click the gear icon next to "Select type" and choose "Web app"
-     - Set "Execute as" to "Me"
-     - Set "Who has access" to "Anyone"
-     - Click "Deploy"
-     - Authorize the app when prompted
-     - Copy the Web App URL
-
-  4. UPDATE THIS FILE
-     - Replace YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL at the top of the
-       <script> section with your copied URL. It will look like:
-       https://script.google.com/macros/s/ABCDEF.../exec
-
-  That's it! Each time a customer submits a request, a new row
-  will be added to your Google Sheet automatically.
-  ============================================================
-  -->
 </body>
 </html>
