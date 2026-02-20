@@ -1837,8 +1837,11 @@
       if (dayStarted) {
         var crewNames = checkedInMembers.map(function(m) { return typeof m === 'string' ? m : m.name; });
         html += '<button class="edit-crew-banner" onclick="showEditCrewModal()">';
+        html += '<div class="edit-crew-banner-left">';
         html += '<div class="edit-crew-banner-title">' + t('editCrew') + '</div>';
         html += '<div class="edit-crew-banner-names">' + escapeHtml(crewNames.join(', ')) + '</div>';
+        html += '</div>';
+        html += '<div class="edit-crew-banner-chevron">\u203A</div>';
         html += '</button>';
 
         var isShopActive = !!activeTickets['SHOP'];
