@@ -1391,6 +1391,17 @@
     .site-report-annotate-controls button:active {
       background: var(--ios-separator);
     }
+
+    /* Override absolute positioning for autocomplete inside scrollable panels (overflow clips on mobile Safari) */
+    .site-report-panel .autocomplete-list,
+    .modal .autocomplete-list {
+      position: relative;
+      top: auto;
+      left: auto;
+      right: auto;
+      margin-top: 6px;
+    }
+
     .sr-next-btn, .sr-generate-btn {
       width: 100%;
       margin-top: 24px;
