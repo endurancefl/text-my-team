@@ -6276,10 +6276,6 @@
         .then(function(r) { return r.json(); })
         .then(function(data) {
           propertiesList = data.properties || [];
-          console.log('[loadProperties] loaded ' + propertiesList.length + ' properties');
-        })
-        .catch(function(err) {
-          console.error('[loadProperties] error:', err);
         });
     }
 
@@ -6361,6 +6357,7 @@
       ticketPhotoBtn.style.display = 'block';
       updateTicketSaveBtn();
       ticketOverlay.classList.add('active');
+      if (propertiesList.length === 0) loadProperties();
     });
 
     ticketPhotoBtn.addEventListener('click', function() {
@@ -6533,6 +6530,7 @@
         // Reset onclick handler in case it was modified by retry logic
         inspectionUploadBtn.onclick = null;
         inspectionOverlay.classList.add('active');
+        if (propertiesList.length === 0) loadProperties();
       });
     }
 
@@ -6949,8 +6947,7 @@
       srGenerateBtn.textContent = 'Generate Report';
       srGoToStep(1);
       srWizard.classList.add('active');
-      // DEBUG: temporary alert to verify properties loaded on mobile
-      alert('DEBUG: ' + propertiesList.length + ' properties loaded');
+      if (propertiesList.length === 0) loadProperties();
     });
 
     srCloseBtn.addEventListener('click', function() {
@@ -7000,11 +6997,9 @@
     // Step 1: Property autocomplete (reuse pattern)
     srPropertyInput.addEventListener('input', function() {
       var query = this.value.trim().toLowerCase();
-      console.log('[SR autocomplete] query="' + query + '", propertiesList.length=' + propertiesList.length);
       srAcList.innerHTML = '';
       if (query.length === 0) { srAcList.classList.remove('active'); return; }
       var matches = propertiesList.filter(function(p) { return p.address.toLowerCase().indexOf(query) >= 0; });
-      console.log('[SR autocomplete] matches=' + matches.length);
       if (matches.length === 0) { srAcList.classList.remove('active'); return; }
       matches.forEach(function(prop) {
         var item = document.createElement('div');
@@ -8106,6 +8101,7 @@
       baStep1Next.disabled = true;
       baGoToStep(1);
       baWizard.style.display = 'flex';
+      if (propertiesList.length === 0) loadProperties();
     });
 
     // Close wizard with confirmation if work in progress
