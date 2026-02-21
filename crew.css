@@ -3146,8 +3146,8 @@
       padding: 12px 24px;
       margin-top: 8px;
       min-height: 48px;
-      width: calc(100% - 48px);
-      max-width: 320px;
+      width: 100%;
+      max-width: 240px;
     }
     .pin-cancel-btn.start-day-mode:active {
       background: #2da74d;
