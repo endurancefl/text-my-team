@@ -324,7 +324,8 @@ function getServiceCatalog() {
     'Items': 'items',
     'Is Manual Entry': 'isManualEntry',
     'Sort Order': 'sortOrder',
-    'Last Modified': 'lastModified'
+    'Last Modified': 'lastModified',
+    'Duration Type': 'durationType'
   };
 
   for (var i = 1; i < data.length; i++) {
@@ -2188,12 +2189,20 @@ function saveTimeEntry(data) {
       sheet.getRange(1, nextCol2, 1, 2).setValues([['Service Name', 'Member Count']]);
       sheet.getRange(1, nextCol2, 1, 2).setFontWeight('bold');
     }
+    // Auto-upgrade: add Duration Type column if missing
+    headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    if (headerRow.indexOf('Duration Type') === -1) {
+      var nextCol3 = sheet.getLastColumn() + 1;
+      sheet.getRange(1, nextCol3).setValue('Duration Type');
+      sheet.getRange(1, nextCol3).setFontWeight('bold');
+    }
   }
 
   // Re-read headers after potential upgrade
   var currentHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   var serviceNameCol = currentHeaders.indexOf('Service Name');
   var memberCountCol = currentHeaders.indexOf('Member Count');
+  var durationTypeCol = currentHeaders.indexOf('Duration Type');
 
   // Generate entry ID
   var existingData = sheet.getDataRange().getValues();
@@ -2237,6 +2246,7 @@ function saveTimeEntry(data) {
   }
   if (serviceNameCol !== -1) baseRow[serviceNameCol] = data.serviceName || '';
   if (memberCountCol !== -1) baseRow[memberCountCol] = data.memberCount || '';
+  if (durationTypeCol !== -1) baseRow[durationTypeCol] = data.durationType || '';
 
   sheet.appendRow(baseRow);
 

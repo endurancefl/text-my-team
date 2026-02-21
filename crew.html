@@ -949,7 +949,7 @@
         editCrew: 'Edit Crew',
         crew: 'crew',
         target: 'Target',
-        clockOut: 'Clock Out',
+        clockOut: 'Next',
         cancelTicket: 'Cancel Ticket',
         serviceDone: 'service(s) done',
         actual: 'Actual',
@@ -1060,7 +1060,18 @@
         left: 'left',
         estTimeLabel: 'Est.',
         withMember: 'with {name}',
-        demoMode: 'DEMO MODE'
+        demoMode: 'DEMO MODE',
+        internal: 'INTERNAL',
+        statusOpen: 'Open',
+        statusCompleted: 'Completed',
+        updateStatus: 'Update Status',
+        openRequest: 'Open Request',
+        at: 'at',
+        requestLabel: 'Request',
+        translationLabel: 'Translation',
+        fixed: 'Fixed',
+        fixedDuration: 'fixed duration',
+        addCrewWontSpeed: 'Adding crew won\'t speed this up'
       },
       es: {
         langToggle: 'English',
@@ -1099,7 +1110,7 @@
         editCrew: 'Editar Equipo',
         crew: 'equipo',
         target: 'Meta',
-        clockOut: 'Registrar Salida',
+        clockOut: 'Siguiente',
         cancelTicket: 'Cancelar Ticket',
         serviceDone: 'servicio(s) listo(s)',
         actual: 'Real',
@@ -1196,7 +1207,18 @@
         left: 'restante',
         estTimeLabel: 'Est.',
         withMember: 'con {name}',
-        demoMode: 'MODO DEMO'
+        demoMode: 'MODO DEMO',
+        internal: 'INTERNO',
+        statusOpen: 'Abierto',
+        statusCompleted: 'Completado',
+        updateStatus: 'Actualizar Estado',
+        openRequest: 'Solicitud Abierta',
+        at: 'a las',
+        requestLabel: 'Solicitud',
+        translationLabel: 'Traducci\u00f3n',
+        fixed: 'Fijo',
+        fixedDuration: 'duraci\u00f3n fija',
+        addCrewWontSpeed: 'Agregar equipo no acelerar\u00e1 esto'
       }
     };
 
@@ -1347,6 +1369,7 @@
             ticketId: opts.ticketId || '',
             propertyAddress: opts.propertyAddress || '',
             serviceName: opts.serviceName || '',
+            durationType: opts.durationType || '',
             clockIn: clockOutStr,
             crewMembers: newMemberNames,
             memberCount: newMemberNames.length,
@@ -1544,7 +1567,7 @@
                       { serviceName: 'Shrub Pruning', estimatedHours: 1.2 },
                       { serviceName: 'Weed Control', estimatedHours: 0.8 },
                       { serviceName: 'Mulch Install', estimatedHours: 1.5 },
-                      { serviceName: 'Irrigation Check', estimatedHours: 0.5 }
+                      { serviceName: 'Irrigation Check', estimatedHours: 0.5, durationType: 'fixed' }
                     ],
                     totalEstHours: 4.0,
                     stopOrder: 1,
@@ -1578,7 +1601,7 @@
                     propertyAddress: '310 Sunset Ln, Ocoee, FL',
                     services: [
                       { serviceName: 'Sod Replacement', estimatedHours: 1.0 },
-                      { serviceName: 'Fertilizer Application', estimatedHours: 0.5 }
+                      { serviceName: 'Fertilizer Application', estimatedHours: 0.5, durationType: 'fixed' }
                     ],
                     totalEstHours: 1.5,
                     stopOrder: 5,
@@ -1589,9 +1612,70 @@
               };
             }
 
-            // getRequests — return empty
+            // getRequests — return demo requests
             if (url.indexOf('getRequests') >= 0) {
-              mockResponse = { success: true, authorized: true, crewName: 'Demo Crew', requests: [] };
+              mockResponse = { success: true, authorized: true, crewName: 'Demo Crew', requests: [
+                {
+                  id: 'REQ-D001',
+                  requestId: 'REQ-D001',
+                  property: '1420 Oak Ridge Dr, Orlando, FL',
+                  customerName: 'Maria Santos',
+                  customerPhone: '(407) 555-0101',
+                  date: '2026-02-18',
+                  time: '9:15 AM',
+                  message: 'There is a large dead branch hanging over the driveway near the front oak tree. Worried it could fall on a car.',
+                  status: 'Open',
+                  type: 'Customer',
+                  photo: '',
+                  acknowledged: '',
+                  translatedMessage: 'Hay una rama grande muerta colgando sobre la entrada cerca del roble del frente. Me preocupa que pueda caer sobre un carro.'
+                },
+                {
+                  id: 'REQ-D002',
+                  requestId: 'REQ-D002',
+                  property: '875 Magnolia Blvd, Winter Park, FL',
+                  customerName: 'Tom Henderson',
+                  customerPhone: '(407) 555-0202',
+                  date: '2026-02-17',
+                  time: '3:42 PM',
+                  message: 'Sprinkler head in the front yard is broken and spraying sideways onto the sidewalk. Zone 3 I think.',
+                  status: 'Open',
+                  type: 'Customer',
+                  photo: 'https://example.com/photo1.jpg',
+                  acknowledged: '',
+                  translatedMessage: 'El aspersor del jard\u00edn del frente est\u00e1 roto y est\u00e1 rociando de lado hacia la acera. Creo que es la zona 3.'
+                },
+                {
+                  id: 'REQ-D003',
+                  requestId: 'REQ-D003',
+                  property: '310 Sunset Ln, Ocoee, FL',
+                  customerName: 'Jake Miller',
+                  customerPhone: '(407) 555-0303',
+                  date: '2026-02-16',
+                  time: '11:30 AM',
+                  message: 'Ant mounds appearing along the back fence line. At least 4-5 large mounds.',
+                  status: 'Open',
+                  type: 'Internal',
+                  photo: '',
+                  acknowledged: 'Jake Miller',
+                  translatedMessage: 'Hormigueros apareciendo a lo largo de la cerca trasera. Al menos 4-5 mont\u00edculos grandes.'
+                },
+                {
+                  id: 'REQ-D004',
+                  requestId: 'REQ-D004',
+                  property: '2216 Mallard Circle, Windermere, FL',
+                  customerName: 'Lisa Park',
+                  customerPhone: '(407) 555-0404',
+                  date: '2026-02-14',
+                  time: '8:05 AM',
+                  message: 'Can you trim the hedges along the pool fence? They are blocking the view from the patio.',
+                  status: 'Completed',
+                  type: 'Customer',
+                  photo: '',
+                  acknowledged: 'Carlos Rivera',
+                  translatedMessage: '\u00bfPueden podar los setos a lo largo de la cerca de la piscina? Est\u00e1n bloqueando la vista desde el patio.'
+                }
+              ]};
             }
 
             // verifyPin — accept any 4-digit pin, match to demo member
@@ -1973,6 +2057,34 @@
         }
       });
 
+      // Show open requests for this property as rows at the bottom
+      var propertyRequests = (currentRequests || []).filter(function(req) {
+        var status = (req.status || 'Open').toLowerCase();
+        if (status === 'completed') return false;
+        var reqProp = req.property || '';
+        return reqProp.indexOf(address.split(',')[0]) !== -1 ||
+               address.indexOf(reqProp.split(',')[0]) !== -1;
+      });
+      if (propertyRequests.length > 0) {
+        propertyRequests.forEach(function(req) {
+          var reqMsg = (currentLang === 'es' && req.translatedMessage) ? req.translatedMessage : (req.message || t('noDescription'));
+          var truncMsg = reqMsg.length > 60 ? reqMsg.substring(0, 60) + '\u2026' : reqMsg;
+          html += '<div class="ticket-sub-row request-row" onclick="openRequestFromCard(\'' + req.id + '\')">';
+          html += '<div class="ticket-sub-row-info">';
+          html += '<div class="ticket-sub-row-services" style="color:var(--ios-orange);font-weight:600;font-size:13px;">';
+          html += '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px;color:var(--ios-orange);"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>';
+          html += t('openRequest');
+          html += '</div>';
+          html += '<div style="font-size:12px;color:var(--ios-text-secondary);margin-top:2px;">' + escapeHtml(truncMsg) + '</div>';
+          html += '<div style="font-size:11px;color:var(--ios-text-tertiary);margin-top:1px;">' + escapeHtml(req.customerName || '') + ' \u00B7 ' + escapeHtml(formatDate(req.date)) + '</div>';
+          html += '</div>';
+          html += '<div class="ticket-sub-row-right">';
+          html += '<div class="property-group-chevron" style="font-size:18px;">\u203A</div>';
+          html += '</div>';
+          html += '</div>';
+        });
+      }
+
       html += '</div>'; // .property-group-tickets
       html += '</div>'; // .property-group-card
 
@@ -2087,8 +2199,11 @@
         var svcActive = svcClock && svcClock.startTime && !svcClock.endTime;
         var escapedSvcName = escapeHtml(svcName).replace(/'/g, "\\'");
 
+        var svcDurationType = getServiceDurationType(ticket, svcName);
+        var svcIsFixed = svcDurationType === 'fixed';
+
         html += '<div class="service-row" style="margin-left:0;flex-wrap:wrap;">';
-        html += '<span class="service-row-name" style="flex:1;font-size:14px;' + (svcCompleted ? 'text-decoration:line-through;color:#8E8E93;' : '') + '">' + escapeHtml(svcName) + '</span>';
+        html += '<span class="service-row-name" style="flex:1;font-size:14px;' + (svcCompleted ? 'text-decoration:line-through;color:#8E8E93;' : '') + '">' + escapeHtml(svcName) + (svcIsFixed ? ' <span class="fixed-badge">' + t('fixed') + '</span>' : '') + '</span>';
 
         if (svcCompleted) {
           html += '<span style="color:#34C759;font-size:13px;">\u2713 ' + t('done') + '</span>';
@@ -2105,18 +2220,18 @@
           // Progress bar + remaining time (only if service has estimated hours)
           var svcEstHours = getServiceEstHours(ticket, svcName);
           if (svcEstHours > 0) {
-            var progress = getServiceProgress(svcClock, svcEstHours);
+            var progress = getServiceProgress(svcClock, svcEstHours, svcDurationType);
             var pct = Math.min(Math.round(progress * 100), 100);
             var colorClass = progress >= 1 ? 'red' : progress >= 0.75 ? 'yellow' : '';
             html += '<div class="svc-progress-track" style="width:100%;">';
             html += '<div class="svc-progress-fill ' + colorClass + '" id="svc-prog-' + ticket.ticketId + '-' + svcName.replace(/[^a-zA-Z0-9]/g, '_') + '" style="width:' + pct + '%;"></div>';
             html += '</div>';
             // Remaining time label
-            var svcRemMin = getServiceRemainingMin(svcClock, svcEstHours);
+            var svcRemMin = getServiceRemainingMin(svcClock, svcEstHours, svcDurationType);
             var crewCount = (svcClock.assignedMembers || []).length || 1;
             var timeId = 'svc-time-' + ticket.ticketId + '-' + svcName.replace(/[^a-zA-Z0-9]/g, '_');
             html += '<div class="svc-remaining-time' + (svcRemMin !== null && svcRemMin <= 0 ? ' over' : '') + '" id="' + timeId + '">';
-            html += svcRemMin !== null ? formatRemainingMin(svcRemMin) + ' \u00B7 ' + crewCount + ' ' + t('crew') : '';
+            html += svcRemMin !== null ? formatRemainingMin(svcRemMin) + ' \u00B7 ' + (svcIsFixed ? t('fixedDuration') : crewCount + ' ' + t('crew')) : '';
             html += '</div>';
           }
         } else {
@@ -2634,9 +2749,10 @@
             });
 
             if (sc[sn].entryId && sc[sn].startTime && !sc[sn].endTime) {
-              // Accumulate man-hours from previous segment
+              // Accumulate man-hours from previous segment (fixed services: wall time only)
               var segMins = (splitNow - sc[sn].startTime) / 60000;
-              sc[sn].manHoursConsumed = (sc[sn].manHoursConsumed || 0) + segMins * oldSvcMembers.length;
+              var svcDurType = getServiceDurationType(ticket, sn);
+              sc[sn].manHoursConsumed = (sc[sn].manHoursConsumed || 0) + (svcDurType === 'fixed' ? segMins : segMins * oldSvcMembers.length);
               if (sc[sn].assignedMembers.length === 0) {
                 // Last person removed — close entry without opening new one
                 var clockOutStr = splitNow.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
@@ -2663,7 +2779,8 @@
                     entryType: 'service',
                     ticketId: tid,
                     propertyAddress: ticket ? ticket.propertyAddress : '',
-                    serviceName: svcName
+                    serviceName: svcName,
+                    durationType: getServiceDurationType(ticket, svcName)
                   }).then(function(newId) {
                     if (newId) {
                       svcClock.entryId = newId;
@@ -2924,6 +3041,13 @@
       document.getElementById('active-job-banner').style.display = 'flex';
     }
 
+    function openRequestFromCard(requestId) {
+      var index = currentRequests.findIndex(function(r) { return String(r.id) === String(requestId); });
+      if (index >= 0) {
+        openRequestModal(currentRequests[index], index);
+      }
+    }
+
     function checkPropertyRequests(propertyAddress) {
       // Filter current requests for this property
       var propertyRequests = (currentRequests || []).filter(function(req) {
@@ -2941,8 +3065,9 @@
 
       var list = document.getElementById('request-alert-list');
       list.innerHTML = propertyRequests.map(function(req) {
+        var alertMsg = (currentLang === 'es' && req.translatedMessage) ? req.translatedMessage : (req.message || t('noDescription'));
         return '<div class="request-alert-item" data-request-id="' + req.id + '">' +
-          '<div class="request-alert-message">' + escapeHtml(req.message || t('noDescription')) + '</div>' +
+          '<div class="request-alert-message">' + escapeHtml(alertMsg) + '</div>' +
           '<div style="font-size:11px;color:#888;margin-bottom:6px;">' + escapeHtml(req.customerName || '') + ' · ' + escapeHtml(formatDate(req.date)) + '</div>' +
           '<div class="request-alert-actions">' +
             '<button class="request-handle-btn" onclick="handleRequest(\'' + req.id + '\')">' + t('handleIt') + '</button>' +
@@ -3452,12 +3577,33 @@
       return 0;
     }
 
+    // Get duration type for a service: 'scalable' (default) or 'fixed'
+    function getServiceDurationType(ticket, serviceName) {
+      var services = ticket.services || [];
+      for (var i = 0; i < services.length; i++) {
+        var s = services[i];
+        var sn = typeof s === 'string' ? s : (s.serviceName || s.proposalName || s.sectionName || s.name || s.service || '');
+        if (sn === serviceName && s.durationType) {
+          return s.durationType;
+        }
+      }
+      return 'scalable';
+    }
+    function isFixedService(ticket, serviceName) {
+      return getServiceDurationType(ticket, serviceName) === 'fixed';
+    }
+
     // Calculate service progress as a fraction (0..∞). Accounts for crew changes via manHoursConsumed.
-    function getServiceProgress(svcClock, estManHours) {
+    // For fixed-duration services, crew count is irrelevant — progress tracks wall time only.
+    function getServiceProgress(svcClock, estManHours, durationType) {
       if (!estManHours || estManHours <= 0 || !svcClock || !svcClock.startTime) return -1;
       var consumed = svcClock.manHoursConsumed || 0; // man-minutes from prior segments
-      var crewCount = (svcClock.assignedMembers || []).length || 1;
       var currentSegmentMinutes = (new Date() - svcClock.startTime) / 60000;
+      if (durationType === 'fixed') {
+        var totalWallMinutes = consumed + currentSegmentMinutes;
+        return totalWallMinutes / (estManHours * 60);
+      }
+      var crewCount = (svcClock.assignedMembers || []).length || 1;
       var totalManMinutes = consumed + (currentSegmentMinutes * crewCount);
       return totalManMinutes / (estManHours * 60);
     }
@@ -3478,19 +3624,26 @@
       return formatEstMin(wallMinutes) + ' ' + t('left');
     }
 
-    // Calculate remaining wall-clock minutes for a service, accounting for crew changes
-    function getServiceRemainingMin(svcClock, estManHours) {
+    // Calculate remaining wall-clock minutes for a service, accounting for crew changes.
+    // For fixed-duration services, remaining = est wall time - wall time consumed (no crew division).
+    function getServiceRemainingMin(svcClock, estManHours, durationType) {
       if (!estManHours || estManHours <= 0 || !svcClock || !svcClock.startTime) return null;
       var consumed = svcClock.manHoursConsumed || 0;
-      var crewCount = (svcClock.assignedMembers || []).length || 1;
       var currentSegmentMinutes = (new Date() - svcClock.startTime) / 60000;
+      if (durationType === 'fixed') {
+        var totalWallMinutes = consumed + currentSegmentMinutes;
+        return Math.round((estManHours * 60) - totalWallMinutes);
+      }
+      var crewCount = (svcClock.assignedMembers || []).length || 1;
       var totalManMinutes = consumed + (currentSegmentMinutes * crewCount);
       var remainingManMinutes = (estManHours * 60) - totalManMinutes;
       return Math.round(remainingManMinutes / crewCount);
     }
 
-    // Calculate remaining wall-clock minutes with a hypothetical extra crew member
-    function getServiceRemainingWithExtra(svcClock, estManHours) {
+    // Calculate remaining wall-clock minutes with a hypothetical extra crew member.
+    // For fixed-duration services, returns null — adding crew doesn't help.
+    function getServiceRemainingWithExtra(svcClock, estManHours, durationType) {
+      if (durationType === 'fixed') return null;
       if (!estManHours || estManHours <= 0 || !svcClock || !svcClock.startTime) return null;
       var consumed = svcClock.manHoursConsumed || 0;
       var crewCount = (svcClock.assignedMembers || []).length || 1;
@@ -3849,12 +4002,13 @@
         if (!sc[sn].startTime || sc[sn].endTime) return;
         var estHours = getServiceEstHours(ticket, sn);
         if (estHours <= 0) return;
+        var durType = getServiceDurationType(ticket, sn);
 
         var safeId = sn.replace(/[^a-zA-Z0-9]/g, '_');
         var fillEl = document.getElementById('svc-prog-' + ticketId + '-' + safeId);
         if (!fillEl) return;
 
-        var progress = getServiceProgress(sc[sn], estHours);
+        var progress = getServiceProgress(sc[sn], estHours, durType);
         var pct = Math.min(Math.round(progress * 100), 100);
         fillEl.style.width = pct + '%';
         fillEl.className = 'svc-progress-fill' + (progress >= 1 ? ' red' : progress >= 0.75 ? ' yellow' : '');
@@ -3862,9 +4016,10 @@
         // Update remaining time label
         var timeEl = document.getElementById('svc-time-' + ticketId + '-' + safeId);
         if (timeEl) {
-          var remMin = getServiceRemainingMin(sc[sn], estHours);
+          var remMin = getServiceRemainingMin(sc[sn], estHours, durType);
           var crewCount = (sc[sn].assignedMembers || []).length || 1;
-          timeEl.textContent = remMin !== null ? formatRemainingMin(remMin) + ' \u00B7 ' + crewCount + ' ' + t('crew') : '';
+          var isFixed = durType === 'fixed';
+          timeEl.textContent = remMin !== null ? formatRemainingMin(remMin) + ' \u00B7 ' + (isFixed ? t('fixedDuration') : crewCount + ' ' + t('crew')) : '';
           timeEl.className = 'svc-remaining-time' + (remMin !== null && remMin <= 0 ? ' over' : '');
         }
       });
@@ -4045,6 +4200,7 @@
       var crewName = scheduleData ? scheduleData.crewName : currentCrewName;
       var now = new Date();
       var assignedNames = assigned.map(function(m) { return typeof m === 'string' ? m : m.name; });
+      var svcDurType = getServiceDurationType(ticket, serviceName);
       fetch(GOOGLE_SHEETS_URL, {
         method: 'POST',
         body: JSON.stringify({
@@ -4055,6 +4211,7 @@
           ticketId: ticketId,
           propertyAddress: ticket ? ticket.propertyAddress : '',
           serviceName: serviceName,
+          durationType: svcDurType,
           clockIn: now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
           crewMembers: assignedNames,
           memberCount: assigned.length,
@@ -4148,9 +4305,10 @@
         // Crew changed on active service — split entry for accurate man-hours
         var ticket = todayTickets.find(function(t) { return t.ticketId === ticketId; });
         var splitNow = new Date();
-        // Accumulate man-hours from previous segment
+        // Accumulate man-hours from previous segment (fixed services: wall time only)
         var segmentMinutes = (splitNow - svcClock.startTime) / 60000;
-        svcClock.manHoursConsumed = (svcClock.manHoursConsumed || 0) + segmentMinutes * oldMembers.length;
+        var svcDurType = getServiceDurationType(ticket, serviceName);
+        svcClock.manHoursConsumed = (svcClock.manHoursConsumed || 0) + (svcDurType === 'fixed' ? segmentMinutes : segmentMinutes * oldMembers.length);
         splitTimeEntry({
           oldEntryId: svcClock.entryId,
           splitTime: splitNow,
@@ -4160,7 +4318,8 @@
           entryType: 'service',
           ticketId: ticketId,
           propertyAddress: ticket ? ticket.propertyAddress : '',
-          serviceName: serviceName
+          serviceName: serviceName,
+          durationType: svcDurType
         }).then(function(newId) {
           if (newId) {
             svcClock.entryId = newId;
@@ -4420,19 +4579,23 @@
         var crewCount = crewNames.length || 1;
         var escapedSn = escapeHtml(sn).replace(/'/g, "\\'");
         var estHours = getServiceEstHours(ticket, sn);
+        var durType = getServiceDurationType(ticket, sn);
+        var isFixed = durType === 'fixed';
 
         buttons += '<button class="reassign-service-btn is-active" data-svc="' + escapeHtml(sn) + '" onclick="assignMemberToService(\'' + ticketId + '\', \'' + escapedSn + '\')">';
         buttons += '<div class="reassign-service-info">';
-        buttons += '<div class="reassign-service-name">' + escapeHtml(sn) + '</div>';
-        buttons += '<div class="reassign-service-status active-status">' + t('active') + ' \u00B7 ' + crewCount + ' ' + t('crew') + '</div>';
+        buttons += '<div class="reassign-service-name">' + escapeHtml(sn) + (isFixed ? ' <span class="fixed-badge">' + t('fixed') + '</span>' : '') + '</div>';
+        buttons += '<div class="reassign-service-status active-status">' + t('active') + ' \u00B7 ' + (isFixed ? t('fixedDuration') : crewCount + ' ' + t('crew')) + '</div>';
 
         // Time remaining + projection with extra member
         if (estHours > 0) {
-          var remMin = getServiceRemainingMin(sc, estHours);
-          var remWithExtra = getServiceRemainingWithExtra(sc, estHours);
+          var remMin = getServiceRemainingMin(sc, estHours, durType);
+          var remWithExtra = getServiceRemainingWithExtra(sc, estHours, durType);
           if (remMin !== null) {
             buttons += '<div class="reassign-time-info' + (remMin <= 0 ? ' over' : '') + '">' + formatRemainingMin(remMin) + '</div>';
-            if (remWithExtra !== null && remMin > 0) {
+            if (isFixed) {
+              buttons += '<div class="reassign-time-projection fixed-note">' + t('addCrewWontSpeed') + '</div>';
+            } else if (remWithExtra !== null && remMin > 0) {
               buttons += '<div class="reassign-time-projection">\u2192 ' + formatEstMin(remWithExtra) + ' ' + t('withMember').replace('{name}', currentName) + '</div>';
             }
           }
@@ -4454,15 +4617,17 @@
         if (sc && sc.startTime && !sc.endTime) return;
         var escapedSn = escapeHtml(svcName).replace(/'/g, "\\'");
         var estHours = getServiceEstHours(ticket, svcName);
+        var durType = getServiceDurationType(ticket, svcName);
+        var isFixed = durType === 'fixed';
 
         buttons += '<button class="reassign-service-btn" data-svc="' + escapeHtml(svcName) + '" onclick="assignMemberToService(\'' + ticketId + '\', \'' + escapedSn + '\')">';
         buttons += '<div class="reassign-service-info">';
-        buttons += '<div class="reassign-service-name">' + escapeHtml(svcName) + '</div>';
+        buttons += '<div class="reassign-service-name">' + escapeHtml(svcName) + (isFixed ? ' <span class="fixed-badge">' + t('fixed') + '</span>' : '') + '</div>';
         if (estHours > 0) {
           var soloMin = Math.round(estHours * 60);
-          buttons += '<div class="reassign-service-status pending-status">' + t('notStarted') + ' \u00B7 ' + t('estTimeLabel') + ' ' + formatEstMin(soloMin) + '</div>';
+          buttons += '<div class="reassign-service-status pending-status">' + (isFixed ? t('fixed') + ' \u00B7 ' : t('notStarted') + ' \u00B7 ') + t('estTimeLabel') + ' ' + formatEstMin(soloMin) + '</div>';
         } else {
-          buttons += '<div class="reassign-service-status pending-status">' + t('notStarted') + '</div>';
+          buttons += '<div class="reassign-service-status pending-status">' + (isFixed ? t('fixed') : t('notStarted')) + '</div>';
         }
         buttons += '</div>';
         buttons += '<span class="reassign-chevron">\u203A</span>';
@@ -4516,9 +4681,10 @@
         if (svcClock.entryId) {
           var ticket = todayTickets.find(function(t) { return t.ticketId === ticketId; });
           var splitNow = new Date();
-          // Accumulate man-hours from previous segment
+          // Accumulate man-hours from previous segment (fixed services: wall time only)
           var segmentMinutes = (splitNow - svcClock.startTime) / 60000;
-          svcClock.manHoursConsumed = (svcClock.manHoursConsumed || 0) + segmentMinutes * oldMembers.length;
+          var svcDurType = getServiceDurationType(ticket, serviceName);
+          svcClock.manHoursConsumed = (svcClock.manHoursConsumed || 0) + (svcDurType === 'fixed' ? segmentMinutes : segmentMinutes * oldMembers.length);
           splitTimeEntry({
             oldEntryId: svcClock.entryId,
             splitTime: splitNow,
@@ -4528,7 +4694,8 @@
             entryType: 'service',
             ticketId: ticketId,
             propertyAddress: ticket ? ticket.propertyAddress : '',
-            serviceName: serviceName
+            serviceName: serviceName,
+            durationType: svcDurType
           }).then(function(newId) {
             if (newId) {
               svcClock.entryId = newId;
@@ -4548,6 +4715,7 @@
         var ticket = todayTickets.find(function(t) { return t.ticketId === ticketId; });
         var crewName = scheduleData ? scheduleData.crewName : currentCrewName;
         var now = new Date();
+        var svcDurType = getServiceDurationType(ticket, serviceName);
         fetch(GOOGLE_SHEETS_URL, {
           method: 'POST',
           body: JSON.stringify({
@@ -4558,6 +4726,7 @@
             ticketId: ticketId,
             propertyAddress: ticket ? ticket.propertyAddress : '',
             serviceName: serviceName,
+            durationType: svcDurType,
             clockIn: now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
             crewMembers: [nameToAdd],
             memberCount: 1,
@@ -5118,16 +5287,19 @@
         if (req.status && req.status.toLowerCase().includes('complete')) statusClass = 'completed';
         var isInternal = req.type === 'Internal';
 
+        var displayMessage = (currentLang === 'es' && req.translatedMessage) ? req.translatedMessage : (req.message || t('noDescription'));
+        var statusText = statusClass === 'completed' ? t('statusCompleted') : t('statusOpen');
+
         html +=
           '<div class="request-card ' + statusClass + '" data-index="' + originalIndex + '">' +
             '<div class="request-header">' +
-              '<div class="request-property">' + escapeHtml(req.property) + (isInternal ? ' <span style="background:#DBEAFE;color:#1E40AF;font-size:10px;padding:2px 6px;border-radius:4px;margin-left:6px;">INTERNAL</span>' : '') + '</div>' +
+              '<div class="request-property">' + escapeHtml(req.property) + (isInternal ? ' <span style="background:#DBEAFE;color:#1E40AF;font-size:10px;padding:2px 6px;border-radius:4px;margin-left:6px;">' + t('internal') + '</span>' : '') + '</div>' +
               '<div class="request-date">' + escapeHtml(formatDate(req.date)) + '</div>' +
             '</div>' +
-            '<div class="request-message">' + escapeHtml(req.message || t('noDescription')) + '</div>' +
+            '<div class="request-message">' + escapeHtml(displayMessage) + '</div>' +
             '<div class="request-customer">' + escapeHtml(req.customerName) + ' · ' + escapeHtml(req.customerPhone) + '</div>' +
             '<div class="request-footer">' +
-              '<span class="status-badge ' + statusClass + '">' + escapeHtml(req.status || 'Open') + '</span>' +
+              '<span class="status-badge ' + statusClass + '">' + escapeHtml(statusText) + '</span>' +
               (req.photo ? '<span class="photo-indicator"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg> ' + t('photo') + '</span>' : '') +
             '</div>' +
           '</div>';
@@ -5188,19 +5360,31 @@
         modalHeader.classList.remove('completed');
       }
 
-      var typeBadge = req.type === 'Internal' ? ' <span style="background:#DBEAFE;color:#1E40AF;font-size:11px;padding:2px 8px;border-radius:4px;margin-left:8px;">INTERNAL</span>' : '';
+      var typeBadge = req.type === 'Internal' ? ' <span style="background:#DBEAFE;color:#1E40AF;font-size:11px;padding:2px 8px;border-radius:4px;margin-left:8px;">' + t('internal') + '</span>' : '';
       document.getElementById('modal-property').innerHTML = escapeHtml(req.property) + typeBadge;
       document.getElementById('modal-customer').textContent = req.customerName + ' · ' + req.customerPhone;
-      document.getElementById('modal-date').textContent = formatDate(req.date) + ' at ' + formatTime(req.time);
-      document.getElementById('modal-message').textContent = req.message || t('noDescription');
+      document.getElementById('modal-date').textContent = formatDate(req.date) + ' ' + t('at') + ' ' + formatTime(req.time);
 
-      // Show Spanish translation if available
-      if (req.translatedMessage && req.translatedMessage.length > 0) {
+      // In Spanish mode: show translated message as primary, English as "original"
+      // In English mode: show English message, show translation section if translatedMessage exists
+      if (currentLang === 'es' && req.translatedMessage) {
+        document.getElementById('modal-message').textContent = req.translatedMessage;
         document.getElementById('modal-translated-section').style.display = 'block';
-        document.getElementById('modal-translated').textContent = req.translatedMessage;
+        document.querySelector('#modal-translated-section .detail-translation-label').textContent = 'Original';
+        document.getElementById('modal-translated').textContent = req.message || '';
       } else {
-        document.getElementById('modal-translated-section').style.display = 'none';
+        document.getElementById('modal-message').textContent = req.message || t('noDescription');
+        if (req.translatedMessage && req.translatedMessage.length > 0) {
+          document.getElementById('modal-translated-section').style.display = 'block';
+          document.querySelector('#modal-translated-section .detail-translation-label').textContent = t('translationLabel');
+          document.getElementById('modal-translated').textContent = req.translatedMessage;
+        } else {
+          document.getElementById('modal-translated-section').style.display = 'none';
+        }
       }
+
+      // Translate the "Request" label
+      document.querySelector('.detail-message-label').textContent = t('requestLabel');
 
       // Photo link
       var photoLink = document.getElementById('modal-photo-link');
@@ -5250,13 +5434,18 @@
       if (completionPhotoBtns) completionPhotoBtns.style.display = 'flex';
       if (completionPhotoSection) completionPhotoSection.style.display = 'none';
 
-      // Set selected status
+      // Translate status buttons (data-status stays English for backend, display text translates)
       document.querySelectorAll('.status-btn').forEach(function(btn) {
         btn.classList.remove('selected');
-        if (btn.getAttribute('data-status') === selectedStatus) {
+        var ds = btn.getAttribute('data-status');
+        btn.textContent = ds === 'Completed' ? t('statusCompleted') : t('statusOpen');
+        if (ds === selectedStatus) {
           btn.classList.add('selected');
         }
       });
+      // Translate "Update Status" label
+      var statusLabel = document.querySelector('#status-section .modal-label');
+      if (statusLabel) statusLabel.textContent = t('updateStatus');
 
       modalOverlay.classList.add('active');
     }
