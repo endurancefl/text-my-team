@@ -3137,6 +3137,22 @@
     .pin-cancel-btn:active {
       opacity: 0.5;
     }
+    .pin-cancel-btn.start-day-mode {
+      background: #34C759;
+      color: #fff;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 16px;
+      padding: 12px 24px;
+      margin-top: 8px;
+      min-height: 48px;
+      width: calc(100% - 48px);
+      max-width: 320px;
+    }
+    .pin-cancel-btn.start-day-mode:active {
+      background: #2da74d;
+      opacity: 1;
+    }
     .pin-error {
       color: var(--ios-red);
       font-size: 14px;
@@ -3769,11 +3785,24 @@
     }
     .ticket-sub-row.request-row {
       background: rgba(255, 149, 0, 0.05);
-      cursor: pointer;
-      border-top: 0.5px solid var(--ios-separator);
+      border-bottom: 0.5px solid var(--ios-separator);
     }
     .ticket-sub-row.request-row:active {
       background: rgba(255, 149, 0, 0.12);
+    }
+    .send-to-office-btn {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--ios-orange);
+      background: transparent;
+      color: var(--ios-orange);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .send-to-office-btn:active {
+      background: rgba(255, 149, 0, 0.15);
     }
     .ticket-sub-row.active-expanded {
       display: block;
