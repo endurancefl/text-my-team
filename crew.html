@@ -950,7 +950,9 @@
         // Stop cards
         shop: 'Shop',
         active: 'Active',
-        shopDesc: 'Time tracking for shop tasks',
+        shopDesc: 'Tap to start shop time',
+        shopActivityPrompt: 'What are you doing at the shop?',
+        shopActivityRequired: 'Please describe the shop activity',
         stop: 'Stop',
         start: 'Start',
         returnText: 'Return',
@@ -1116,7 +1118,9 @@
         stopsDone: 'paradas listas',
         shop: 'Taller',
         active: 'Activo',
-        shopDesc: 'Control de tiempo para tareas de taller',
+        shopDesc: 'Toca para iniciar tiempo de taller',
+        shopActivityPrompt: '\u00bfQu\u00e9 est\u00e1s haciendo en el taller?',
+        shopActivityRequired: 'Por favor describe la actividad del taller',
         stop: 'Parar',
         start: 'Iniciar',
         returnText: 'Volver',
@@ -2055,23 +2059,24 @@
         html += '</button>';
 
         var isShopActive = !!activeTickets['SHOP'];
+        var shopAt = activeTickets['SHOP'];
         html += '<div class="property-group-card shop-card' + (isShopActive ? ' active' : '') + '">';
-        html += '<div class="property-group-header" style="cursor:default;">';
+        html += '<div class="property-group-header" onclick="' + (isShopActive ? 'clockOutTicket(\\\'SHOP\\\')' : 'startShopWithDescription()') + '">';
         html += '<div class="property-group-number" style="background:var(--ios-orange);color:#fff;">S</div>';
         html += '<div class="property-group-info">';
         html += '<div class="property-group-address">' + t('shop') + '</div>';
         if (isShopActive) {
-          html += '<div class="property-group-meta" style="color:var(--ios-green);font-weight:600;">' + t('active') + '</div>';
+          var shopNotes = shopAt.shopNotes || '';
+          html += '<div class="property-group-meta" style="color:var(--ios-green);font-weight:600;">' + escapeHtml(shopNotes) + '</div>';
         } else {
           html += '<div class="property-group-meta">' + t('shopDesc') + '</div>';
         }
         html += '</div>';
         html += '<div class="property-group-right">';
         if (isShopActive) {
-          html += '<button class="ticket-sub-row-btn" style="background:var(--ios-red);" onclick="event.stopPropagation();clockOutTicket(\'SHOP\')">' + t('stop') + '</button>';
-        } else {
-          html += '<button class="ticket-sub-row-btn" onclick="event.stopPropagation();startTicket(\'SHOP\')">' + t('start') + '</button>';
+          html += '<span class="ticket-sub-row-est" style="color:var(--ios-red);font-weight:600;">' + t('stop') + '</span>';
         }
+        html += '<div class="property-group-chevron">\u203A</div>';
         html += '</div></div></div>';
       }
 
@@ -3851,6 +3856,21 @@
       doStartTicket(ticketId, ticket);
     }
 
+    var pendingShopNotes = '';
+
+    function startShopWithDescription() {
+      iosPrompt(t('shopActivityPrompt'), '', function(description) {
+        if (description === null) return; // cancelled
+        description = description.trim();
+        if (!description) {
+          iosAlert(t('shopActivityRequired'));
+          return;
+        }
+        pendingShopNotes = description;
+        startTicket('SHOP');
+      });
+    }
+
     function doStartTicket(ticketId, ticket) {
       // Shop uses manual member selection; regular tickets auto-assign all checked-in members
       if (ticketId === 'SHOP' || ticket.isShopTicket) {
@@ -3880,6 +3900,13 @@
       }
 
       var effectiveStart = new Date(now.getTime() - (priorElapsed * 1000));
+      // Capture shop notes if starting shop
+      var ticketNotes = '';
+      if (ticket.isShopTicket && pendingShopNotes) {
+        ticketNotes = pendingShopNotes;
+        pendingShopNotes = '';
+      }
+
       activeTickets[ticketId] = {
         startTime: effectiveStart,
         interval: null,
@@ -3887,7 +3914,8 @@
         serviceClocks: {},
         completedServices: completedSvcs.slice(),
         manHoursConsumed: 0,
-        phaseStartTime: now
+        phaseStartTime: now,
+        shopNotes: ticketNotes
       };
 
       // Save to backend
@@ -3905,7 +3933,7 @@
           clockIn: now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
           crewMembers: assignedNames,
           memberCount: assigned.length,
-          notes: ''
+          notes: ticketNotes
         })
       })
       .then(function(r) { return r.json(); })
