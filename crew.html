@@ -7351,6 +7351,13 @@
       }
       srState.drawStart = null;
       srState.drawCurrent = null;
+      // Auto-disable draw mode after drawing a rectangle so user can scroll
+      if (srDrawModeOn) {
+        srDrawModeOn = false;
+        srDrawToggle.textContent = 'Draw: OFF';
+        srDrawToggle.style.background = 'var(--tint)';
+        srCanvasWrap.style.touchAction = 'auto';
+      }
       // Save current note/category before re-rendering
       srSaveCurrentNote();
       srRenderAnnotation();
