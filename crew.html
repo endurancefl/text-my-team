@@ -1696,6 +1696,98 @@
               ]};
             }
 
+            // getProperties — return demo property list for Site Report + Before & After
+            if (url.indexOf('getProperties') >= 0) {
+              mockResponse = {
+                success: true,
+                properties: [
+                  { address: '1420 Oak Ridge Dr, Orlando, FL', crew: 'Demo Crew' },
+                  { address: '875 Magnolia Blvd, Winter Park, FL', crew: 'Demo Crew' },
+                  { address: '2216 Mallard Circle, Windermere, FL', crew: 'Demo Crew' },
+                  { address: '310 Sunset Ln, Ocoee, FL', crew: 'Demo Crew' },
+                  { address: '508 Lake Shore Dr, Maitland, FL', crew: 'Demo Crew' },
+                  { address: '1025 Cypress Point Ct, Longwood, FL', crew: 'Bravo Crew' },
+                  { address: '742 Palm Valley Way, Altamonte Springs, FL', crew: 'Bravo Crew' },
+                  { address: '3300 Live Oak Trail, Sanford, FL', crew: 'Charlie Crew' }
+                ]
+              };
+            }
+
+            // getSavedReports — return prior site reports for a property
+            if (url.indexOf('getSavedReports') >= 0) {
+              var propParam = decodeURIComponent((url.match(/property=([^&]+)/) || [])[1] || '');
+              var demoReports = {
+                '1420 Oak Ridge Dr, Orlando, FL': [
+                  { id: 'RPT-D001', name: 'Site Inspection - Oak Ridge Dr - Feb 10 2026', date: '2026-02-10' },
+                  { id: 'RPT-D002', name: 'Monthly Walkthrough - Oak Ridge Dr - Jan 15 2026', date: '2026-01-15' }
+                ],
+                '875 Magnolia Blvd, Winter Park, FL': [
+                  { id: 'RPT-D003', name: 'Site Inspection - Magnolia Blvd - Feb 5 2026', date: '2026-02-05' }
+                ],
+                '2216 Mallard Circle, Windermere, FL': [
+                  { id: 'RPT-D004', name: 'Quarterly Review - Mallard Circle - Jan 20 2026', date: '2026-01-20' }
+                ]
+              };
+              mockResponse = {
+                success: true,
+                reports: demoReports[propParam] || []
+              };
+            }
+
+            // getReportData — return photos from a prior report
+            if (url.indexOf('getReportData') >= 0) {
+              var DEMO_IMG_GREEN = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAZAAAAEsCAIAAABi1XKVAAAD70lEQVR4nO3UsQkAIBDAwB/QwsEc2hXsJHBwA6TKrLMBEuZ7AcAjwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8i43Xkdwy3O4QsAAAAASUVORK5CYII=';
+              var DEMO_IMG_BROWN = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAZAAAAEsCAIAAABi1XKVAAAD8ElEQVR4nO3SQQkAIADAQMuawRCWtoRDkIMLsMfGXhOuG88L+JKxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIuEsUgYi4SxSBiLhLFIGIvEAQK6X+0idJpAAAAAAElFTkSuQmCC';
+              var DEMO_IMG_BLUE = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAZAAAAEsCAIAAABi1XKVAAAD8ElEQVR4nO3UQQ0AIBDAsBOLJWTiAQv8yJImFbDXZu0DkDDfCwAeGRaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWEDGBe7RGKe9oCjJAAAAAElFTkSuQmCC';
+              var DEMO_IMG_OLIVE = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAZAAAAEsCAIAAABi1XKVAAAD8UlEQVR4nO3UMQ0AIBDAwHeEGlTgf8cCG2lyyQno1NlnASTM9wKAR4YFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWECGYQEZhgVkGBaQYVhAhmEBGYYFZBgWkGFYQIZhARmGBWQYFpBhWEDGBf+ff8DIBrf+AAAAAElFTkSuQmCC';
+
+              var fileId = (url.match(/fileId=([^&]+)/) || [])[1] || '';
+              var reportPhotos = {
+                'RPT-D001': [
+                  { fileId: 'PH-D001', base64: DEMO_IMG_GREEN, note: 'Front lawn - patchy areas near sidewalk', category: 'Turf Health' },
+                  { fileId: 'PH-D002', base64: DEMO_IMG_BROWN, note: 'Mulch bed erosion along east side', category: 'Drainage and/or Erosion' },
+                  { fileId: 'PH-D003', base64: DEMO_IMG_OLIVE, note: 'Overgrown hedge by driveway entrance', category: 'Plant Health' },
+                  { fileId: 'PH-D004', base64: DEMO_IMG_BLUE, note: 'Irrigation head - zone 3 not rotating', category: 'Irrigation' }
+                ],
+                'RPT-D002': [
+                  { fileId: 'PH-D005', base64: DEMO_IMG_GREEN, note: 'Lawn recovering well after overseeding', category: 'Turf Health' },
+                  { fileId: 'PH-D006', base64: DEMO_IMG_BROWN, note: 'Mulch thinning around oak tree base', category: 'Mulch Beds' }
+                ],
+                'RPT-D003': [
+                  { fileId: 'PH-D007', base64: DEMO_IMG_GREEN, note: 'Weed pressure in bermuda transition area', category: 'Turf Health' },
+                  { fileId: 'PH-D008', base64: DEMO_IMG_OLIVE, note: 'Ligustrum hedge needs shaping', category: 'Plant Health' },
+                  { fileId: 'PH-D009', base64: DEMO_IMG_BLUE, note: 'Broken sprinkler head zone 2 - front bed', category: 'Irrigation' }
+                ],
+                'RPT-D004': [
+                  { fileId: 'PH-D010', base64: DEMO_IMG_GREEN, note: 'St. Augustine declining under live oak canopy', category: 'Turf Health' },
+                  { fileId: 'PH-D011', base64: DEMO_IMG_BROWN, note: 'Bare soil exposure in side yard bed', category: 'Mulch Beds' },
+                  { fileId: 'PH-D012', base64: DEMO_IMG_OLIVE, note: 'Crape myrtles need corrective pruning', category: 'Plant Health' },
+                  { fileId: 'PH-D013', base64: DEMO_IMG_BLUE, note: 'Drip line disconnected at planter box', category: 'Irrigation' },
+                  { fileId: 'PH-D014', base64: DEMO_IMG_GREEN, note: 'Fire ant mounds near pool cage entry', category: 'Pest Issues' }
+                ]
+              };
+              mockResponse = {
+                success: true,
+                data: {
+                  photos: reportPhotos[fileId] || []
+                }
+              };
+            }
+
+            // getPhotoBase64 — return placeholder image
+            if (url.indexOf('getPhotoBase64') >= 0) {
+              mockResponse = {
+                success: true,
+                base64: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAZAAAAEsCAIAAABi1XKVAAAD70lEQVR4nO3UsQkAIBDAwB/QwsEc2hXsJHBwA6TKrLMBEuZ7AcAjwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8gwLCDDsIAMwwIyDAvIMCwgw7CADMMCMgwLyDAsIMOwgAzDAjIMC8i43Xkdwy3O4QsAAAAASUVORK5CYII='
+              };
+            }
+
+            // saveSiteReport — mock save, return success
+            if (url.indexOf('saveSiteReport') >= 0 || body.saveSiteReport) {
+              console.log('[DEMO] saveSiteReport for', body.property || 'unknown property');
+              mockResponse = { success: true, fileId: 'RPT-DEMO-' + (_nextEntryId++) };
+            }
+
             // verifyPin — accept any 4-digit pin, match to demo member
             if (url.indexOf('verifyPin') >= 0) {
               var pinMatch = url.match(/pin=(\d+)/);
@@ -1718,6 +1810,19 @@
             return Promise.resolve({
               ok: true,
               json: function() { return Promise.resolve(mockResponse); }
+            });
+          }
+          // Intercept Cloud Function calls (PDF generation) in demo mode
+          if (typeof url === 'string' && url.indexOf('cloudfunctions.net') >= 0) {
+            console.log('[DEMO] Cloud Function PDF generation intercepted');
+            // Return a minimal valid PDF blob
+            var pdfContent = '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R/Resources<<>>>>endobj\nxref\n0 4\n0000000000 65535 f \n0000000009 00000 n \n0000000058 00000 n \n0000000115 00000 n \ntrailer<</Size 4/Root 1 0 R>>\nstartxref\n206\n%%EOF';
+            var pdfBlob = new Blob([pdfContent], { type: 'application/pdf' });
+            return Promise.resolve({
+              ok: true,
+              status: 200,
+              blob: function() { return Promise.resolve(pdfBlob); },
+              json: function() { return Promise.resolve({ success: true }); }
             });
           }
           return _realFetch.apply(this, arguments);
