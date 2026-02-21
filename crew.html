@@ -2260,7 +2260,8 @@
         html += '</div>';
       });
 
-      // Clock out button
+      // Separator + Clock out button
+      html += '<div class="clockout-separator"></div>';
       html += '<button class="stop-clockout-btn" onclick="clockOutTicket(\'' + ticket.ticketId + '\')">' + t('clockOut') + '</button>';
 
       // Cancel button — only before any services are completed
