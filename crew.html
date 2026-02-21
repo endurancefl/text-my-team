@@ -6276,6 +6276,10 @@
         .then(function(r) { return r.json(); })
         .then(function(data) {
           propertiesList = data.properties || [];
+          console.log('[loadProperties] loaded ' + propertiesList.length + ' properties');
+        })
+        .catch(function(err) {
+          console.error('[loadProperties] error:', err);
         });
     }
 
@@ -6945,6 +6949,8 @@
       srGenerateBtn.textContent = 'Generate Report';
       srGoToStep(1);
       srWizard.classList.add('active');
+      // DEBUG: temporary alert to verify properties loaded on mobile
+      alert('DEBUG: ' + propertiesList.length + ' properties loaded');
     });
 
     srCloseBtn.addEventListener('click', function() {
@@ -6994,9 +7000,11 @@
     // Step 1: Property autocomplete (reuse pattern)
     srPropertyInput.addEventListener('input', function() {
       var query = this.value.trim().toLowerCase();
+      console.log('[SR autocomplete] query="' + query + '", propertiesList.length=' + propertiesList.length);
       srAcList.innerHTML = '';
       if (query.length === 0) { srAcList.classList.remove('active'); return; }
       var matches = propertiesList.filter(function(p) { return p.address.toLowerCase().indexOf(query) >= 0; });
+      console.log('[SR autocomplete] matches=' + matches.length);
       if (matches.length === 0) { srAcList.classList.remove('active'); return; }
       matches.forEach(function(prop) {
         var item = document.createElement('div');
