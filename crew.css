@@ -3756,6 +3756,9 @@
       display: block;
       padding: 14px 16px;
       background: rgba(0, 122, 255, 0.03);
+      border-top: 4px solid var(--ios-separator);
+      border-bottom: 4px solid var(--ios-separator);
+      margin: 4px 0;
     }
     .ticket-sub-row-info {
       flex: 1;
