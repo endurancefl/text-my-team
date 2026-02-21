@@ -949,7 +949,7 @@
         editCrew: 'Edit Crew',
         crew: 'crew',
         target: 'Target',
-        clockOut: 'Next',
+        clockOut: 'Complete Visit',
         cancelTicket: 'Cancel Ticket',
         serviceDone: 'service(s) done',
         actual: 'Actual',
@@ -1069,9 +1069,10 @@
         at: 'at',
         requestLabel: 'Request',
         translationLabel: 'Translation',
-        fixed: 'Fixed',
+        fixed: 'Fixed Time',
         fixedDuration: 'fixed duration',
-        addCrewWontSpeed: 'Adding crew won\'t speed this up'
+        addCrewWontSpeed: 'Adding crew won\'t speed this up',
+        allCrewBusy: 'All crew busy \u2014 finish a service to free someone up'
       },
       es: {
         langToggle: 'English',
@@ -1110,7 +1111,7 @@
         editCrew: 'Editar Equipo',
         crew: 'equipo',
         target: 'Meta',
-        clockOut: 'Siguiente',
+        clockOut: 'Completar Visita',
         cancelTicket: 'Cancelar Ticket',
         serviceDone: 'servicio(s) listo(s)',
         actual: 'Real',
@@ -1216,9 +1217,10 @@
         at: 'a las',
         requestLabel: 'Solicitud',
         translationLabel: 'Traducci\u00f3n',
-        fixed: 'Fijo',
+        fixed: 'Tiempo Fijo',
         fixedDuration: 'duraci\u00f3n fija',
-        addCrewWontSpeed: 'Agregar equipo no acelerar\u00e1 esto'
+        addCrewWontSpeed: 'Agregar equipo no acelerar\u00e1 esto',
+        allCrewBusy: 'Todo el equipo ocupado \u2014 termine un servicio para liberar a alguien'
       }
     };
 
@@ -4073,6 +4075,11 @@
       var availableMembers = ticketMembers.filter(function(m) {
         return !busyOnOtherService[typeof m === 'string' ? m : m.name];
       });
+
+      if (availableMembers.length === 0) {
+        iosAlert(t('allCrewBusy'));
+        return;
+      }
 
       if (availableMembers.length === 1) {
         autoStartService(ticketId, serviceName, availableMembers);

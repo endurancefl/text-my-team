@@ -3329,6 +3329,10 @@
       padding: 6px 0;
       margin-left: 34px;
       font-size: 13px;
+      border-bottom: 1px solid var(--ios-separator);
+    }
+    .service-row:last-of-type {
+      border-bottom: none;
     }
     .service-status-icon {
       width: 18px;
