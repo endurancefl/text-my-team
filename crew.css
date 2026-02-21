@@ -3347,7 +3347,7 @@
       font-size: 13px;
       border-bottom: 1px solid var(--ios-separator);
     }
-    .service-row:last-of-type {
+    .service-row.last-service {
       border-bottom: none;
     }
     .service-status-icon {
@@ -3629,6 +3629,13 @@
       border: none;
       border-radius: 8px;
       font-weight: 500;
+    }
+    .ios-btn.svc-edit-btn {
+      background: rgba(0, 122, 255, 0.12);
+      color: var(--ios-blue);
+    }
+    .ios-btn.svc-edit-btn:active {
+      background: rgba(0, 122, 255, 0.25);
     }
     .clockout-separator {
       height: 1px;

@@ -957,6 +957,7 @@
         skip: 'Skip',
         skipped: 'Skipped',
         editCrew: 'Edit Crew',
+        edit: 'Edit',
         crew: 'crew',
         target: 'Target',
         clockOut: 'Complete Visit',
@@ -1122,6 +1123,7 @@
         skip: 'Omitir',
         skipped: 'Omitido',
         editCrew: 'Editar Equipo',
+        edit: 'Editar',
         crew: 'equipo',
         target: 'Meta',
         clockOut: 'Completar Visita',
@@ -2316,8 +2318,11 @@
       html += '<button class="ios-btn ios-btn-secondary" style="font-size:12px;padding:4px 10px;min-height:32px;" onclick="editTicketCrew(\'' + ticket.ticketId + '\')">' + t('editCrew') + '</button>';
       html += '</div>';
 
+      // Separator before services
+      html += '<div class="clockout-separator" style="margin-top:8px;"></div>';
+
       // Per-service controls
-      services.forEach(function(s) {
+      services.forEach(function(s, svcIdx) {
         var svcName = typeof s === 'string' ? s : (s.serviceName || s.proposalName || s.sectionName || s.name || s.service || '');
         var svcCompleted = (at.completedServices || []).indexOf(svcName) >= 0;
         var svcClock = (at.serviceClocks || {})[svcName];
@@ -2326,15 +2331,16 @@
 
         var svcDurationType = getServiceDurationType(ticket, svcName);
         var svcIsFixed = svcDurationType === 'fixed';
+        var isLastService = svcIdx === services.length - 1;
 
-        html += '<div class="service-row" style="margin-left:0;flex-wrap:wrap;">';
+        html += '<div class="service-row' + (isLastService ? ' last-service' : '') + '" style="margin-left:0;flex-wrap:wrap;">';
         html += '<span class="service-row-name" style="flex:1;font-size:14px;' + (svcCompleted ? 'text-decoration:line-through;color:#8E8E93;' : '') + '">' + escapeHtml(svcName) + (svcIsFixed ? ' <span class="fixed-badge">' + t('fixed') + '</span>' : '') + '</span>';
 
         if (svcCompleted) {
           html += '<span style="color:#34C759;font-size:13px;">\u2713 ' + t('done') + '</span>';
         } else if (svcActive) {
           html += '<div style="display:flex;gap:6px;">';
-          html += '<button class="ios-btn svc-action-btn" style="background:var(--ios-fill-tertiary);color:var(--ios-text-primary);" onclick="showServiceMemberAssignment(\'' + ticket.ticketId + '\', \'' + escapedSvcName + '\', true)">' + t('editCrew') + '</button>';
+          html += '<button class="ios-btn svc-action-btn svc-edit-btn" onclick="showServiceMemberAssignment(\'' + ticket.ticketId + '\', \'' + escapedSvcName + '\', true)">' + t('edit') + '</button>';
           html += '<button class="ios-btn svc-action-btn" style="background:#34C759;color:#fff;" onclick="completeService(\'' + ticket.ticketId + '\', \'' + escapedSvcName + '\')">' + t('done') + '</button>';
           html += '</div>';
           // Show assigned members below service name
