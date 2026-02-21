@@ -2185,8 +2185,8 @@
         propertyRequests.forEach(function(req) {
           var reqMsg = (currentLang === 'es' && req.translatedMessage) ? req.translatedMessage : (req.message || t('noDescription'));
           var truncMsg = reqMsg.length > 60 ? reqMsg.substring(0, 60) + '\u2026' : reqMsg;
-          html += '<div class="ticket-sub-row request-row">';
-          html += '<div class="ticket-sub-row-info" onclick="openRequestFromCard(\'' + req.id + '\')" style="cursor:pointer;">';
+          html += '<div class="ticket-sub-row request-row" onclick="openRequestFromCard(\'' + req.id + '\')">';
+          html += '<div class="ticket-sub-row-info">';
           html += '<div class="ticket-sub-row-services" style="color:var(--ios-orange);font-weight:600;font-size:13px;">';
           html += '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px;color:var(--ios-orange);"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>';
           html += t('openRequest');
@@ -2194,9 +2194,8 @@
           html += '<div style="font-size:12px;color:var(--ios-text-secondary);margin-top:2px;">' + escapeHtml(truncMsg) + '</div>';
           html += '<div style="font-size:11px;color:var(--ios-text-tertiary);margin-top:1px;">' + escapeHtml(req.customerName || '') + ' \u00B7 ' + escapeHtml(formatDate(req.date)) + '</div>';
           html += '</div>';
-          html += '<div class="ticket-sub-row-right" style="display:flex;align-items:center;gap:6px;">';
-          html += '<button class="send-to-office-btn" onclick="event.stopPropagation();sendRequestToOffice(\'' + req.id + '\')">' + t('sendToOffice') + '</button>';
-          html += '<div class="property-group-chevron" style="font-size:18px;cursor:pointer;" onclick="openRequestFromCard(\'' + req.id + '\')">\u203A</div>';
+          html += '<div class="ticket-sub-row-right">';
+          html += '<div class="property-group-chevron" style="font-size:18px;">\u203A</div>';
           html += '</div>';
           html += '</div>';
         });
