@@ -2212,8 +2212,8 @@
           html += '<span style="color:#34C759;font-size:13px;">\u2713 ' + t('done') + '</span>';
         } else if (svcActive) {
           html += '<div style="display:flex;gap:6px;">';
-          html += '<button class="ios-btn" style="font-size:12px;padding:4px 8px;min-height:32px;background:var(--ios-fill-tertiary);color:var(--ios-text-primary);border:none;border-radius:8px;" onclick="showServiceMemberAssignment(\'' + ticket.ticketId + '\', \'' + escapedSvcName + '\', true)">' + t('editCrew') + '</button>';
-          html += '<button class="ios-btn" style="font-size:12px;padding:4px 10px;min-height:32px;background:#34C759;color:#fff;border:none;border-radius:8px;" onclick="completeService(\'' + ticket.ticketId + '\', \'' + escapedSvcName + '\')">' + t('done') + '</button>';
+          html += '<button class="ios-btn svc-action-btn" style="background:var(--ios-fill-tertiary);color:var(--ios-text-primary);" onclick="showServiceMemberAssignment(\'' + ticket.ticketId + '\', \'' + escapedSvcName + '\', true)">' + t('editCrew') + '</button>';
+          html += '<button class="ios-btn svc-action-btn" style="background:#34C759;color:#fff;" onclick="completeService(\'' + ticket.ticketId + '\', \'' + escapedSvcName + '\')">' + t('done') + '</button>';
           html += '</div>';
           // Show assigned members below service name
           if (svcClock.assignedMembers && svcClock.assignedMembers.length > 0) {
@@ -2238,7 +2238,7 @@
             html += '</div>';
           }
         } else {
-          html += '<button class="ios-btn" style="font-size:12px;padding:4px 10px;min-height:32px;background:var(--tint);color:#fff;border:none;border-radius:8px;" onclick="startService(\'' + ticket.ticketId + '\', \'' + escapedSvcName + '\')">' + t('start') + '</button>';
+          html += '<button class="ios-btn svc-action-btn" style="background:var(--tint);color:#fff;" onclick="startService(\'' + ticket.ticketId + '\', \'' + escapedSvcName + '\')">' + t('start') + '</button>';
         }
         html += '</div>';
       });

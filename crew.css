@@ -3602,10 +3602,19 @@
     .edit-crew-btn:active {
       opacity: 0.5;
     }
+    /* Consistent sizing for Start / Done / Edit Crew buttons on service rows */
+    .svc-action-btn {
+      font-size: 13px;
+      padding: 6px 14px;
+      min-height: 34px;
+      border: none;
+      border-radius: 8px;
+      font-weight: 500;
+    }
     .stop-clockout-btn {
       display: block;
       width: 100%;
-      margin-top: 10px;
+      margin-top: 14px;
       padding: 10px;
       font-size: 15px;
       font-weight: 600;
@@ -3614,6 +3623,16 @@
       border: none;
       border-radius: 8px;
       cursor: pointer;
+      position: relative;
+    }
+    .stop-clockout-btn::before {
+      content: '';
+      position: absolute;
+      top: -8px;
+      left: -16px;
+      right: -16px;
+      height: 1px;
+      background: var(--ios-separator);
     }
     .stop-clockout-btn:active {
       background: #cc2f27;
