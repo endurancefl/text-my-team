@@ -4058,7 +4058,74 @@
       var at = activeTickets[ticketId];
       if (!at) return;
 
+      // If only one member is available, auto-assign without showing the overlay
+      var ticketMembers = at.assignedMembers || [];
+      var svcClocks = at.serviceClocks || {};
+      var busyOnOtherService = {};
+      Object.keys(svcClocks).forEach(function(sn) {
+        var sc = svcClocks[sn];
+        if (sc.startTime && !sc.endTime && sc.assignedMembers) {
+          sc.assignedMembers.forEach(function(m) {
+            busyOnOtherService[typeof m === 'string' ? m : m.name] = true;
+          });
+        }
+      });
+      var availableMembers = ticketMembers.filter(function(m) {
+        return !busyOnOtherService[typeof m === 'string' ? m : m.name];
+      });
+
+      if (availableMembers.length === 1) {
+        autoStartService(ticketId, serviceName, availableMembers);
+        return;
+      }
+
       showServiceMemberAssignment(ticketId, serviceName, false);
+    }
+
+    function autoStartService(ticketId, serviceName, assigned) {
+      var at = activeTickets[ticketId];
+      if (!at) return;
+
+      if (!at.serviceClocks) at.serviceClocks = {};
+      at.serviceClocks[serviceName] = {
+        startTime: new Date(),
+        endTime: null,
+        assignedMembers: assigned,
+        manHoursConsumed: 0
+      };
+
+      var ticket = todayTickets.find(function(t) { return t.ticketId === ticketId; });
+      var crewName = scheduleData ? scheduleData.crewName : currentCrewName;
+      var now = new Date();
+      var assignedNames = assigned.map(function(m) { return typeof m === 'string' ? m : m.name; });
+      var svcDurType = getServiceDurationType(ticket, serviceName);
+      fetch(GOOGLE_SHEETS_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+          saveTimeEntry: true,
+          crew: crewName,
+          date: now.toISOString().split('T')[0],
+          entryType: 'service',
+          ticketId: ticketId,
+          propertyAddress: ticket ? ticket.propertyAddress : '',
+          serviceName: serviceName,
+          durationType: svcDurType,
+          clockIn: now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+          crewMembers: assignedNames,
+          memberCount: assigned.length,
+          notes: ''
+        })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(result) {
+        if (result.success && result.entryId) {
+          at.serviceClocks[serviceName].entryId = result.entryId;
+        }
+      })
+      .catch(function(err) { console.error('Failed to save service start:', err); });
+
+      renderStopCards();
+      checkUnassignedMembers(ticketId);
     }
 
     function showServiceMemberAssignment(ticketId, serviceName, isEdit) {
