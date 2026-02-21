@@ -3050,35 +3050,8 @@
     }
 
     function checkPropertyRequests(propertyAddress) {
-      // Filter current requests for this property
-      var propertyRequests = (currentRequests || []).filter(function(req) {
-        var status = (req.status || 'Open').toLowerCase();
-        if (status === 'completed') return false;
-        var reqProp = req.property || '';
-        return reqProp.indexOf(propertyAddress.split(',')[0]) !== -1 ||
-               propertyAddress.indexOf(reqProp.split(',')[0]) !== -1;
-      });
-
-      if (propertyRequests.length === 0) {
-        document.getElementById('request-alert').style.display = 'none';
-        return;
-      }
-
-      var list = document.getElementById('request-alert-list');
-      list.innerHTML = propertyRequests.map(function(req) {
-        var alertMsg = (currentLang === 'es' && req.translatedMessage) ? req.translatedMessage : (req.message || t('noDescription'));
-        return '<div class="request-alert-item" data-request-id="' + req.id + '">' +
-          '<div class="request-alert-message">' + escapeHtml(alertMsg) + '</div>' +
-          '<div style="font-size:11px;color:#888;margin-bottom:6px;">' + escapeHtml(req.customerName || '') + ' · ' + escapeHtml(formatDate(req.date)) + '</div>' +
-          '<div class="request-alert-actions">' +
-            '<button class="request-handle-btn" onclick="handleRequest(\'' + req.id + '\')">' + t('handleIt') + '</button>' +
-            '<button class="request-skip-btn" onclick="skipRequest(\'' + req.id + '\')">' + t('office') + '</button>' +
-          '</div>' +
-          '</div>';
-      }).join('');
-
-      document.getElementById('request-alert').style.display = 'block';
-      document.getElementById('request-alert').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      // Requests now show inline in property stop cards — no top banner needed
+      return;
     }
 
     function handleRequest(requestId) {
