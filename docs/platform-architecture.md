@@ -386,12 +386,14 @@ Both apps live in the same monorepo, share the component library (`packages/ui`)
 - Twilio: pay-per-message for SMS/text notifications
 - All outbound messages logged back to HubSpot as timeline events
 
-### Accounting (Optional Tenant Add-On)
-**QuickBooks Online**
+### Accounting
+**QuickBooks Online — the accounting backbone**
 - Tenants connect their own QBO account via OAuth
-- Your platform pushes invoices and payments to QBO automatically — the accountant works in QuickBooks as they always have
-- One-way push: your platform → QBO. No sync conflicts, no complexity.
-- Not required — platform tracks invoices and payments internally regardless
+- Platform pushes invoices, payments, and direct labor expenses to QBO — the accountant works in QuickBooks as they always have
+- QBO produces the official P&L, balance sheet, and tax reports
+- Direct labor expenses calculated from time entries (crew hours × rates) and pushed monthly
+- Platform keeps earned revenue and operational analytics internally (management accounting)
+- Two views: QBO for "did we make money?" (cash accounting) / Platform for "are we on track?" (operational)
 
 ### E-Signature
 **Built-in signature pad (default) + optional DocuSign**
@@ -706,36 +708,38 @@ signed_proposals (
 -- billed-separately services on completion, optional/recommended services, annual escalation.
 invoices (
   id, tenant_id, customer_id, property_id, contract_id,
-  invoice_number, invoice_date, due_date,
-  billing_period_start,            -- e.g., 2026-04-01 (the month this invoice covers)
-  billing_period_end,              -- e.g., 2026-04-30
-  invoice_type,                    -- 'fixed_monthly', 'billed_separately', 'one_time'
-  status,                          -- draft, sent, viewed, partial, paid, overdue, void
+  invoice_number,                    -- sequential: INV-001, INV-002, etc.
+  invoice_date, due_date,
+  billing_period_start,              -- e.g., 2026-04-01 (the month this invoice covers)
+  billing_period_end,                -- e.g., 2026-04-30
+  invoice_type,                      -- 'fixed_monthly' (maintenance), 'deposit' (project), 'final' (project), 'one_time'
+  status,                            -- draft, sent, viewed, partial, paid, overdue, void
   subtotal, tax_rate, tax_amount, total,
   paid_amount, balance_due,
-  -- Earned revenue context (the financial picture behind the invoice)
-  earned_revenue_this_period,      -- sum of completed ticket earned values in this billing period
-  variance,                        -- earned - invoiced (positive = working ahead, negative = collecting ahead)
+  -- Earned revenue context (internal tracking, not on the invoice itself)
+  earned_revenue_this_period,        -- sum of completed ticket earned values in this billing period
+  variance,                          -- earned - invoiced (positive = working ahead, negative = collecting ahead)
   -- Payment tracking
-  payment_method,                  -- card, ach, check, cash, auto_pay
-  stripe_invoice_id,               -- Stripe invoice ID (if paid via Stripe)
-  stripe_subscription_id,          -- Stripe subscription ID (if auto-pay)
+  payment_method,                    -- card, ach, check, cash (set when paid)
+  stripe_checkout_session_id,        -- Stripe Checkout Session ID (if paid via Stripe)
   -- QuickBooks sync
-  qbo_invoice_id,                  -- QBO invoice ID (null if not synced)
-  qbo_synced_at,                   -- when pushed to QBO
+  qbo_invoice_id,                    -- QBO invoice ID (null if not synced)
+  qbo_synced_at,                     -- when pushed to QBO
+  -- Pay Now link
+  pay_link_token,                    -- unique token for the "Pay Now" URL (e.g., ?payInvoice=TOKEN)
   notes,
   created_at, updated_at
 )
 
 invoice_line_items (
   id, invoice_id,
-  line_type,                       -- 'fixed_service', 'billed_separately', 'material', 'surcharge', 'credit', 'adjustment'
-  description,                     -- e.g., "Monthly Grounds Maintenance (April 2026)"
-  service_name,                    -- links to contract service for reporting
-  contract_service_id,             -- FK to contract_services
+  line_type,                         -- 'fixed_service', 'deposit', 'final_payment', 'material', 'credit', 'adjustment'
+  description,                       -- e.g., "Monthly Landscape Maintenance (April 2026)"
+  service_name,                      -- links to contract service for reporting
+  contract_service_id,               -- FK to contract_services
   quantity, unit_price, amount,
-  -- For billed-separately: link to the specific ticket(s) that triggered this line
-  scheduled_event_ids,             -- JSON array of ticket IDs (for billed-separately services)
+  -- For project work: link to the specific ticket(s) if applicable
+  scheduled_event_ids,               -- JSON array of ticket IDs (for billed-separately services)
   sort_order,
   created_at
 )
@@ -836,10 +840,12 @@ payments (
   id, tenant_id, invoice_id,
   amount, method,          -- card, ach, check, cash
   check_number,            -- null unless method = check
-  stripe_payment_id,       -- null unless method = card/ach
+  stripe_checkout_session_id,  -- null unless method = card/ach (from Stripe webhook)
+  stripe_payment_intent_id,    -- Stripe payment intent ID (from webhook event data)
   status,                  -- completed, pending, failed
   received_date, notes,
   created_by,              -- who recorded it (for manual entries, null for auto/Stripe)
+  qbo_payment_id,          -- QBO payment ID (null if not synced)
   created_at
 )
 ```
@@ -1443,75 +1449,118 @@ The platform doesn't care which path was taken — the outcome is the same: a si
 ### Phase 4: Invoicing & Payments (Weeks 15-18)
 **Goal: Get paid**
 
-#### Invoice Generation
-- [ ] Invoice generation (manual or auto-generated from completed scheduled services)
-- [ ] Invoice PDF generation and email/SMS delivery
-- [ ] Recurring invoices for contract customers (monthly, quarterly)
+> **Key decisions made:** (1) Invoice types are simple — fixed monthly maintenance contracts and project work (deposit + final payment), NOT per-ticket earned revenue billing. (2) Credit card fees are baked into the contract price so the customer never sees a surcharge. (3) Stripe Payments (core) handles payment processing — NOT Stripe Invoicing — because the platform generates its own invoice PDFs via Lambda/ReportLab. (4) QuickBooks handles accounting — invoices push to QBO, direct expenses push to QBO, QBO produces the P&L. (5) No sensitive payment data (card numbers, bank accounts) ever touches the platform — Stripe Checkout hosted page only.
+
+#### Invoice Types
+
+**Fixed monthly maintenance contracts:**
+- Same amount every month, pulled directly from the contract's `monthly_payment` field
+- Invoice line: "Monthly Landscape Maintenance — $X,XXX.XX"
+- Generated in bulk at billing cycle (e.g., 1st of the month for all active contracts)
+
+**Project work:**
+- Deposit invoice (percentage or fixed amount) created from estimate at contract signing
+- Final payment invoice created on project completion
+- Invoice lines reference the estimate/contract for the project
+
+#### Invoice Generation & Delivery
+- [ ] "Generate Invoice" action in estimate.html — creates invoice record, triggers PDF + email
+- [ ] Bulk monthly invoice generation — one click to generate invoices for all active maintenance contracts
+- [ ] Invoice PDF generation via AWS Lambda (ReportLab) — same pipeline as site reports, new invoice template
+- [ ] Invoice PDF includes: company logo, customer info, invoice number, date, due date, line items, total, and a **"Pay Now" link**
+- [ ] Email delivery via Apps Script `GmailApp.sendEmail()` with PDF attachment
 - [ ] Automated payment reminders for overdue invoices
-- [ ] Accounts receivable aging report
+- [ ] Invoice numbering: sequential (INV-001, INV-002, etc.)
 
-#### Stripe Payment Integration
-- [ ] Stripe account setup and API integration
-- [ ] Customer-facing payment page with Stripe Elements (embedded on your platform, your branding)
-- [ ] Credit card payments (Stripe fee: 2.9% + $0.30 per transaction)
-- [ ] ACH / bank transfer payments via Plaid instant verification (Stripe fee: 0.8% capped at $5)
-- [ ] Credit card surcharge — pass processing fees to the customer so you keep 100% of the invoice amount
-  - When customer selects credit card, show a line item: "Credit card processing fee: $XX.XX" with updated total
-  - When customer selects ACH/bank transfer, no surcharge — encourages ACH which is cheaper for everyone
-  - Surcharge must not exceed actual processing cost (~3%)
-  - Cannot surcharge debit cards — only credit cards. Use Stripe's API to detect card type automatically
-  - Surcharge must be disclosed before payment is submitted (legal requirement)
-  - Surcharge percentage configurable in tenant settings
-- [ ] "Pay Now" link included in every invoice email/SMS
-- [ ] Stripe webhook endpoint on Cloud Run (`POST /webhooks/stripe`)
-- [ ] Auto-mark invoices as paid when Stripe sends `payment_intent.succeeded` webhook
-- [ ] Auto-notify on failed payments (`payment_intent.payment_failed` webhook)
-- [ ] ACH settlement tracking (3-5 day clearing, listen for `charge.succeeded` webhook)
-- [ ] Recurring billing via Stripe Subscriptions for contract customers on auto-pay
+#### "Pay Now" Link Strategy
 
-#### Auto-Pay & Credit Card Pricing Strategy
-> **⚠️ REVIEW: Decide whether to surcharge at checkout or gross up contract prices to cover CC fees. Both options are built — pick one approach or offer both.**
+> **Problem:** Stripe Checkout Session URLs expire (max 30 days). A monthly invoice PDF sitting in email could outlive the link.
 
-**Option A — Surcharge at checkout (built above):** Customer sees the fee as a separate line item when paying by card. Transparent but can feel like a penalty. Better for one-time or irregular payments.
+> **Solution:** The "Pay Now" link on the invoice PDF points to the platform's own Apps Script endpoint, NOT directly to Stripe. When clicked, the endpoint creates a fresh Stripe Checkout Session on demand and redirects the customer to Stripe's hosted payment page. The link never expires. If the invoice is already paid, redirect to a "This invoice has been paid" confirmation page instead of allowing double-payment.
 
-**Option B — Gross up the contract price (recommended for auto-pay customers):** Bake the ~3% processing cost into the bid total at the estimating stage. Customer agrees to a clean monthly number upfront. No surprise at checkout. Better customer experience for recurring auto-pay.
+**Flow:**
+1. Customer receives invoice PDF via email
+2. Clicks "Pay Now" link → hits Apps Script `doGet()` with `?payInvoice=INV-001`
+3. Apps Script checks invoice status — if already paid, show confirmation page
+4. If unpaid, creates a Stripe Checkout Session (card + ACH enabled) with invoice metadata
+5. Redirects customer to Stripe's hosted payment page (on stripe.com)
+6. Customer enters payment info **on Stripe's site** — platform never sees card/bank data
+7. Stripe processes payment → fires `checkout.session.completed` webhook
+8. Apps Script `doPost()` receives webhook → marks invoice paid in Google Sheet
+9. Payment details pushed to QuickBooks
 
-- [ ] Auto-pay enrollment: customer enters card or bank details once at contract signing via Stripe
-- [ ] Stripe Subscription created for the agreed monthly amount, charges automatically each month
-- [ ] Webhook auto-marks each month's invoice as paid when charge succeeds
-- [ ] Failed payment handling: auto-retry, notify customer, notify admin after repeated failures
-- [ ] Auto-pay management: customer can update payment method, admin can pause/cancel
-- [ ] In the estimating tool: toggle "Include CC processing in price" (Yes/No) with adjusted total shown
-- [ ] If grossed up: the bid summary shows the base price and the CC-adjusted price side by side so you know your true margin
-- [ ] If customer pays by ACH or check instead, offer the lower non-grossed-up price as an incentive
-- [ ] Payment method preference stored on customer record
+#### Stripe Integration (Core Payments Product)
+
+> **Why Stripe Payments, not Stripe Invoicing:** Stripe Invoicing charges $0.50/invoice on top of processing fees and generates its own PDFs/emails. Since the platform already has PDF generation (Lambda/ReportLab) and email delivery (Apps Script), using the core Payments product avoids the per-invoice fee and gives full control over invoice design and delivery.
+
+- [ ] Stripe account setup
+- [ ] Stripe Checkout Sessions via API — card + ACH payment methods enabled
+- [ ] Credit card payments (2.9% + $0.30 per transaction)
+- [ ] ACH bank transfer payments (0.8% capped at $5)
+- [ ] Stripe webhook endpoint via Apps Script `doPost()` — receives `checkout.session.completed` events
+- [ ] Auto-mark invoices as paid when webhook confirms payment
+- [ ] Invoice metadata attached to Checkout Session for webhook routing
+- [ ] **No sensitive payment data touches the platform** — Stripe Checkout hosted page handles all card/bank input (SAQ A PCI compliance)
+
+#### Credit Card Fee Strategy (Decided: Gross Up Contract Price)
+
+> **Decision:** Bake the ~3% credit card processing cost into the contract price at the estimating stage. The customer agrees to a clean monthly number upfront — no surcharge line item, no surprise at checkout. This avoids customer friction and legal complexity around surcharging.
+
+- [ ] In estimate.html: toggle "Customer will pay by card" → grosses up the contract price by ~3%
+- [ ] Example: to net $1,200/month after 3% fee, price the contract at $1,237.12
+- [ ] Bid summary shows base price and CC-adjusted price side by side so you know your true margin
+- [ ] If customer later pays by ACH or check, you keep the slightly higher price (or offer a discount as incentive)
+- [ ] `cc_gross_up` boolean already exists in the `bids` table schema
 
 #### Manual Payment Recording (Check, Cash)
-- [ ] "Record Payment" button on invoice detail screen (admin/manager only)
-- [ ] Payment method selector: Card, ACH, Check, Cash
+- [ ] "Record Payment" button on invoice in dashboard (admin/manager only)
+- [ ] Payment method selector: Check, Cash, Other
 - [ ] Check-specific fields: check number, date received
 - [ ] Partial payment support — multiple payments against one invoice, track remaining balance
 - [ ] Invoice status auto-updates: sent → partial → paid based on total payments vs amount due
 
-#### API Routes
-- `POST /payments/create-intent` — creates a Stripe payment intent when customer clicks Pay Now
-- `POST /webhooks/stripe` — receives Stripe webhook events, updates invoice status automatically
-- `GET /payments/status/:invoiceId` — checks payment status and remaining balance
-- `POST /payments/record` — manually record a check or cash payment (admin/manager only)
+#### Invoice Dashboard (estimate.html)
+- [ ] Invoice list view with status filters: All, Unpaid, Overdue, Paid
+- [ ] Color-coded status badges: draft (gray), sent (blue), overdue (red), partial (orange), paid (green)
+- [ ] Quick stats: total outstanding, total overdue, collected this month
+- [ ] Individual invoice detail with payment history
+- [ ] Aging report: 0-30, 31-60, 61-90, 90+ days outstanding
 
-**Deliverable:** Invoices go out automatically when work is done. Customers pay online via card or bank transfer and the system marks it paid instantly. Check and cash payments are recorded manually. Everything syncs to QuickBooks.
+#### QuickBooks Integration (Accounting & Financials)
 
-#### QuickBooks Online Sync (Optional Tenant Add-On)
+> **QuickBooks is the accounting system.** The platform generates invoices and collects payments — then pushes both to QBO so the books stay current. QBO produces the P&L, balance sheet, and tax reports. The platform also pushes direct expense data (labor costs from time entries) to QBO so the P&L reflects true profitability.
 
-> **Critical distinction:** Your platform owns invoicing. QuickBooks is a **downstream ledger**, not the invoicing engine. Your platform understands landscape billing (three-tier contracts, fixed monthly, billed separately, earned vs. invoiced, seasonal distribution). QBO doesn't and never will. QBO receives finished invoices and payments for tax reporting and general accounting.
+**Two-way relationship:**
+- **Platform → QBO (push):** Invoices, payments, and direct labor expenses
+- **QBO → Platform (read):** Invoice payment status (for dashboard), expense categories (optional overhead pull)
 
-- [ ] OAuth flow: tenant admin connects their QBO account in Settings → Integrations
-- [ ] Invoice push: when an invoice is created in your platform, push it to QBO as an invoice (one-way)
-- [ ] Payment push: when a payment is recorded (Stripe webhook or manual), push it to QBO as a payment against the invoice
-- [ ] Customer mapping: map your local customer (from HubSpot cache) to a QBO customer record
-- [ ] **Overhead pull (optional):** pull expense categories and amounts from QBO to auto-populate the overhead table — saves the owner from entering numbers twice
-- [ ] One-way push for invoices/payments, optional pull for expenses. The accountant works in QuickBooks as they always have.
-- [ ] No QBO? No problem — the platform tracks everything internally. The owner can enter overhead costs manually.
+**What gets pushed to QuickBooks:**
+- [ ] Invoices — when created in the platform, pushed to QBO as an invoice
+- [ ] Payments — when recorded (Stripe webhook or manual check), pushed to QBO as a payment against the invoice
+- [ ] Direct labor expenses — monthly labor cost calculated from time entries (crew hours × rates), pushed as an expense entry categorized by crew/property
+- [ ] Material and subcontractor costs — pushed as expenses when recorded
+
+**What stays in the platform only (not pushed to QBO):**
+- Earned revenue tracking (management accounting, not bookkeeping)
+- Earned vs. invoiced variance analysis
+- Per-property and per-crew profitability breakdowns
+- Contract completion percentages
+
+**Setup:**
+- [ ] OAuth flow: connect QBO account in Settings
+- [ ] Customer mapping: map platform customers to QBO customer records
+- [ ] Expense category mapping: map labor/materials to QBO expense accounts
+- [ ] One-way push for invoices/payments/expenses — the accountant works in QuickBooks as they always have
+
+**Result — two views of the business:**
+- **QuickBooks** → "Did we make money this month?" (cash accounting, tax-ready P&L)
+- **Platform dashboard** → "Are we on track on our contracts?" (earned revenue, operational efficiency, crew profitability)
+
+#### Phase 6 Consideration: Stripe Connect for Multi-Tenant
+
+> When other landscaping companies use the platform (Phase 6), each company needs their own Stripe account receiving their own customer payments. **Stripe Connect** with **Express accounts** handles this — the platform creates a connected Stripe account via API during company onboarding, pre-filled with info from signup. The new company completes Stripe's hosted onboarding (bank account, identity verification) as part of the platform signup flow. From their perspective, it feels like one signup process, not two separate systems.
+
+**Deliverable:** Monthly maintenance invoices go out as branded PDFs with a "Pay Now" link. Customers pay online (card or ACH) on Stripe's hosted page — the platform never touches payment data. Stripe webhook auto-marks invoices paid. Check payments are recorded manually. Invoices, payments, and labor expenses all push to QuickBooks for accounting. The dashboard shows what's paid, what's outstanding, and what's overdue.
 
 ### Phase 5: Financial Reporting & Company-Wide P&L (Weeks 19-22)
 **Goal: Show the owner their TRUE numbers — not just job margin, but real profitability after overhead**
@@ -1668,13 +1717,15 @@ Your Platform (what you build — the operational core)
   │                Connect: OAuth click in Settings → Integrations
   │                Sync: poll every 10-15 min, write-back summaries + timeline events
   │
-  ├── Stripe ──── Payments, subscriptions, auto-pay
-  │                Connect: Stripe Connect OAuth in Settings → Payments
-  │                Sync: webhooks (instant — payment received, failed, refunded)
+  ├── Stripe ──── Payment processing (core Payments product, NOT Stripe Invoicing)
+  │                Connect: Stripe account (single tenant) / Stripe Connect (multi-tenant Phase 6)
+  │                Sync: Checkout Sessions created on demand, webhooks for payment confirmation
+  │                Note: Platform never touches card/bank data — Stripe hosted page only (SAQ A)
   │
-  ├── QuickBooks ─ Accounting, general ledger, tax reporting
+  ├── QuickBooks ─ Accounting, P&L, tax reporting (the accounting backbone)
   │                Connect: OAuth click in Settings → Integrations
-  │                Sync: push invoices + payments on creation
+  │                Push: invoices, payments, and direct labor expenses
+  │                Read: invoice payment status, expense categories (optional)
   │
   ├── DocuSign ── E-signature (OPTIONAL tenant add-on)
   │                Connect: OAuth click in Settings → Integrations → toggle on
@@ -1691,8 +1742,8 @@ Your Platform (what you build — the operational core)
 
 | Category | Examples | Connection | Sync Model |
 |----------|----------|------------|------------|
-| **Tenant-connected (required)** | HubSpot, Stripe | Each tenant connects their own account via OAuth during onboarding | Bidirectional — poll or webhook |
-| **Tenant-connected (optional)** | DocuSign, QuickBooks | Tenant enables in Settings → Integrations when ready | Bidirectional — push on events |
+| **Tenant-connected (required)** | HubSpot, Stripe, QuickBooks | Each tenant connects their own account via OAuth during onboarding. Stripe via Connect (Express accounts) for multi-tenant. | HubSpot: poll. Stripe: webhooks. QBO: push invoices/payments/expenses. |
+| **Tenant-connected (optional)** | DocuSign | Tenant enables in Settings → Integrations when ready | Push on events |
 | **Platform-level** | Twilio, SendGrid, Google Maps | Configured once by you, shared across all tenants | Stateless — fire and forget |
 
 **The onboarding flow for a new tenant:**
