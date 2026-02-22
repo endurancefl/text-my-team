@@ -11045,6 +11045,7 @@ async function openSavedEstimate(bidId) {
         renderTableBody();
         calculateBidTotals();
         showView('builder');
+        updateHeaderActions();
 
         // Update active estimate indicator
         const addressEl = document.getElementById('active-estimate-address');
@@ -11083,6 +11084,7 @@ async function openSavedEstimate(bidId) {
       renderTableBody();
       calculateBidTotals();
       showView('builder');
+      updateHeaderActions();
 
       const addressEl = document.getElementById('active-estimate-address');
       if (addressEl) addressEl.textContent = currentEstimate.propertyAddress || '';
