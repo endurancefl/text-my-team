@@ -56,7 +56,7 @@ The platform supports four divisions, each representing a distinct revenue strea
 - Returning user personalization (remembers name, PIN, language preference)
 - PWA manifest with apple-mobile-web-app-capable
 
-**crew.html + crew.css — Crew Dashboard (~8,440 lines HTML/JS + ~4,210 lines CSS)**
+**crew.html + crew.css — Crew Dashboard (~9,089 lines HTML/JS + ~4,369 lines CSS)**
 - iOS 18-precision mobile app for crew leaders
 - **Full English/Spanish bilingual support** via `data-i18n` system — same `localStorage` key `preferredLang` shared with index.html so language choice persists across apps. Toggle pill-button on both login screen and dashboard header. `translations` object with ~160 keys (en/es), `t(key)` lookup function with English fallback, `updateLanguage()` traverses `[data-i18n]` and `[data-i18n-placeholder]` elements + rebuilds JS-generated UI via `renderStopCards()` and `renderRequests()`. All static HTML text tagged with `data-i18n` attributes. All JS-generated strings use `t()` calls with `{name}` template replacement for dynamic values. Date locales switch between `en-US` and `es-US`. Site Report and Before-After wizard internals deferred (large subsystems with ~50+ strings each).
 - Phone number authentication against Crew Members sheet (Role = "Leader")
@@ -108,7 +108,7 @@ The platform supports four divisions, each representing a distinct revenue strea
 - iOS design system: SF Pro typography, exact system colors, dark mode, frosted glass tab bar with `backdrop-filter`, iOS spring animations, 44px touch targets, `prefers-reduced-motion` support
 - Bottom tab bar: Schedule (home) | Requests | Report Issue | Reports
 
-**estimate.html — Bidding & Estimating Tool (~16,680 lines)**
+**estimate.html — Bidding & Estimating Tool (~16,677 lines)**
 - **Division: Maintenance (MNT) fully built** — Irrigation, Construction, and Enhancement divisions planned, will reuse the same engine with division-specific catalogs and takeoffs
 - Three-panel Google Workspace layout (sidebar, main content, summary panel)
 - **Bid Builder**: Spreadsheet-style table with columns: Item, OCC, QTY, Unit, P/H, AH, TH, P/P, TP, GM%
@@ -132,6 +132,9 @@ The platform supports four divisions, each representing a distinct revenue strea
 - **Service Offers in Weekly Reports**: attach recommended services with catalog pricing and photos to weekly reports — customer approves with one tap from their email
 - **Contacts (Lite CRM)**: Lightweight contact management built into estimate.html as a placeholder until HubSpot integration. Contacts have lifecycle stages (Lead → Prospect → Customer), are linked to estimates via `contactId`, and auto-promote to "Customer" when an estimate is finalized. Searchable by name, email, phone, address. Contact picker in the estimate builder auto-fills property address. Stored in a "Contacts" Google Sheet. The `contactId` foreign key pattern survives the HubSpot migration — the field becomes `hubspot_contact_id` but the linking pattern is the same.
 - **Production Rates View**: Compares catalog production rates against actual field data from completed tickets. Nav item between Item Catalog and Schedule. Date range + crew filter. Two tabs: **Services tab** shows service-level comparison table sorted by worst efficiency — per-service visit count, avg est vs actual man-hours, variance badges (green/yellow/red), expandable rows with per-ticket breakdown and item-level implied rates. **Item Rates tab** shows item catalog with field rate columns — measured rates (from single-item services, direct qty/hours), inferred rates (from multi-item services, proportional via efficiency ratio), delta vs catalog rates, data point counts. Summary cards: tickets analyzed, overall efficiency, services over budget, reopened count. Ticket Services JSON enriched with per-item `quantities` (easy/medium/hard), `unit`, and `complexityFactor` during ticket generation for rate calculation. Functions: `initProductionView()`, `loadProductionAnalysis()`, `setProdTab()`, `renderProductionView()`, `renderProdServicesTable()`, `renderProdItemsTable()`, `renderProdTicketDetail()`, `toggleProdDetail()`, `populateProdCrewFilter()`. CSS: `.prod-variance-badge`, `.prod-confidence-tag`, `.prod-detail-row`, `.prod-detail-content`, `.prod-item-table`, `.prod-reopened-badge`, `.prod-empty-state`.
+- **Schedule View (Route Management)**: Three display modes — day view with property stop cards and drag-drop reordering (`schedDrop()` + `saveRouteOrder()`), week calendar grid with drag-to-reschedule between dates, month calendar with ticket dots. Crew filter dropdown. Stop detail panel with earned value, margin, services. Functions: `loadScheduleView()`, `renderSchedDay()`, `renderSchedWeek()`, `renderSchedMonth()`, `showSchedTicketDetail()`, `rescheduleFromDetail()`, `skipFromDetail()`.
+- **Financials Dashboard (Earned Revenue)**: Summary cards (contract value, collected, earned, deferred revenue, completion %). Monthly bar chart comparing earned vs collected with pagination. Contract table with per-contract breakdown. Deferred revenue = collected - earned (orange if positive/deferred, green if ahead of schedule). Functions: `loadFinancials()`, `renderFinancials()`, `calcCollectedToDate()`, `calcMonthlyData()`, `renderMonthlyChart()`, `renderContractTable()`.
+- **Ticket Scheduling Engine**: Three date distribution strategies dispatched by visit count in `getDatesForVisitCount()`: `generateSeasonalMowingDates()` (weekly Apr–Oct, biweekly Nov–Mar — visits === seasonalAnchor), `generateWeeklyDates()` (every week, 50-54 visits), `generateSimpleScheduleDates()` (even distribution, all others). Item-level visit override via `lineItem.itemVisits`. Tickets bundled by date with earned value proportionally distributed and penny reconciliation. `previewTickets()` shows breakdown before committing.
 - Material Design styling with Google Sans/Roboto fonts
 
 ### Backend & Infrastructure
@@ -143,7 +146,7 @@ The platform supports four divisions, each representing a distinct revenue strea
 
 #### Combined Apps Script Endpoints
 
-**GET endpoints (17):**
+**GET endpoints (22):**
 | Endpoint | Source | Description |
 |----------|--------|-------------|
 | `getItemCatalog` | Estimating | Returns item catalog with production rates |
@@ -155,7 +158,7 @@ The platform supports four divisions, each representing a distinct revenue strea
 | `getContracts` | Estimating | Returns all contracts |
 | `getContacts` | Estimating | Returns all contacts from the Contacts sheet (auto-creates sheet if missing) |
 | `getCrews` | Crew | Returns crew names + crewSizes (active member counts per crew) |
-| `getTickets` | Estimating | Returns tickets (with travelHours), optionally filtered by contractId |
+| `getTickets` | Estimating | Returns tickets (with travelHours, needsReschedule), optionally filtered by contractId, startDate/endDate, crew, or `needsReschedule=true` (returns only queue tickets, ignores date filters) |
 | `getRequests` | Crew | Auth by phone → returns crew's requests |
 | `getProperties` | Crew | Returns all properties with address, crew, phone, pin |
 | `getSavedReports` | Crew | Returns JSON report files from Drive for a property |
@@ -164,8 +167,12 @@ The platform supports four divisions, each representing a distinct revenue strea
 | `getCrewSchedule` | Crew | Auth by phone → returns crew members, today's tickets (with travelHours, completedServices for partial), time entries |
 | `verifyPin` | Crew | Validates 4-digit PIN against Crew Members sheet, returns {success, name, role, crew} |
 | `getProductionAnalysis` | Estimating | Compares catalog production rates vs actual field data. Params: startDate, endDate, crew. Reads Scheduled Tickets (completed/partial) + Time Entries (service type), aggregates by service and item. Returns service-level efficiency (est vs actual man-hours) with per-ticket detail, and item-level field rates (measured from single-item services, inferred from multi-item services) compared to catalog rates |
+| `getCrewMembers` | Crew | Returns all crew members from Crew Members sheet |
+| `getRouteOrder` | Crew | Returns stop order for a crew on a given date |
+| `getWeeklyReportData` | Estimating | Returns weekly property visit summaries for report emails |
+| `getServiceOffers` | Estimating | Loads offers for a property or report |
 
-**POST endpoints (26):**
+**POST endpoints (36):**
 | Endpoint | Source | Description |
 |----------|--------|-------------|
 | `saveContact` | Estimating | Creates a new contact in the Contacts sheet with auto-generated C-{timestamp} ID |
@@ -176,8 +183,9 @@ The platform supports four divisions, each representing a distinct revenue strea
 | `updateContract` | Estimating | Updates existing contract row by contractId (crew, day, dates, months, payment) — used during estimate revision |
 | `saveTickets` | Estimating | Batch-creates scheduled tickets |
 | `deleteFutureTickets` | Estimating | Deletes future scheduled tickets for a contractId (status='scheduled' AND eventDate > afterDate) — used during estimate revision to regenerate tickets |
-| `updateTicketStatus` | Estimating | Updates ticket status/completed date |
-| `rescheduleTicket` | Estimating | Moves ticket to new date |
+| `updateTicketStatus` | Estimating | Updates ticket status/completed date; auto-sets `Needs Reschedule=TRUE` when status is `skipped` |
+| `rescheduleTicket` | Estimating | Moves ticket to new date; clears `Needs Reschedule` flag |
+| `bulkSkipDay` | Estimating | Bulk-skips all scheduled/partial tickets for a crew on a date — sets status to `skipped`, `Needs Reschedule=TRUE`, Notes to reason |
 | `saveBid` | Estimating | Creates new bid row |
 | `updateBid` | Estimating | Updates existing bid row |
 | `saveBidSettings` | Estimating | Saves settings key-value pairs |
@@ -196,9 +204,13 @@ The platform supports four divisions, each representing a distinct revenue strea
 | `uploadSiteReportPdf` | Crew | Uploads site report PDF to Drive |
 | `saveSiteReportJson` | Crew | Saves report JSON data to Drive |
 | `saveServiceOffer` | Crew/Estimating | Creates service offer attached to a report |
-| `getServiceOffers` | Estimating | Loads offers for a property or report |
 | `approveServiceOffer` | Customer (token) | Customer approves an offered service |
 | `declineServiceOffer` | Customer (token) | Customer declines an offered service |
+| `saveRouteOrder` | Crew | Persists drag-drop stop reordering for a crew day |
+| `sendWeeklyReport` | Estimating | Sends weekly property report email to customer |
+| `uploadSiteReportPhoto` | Crew | Uploads individual site report photo to Drive |
+| `submitRequest` | Text My Team | Submits customer service request with photo |
+| `saveServiceOfferResponse` | Estimating | Records customer approval/decline of service offer |
 
 ### What Works Well
 - The UX patterns and workflows are production-quality — crew uses them daily
@@ -1782,13 +1794,13 @@ Before the full React/PostgreSQL migration, the ticket generation and schedule f
 5. ✅ Ticket status update (`updateTicketStatus`) and reschedule (`rescheduleTicket`) endpoints
 6. ✅ "Finalize Estimate" UI flow — locks estimate, opens modal for crew/day/dates, generates contract + tickets
 7. ✅ **Estimate Revision workflow** — Finalized → Revision → Update Contract → re-Finalized. Updates existing contract, deletes/regenerates future tickets, preserves completed tickets, increments `revisionCount`
-8. ⬜ Build `generateSeasonalMowingDates()` with weekly/biweekly seasonal logic
-9. ⬜ Build `generateWeeklyDates()` for items with ~52 visits (every week all year)
-10. ⬜ Build `generateSimpleScheduleDates()` for evenly distributed services
-11. ⬜ **Item-level scheduling**: each line item can override the service visit count (`itemVisits`)
-12. ⬜ Ticket bundling — group same-date services into one property visit, listing only items due that day
-13. ⬜ Calculate **earned value** per ticket from bid rates/markups
-14. ⬜ Preview: show ticket count and item-level breakdown before creating
+8. ✅ `generateSeasonalMowingDates()` — weekly Apr–Oct, biweekly Nov–Mar seasonal logic
+9. ✅ `generateWeeklyDates()` — every week all year, trims to target visit count (50-54 visits)
+10. ✅ `generateSimpleScheduleDates()` — evenly distributed dates for all other visit counts
+11. ✅ **Item-level scheduling**: each line item can override the service visit count via `lineItem.itemVisits`
+12. ✅ Ticket bundling — groups same-date services into one property visit, listing only items due that day
+13. ✅ **Earned value** per ticket — proportionally distributed from bid rates/markups with penny reconciliation
+14. ✅ `previewTickets()` — shows ticket count, item-level breakdown, and earned value before committing
 15. ⬜ Optional: Google Calendar event creation via Apps Script `CalendarApp`
 
 ### Phase B: Schedule Tab (crew.html) — ✅ Built
@@ -1805,7 +1817,7 @@ Before the full React/PostgreSQL migration, the ticket generation and schedule f
 
 ### Phase C: Time Clock (crew.html) — ✅ Built
 1. ✅ Job clock: multi-ticket timers with HH:MM:SS elapsed + static target in stop cards
-2. ⬜ GPS capture at clock in/out
+2. ✅ **GPS capture** at clock in/out — `captureGPS()` using `navigator.geolocation` with high accuracy. Called at 11 points: travel clock-in/out, day clock-in/out, ticket start, ticket complete. Coordinates sent as `latIn/lngIn/latOut/lngOut` on time entries
 3. ✅ **Per-service clocking with crew assignment**: start/complete individual services within a ticket with per-service member selection from parent ticket's assigned crew. Saved as `service` entry type with `serviceName`, per-service `crewMembers`, and `memberCount`
 4. ✅ **Clock-out decision modal**: est vs actual, service status, "Complete" or "Return Later" (partial)
 5. ✅ **Partial ticket carry-over**: partial tickets show orange, carry completed services, "Start (Return)" resumes
@@ -1817,17 +1829,17 @@ Before the full React/PostgreSQL migration, the ticket generation and schedule f
 11. ✅ **Day summary screen**: direct hours, indirect hours, total, direct %, crew members
 12. ✅ Job completion flow (notes, service checklist, partial/complete decision)
 
-### Phase D: Route Management (estimate.html / management view) — ⬜ Not Started
-1. ⬜ Weekly route view — list of stops per day
-2. ✅ Reschedule endpoint exists (`rescheduleTicket`)
-3. ✅ Skip stop in crew app (`updateTicketStatus` with status = 'skipped')
-4. ⬜ Bulk skip: all tickets for a crew on a date (weather day)
+### Phase D: Route Management (estimate.html / management view) — ✅ Built
+1. ✅ **Schedule view** — day/week/month display modes with property stop cards, drag-drop stop reordering (`schedDrop()` + `saveRouteOrder()`), crew filter dropdown. Day view with earned value and margin per stop, week calendar grid with drag-to-reschedule, month calendar with ticket dots. Functions: `loadScheduleView()`, `renderSchedDay()`, `renderSchedWeek()`, `renderSchedMonth()`, `showSchedTicketDetail()`, `rescheduleFromDetail()`, `skipFromDetail()`
+2. ✅ Reschedule endpoint exists (`rescheduleTicket`) — now also clears `needsReschedule` flag
+3. ✅ Skip stop in crew app (`updateTicketStatus` with status = 'skipped') — now auto-sets `needsReschedule=TRUE`
+4. ✅ **Bulk skip + Needs Reschedule queue** — "Skip Day (N)" button on crew headers in day view, `bulkSkipDay` batch endpoint, "Needs Reschedule" queue toggle with badge count, queue view grouped by crew with reschedule controls. All skips (crew field, office single, bulk) enter the queue. Functions: `bulkSkipCrewDay()`, `fetchRescheduleQueue()`, `renderRescheduleQueue()`, `rescheduleFromQueue()`, `toggleRescheduleQueue()`, `updateRescheduleQueueCount()`
 
-### Phase E: Earned Revenue Dashboard (estimate.html / management view) — ⬜ Not Started
-1. ⬜ Monthly earned vs. invoiced chart — overlay of both revenue streams
-2. ⬜ Property-level earned vs. invoiced comparison table
-3. ⬜ Deferred revenue summary — total collected but not yet earned across all contracts
-4. ⬜ Contract completion percentage — earned to date / total contract value
+### Phase E: Earned Revenue Dashboard (estimate.html / management view) — 🔶 Partially Built
+1. ✅ **Monthly earned vs. collected bar chart** — side-by-side bars with pagination (`renderMonthlyChart()`, `calcMonthlyData()`)
+2. ✅ **Contract-level earned vs. collected table** — per-contract breakdown with completion % (`renderContractTable()`)
+3. ✅ **Deferred revenue** — collected minus earned, color-coded (orange if deferred/collected ahead, green if earned ahead of schedule). Summary cards: contract value, collected, earned, deferred revenue, completion %
+4. ✅ **Contract completion percentage** — earned to date / total contract value, displayed per contract. Functions: `loadFinancials()`, `renderFinancials()`, `calcCollectedToDate()`
 5. ⬜ Monthly P&L approximation — earned revenue minus internal costs from completed tickets
 
 ### Google Sheets (Consolidated "Estimating" Spreadsheet)
@@ -1849,7 +1861,7 @@ All sheets live in one spreadsheet with one Code.gs serving both estimate.html a
 | Sheet | Purpose |
 |-------|---------|
 | Contracts | contractId, bidId, propertyAddress, assignedCrew, preferredDay, startDate, endDate, contractMonths, monthlyPayment, status, createdDate (updatable via `updateContract` during revision) |
-| Scheduled Tickets | ticketId, contractId, propertyAddress, assignedCrew, eventDate, servicesJson (each service has name, estimatedHours, items[]; each item has name, hours, and optionally quantities {easy,medium,hard}, unit, complexityFactor for production rate analysis), totalEstHours, travelHours, status, completedDate, notes, completedServices (JSON array of completed service names for partial tickets), createdDate |
+| Scheduled Tickets | ticketId, contractId, propertyAddress, assignedCrew, eventDate, servicesJson (each service has name, estimatedHours, items[]; each item has name, hours, and optionally quantities {easy,medium,hard}, unit, complexityFactor for production rate analysis), totalEstHours, travelHours, status, completedDate, notes, completedServices (JSON array of completed service names for partial tickets), createdDate, needsReschedule (boolean — auto-set TRUE when status=skipped, cleared when rescheduled) |
 | Crew Members | name, phone, role (Leader/Member), crew (MNT Crew 1), pin (4-digit identity PIN), status (Active/Inactive) |
 | Time Entries | entryId, crew, date, entryType (day_clock/job/indirect/service), ticketId, propertyAddress, serviceName, indirectCategory, clockIn, clockOut, durationMinutes, crewMembers (JSON), memberCount, notes, createdDate, durationType (scalable/fixed — auto-upgraded column), reopened ('true'/'' — auto-upgraded column, flags entries created by reopening a completed service), estimatedHours (auto-upgraded column — service-level estimated hours from ticket, passed by crew.html on service start/reopen/split) |
 
@@ -2109,13 +2121,13 @@ You don't have to stop using the current app while you build the new one. Here's
    - ✅ Crew-hours display (man-hours ÷ crew size) + budgeted indirect time from travelHours
    - ✅ **Contract finalization UI in estimate.html** — "Finalize Estimate" flow that generates tickets from bid services
    - ✅ **Estimate Revision & Re-Finalize workflow** — three-status lifecycle (Draft/Revision/Finalized), contract update instead of duplicate, future ticket regeneration, revision count tracking
-   - ⬜ **Next: Ticket generation logic** — seasonal mowing dates, weekly dates, simple schedule dates, ticket bundling
-   - ⬜ **Next: GPS capture** at clock in/out for verification
-   - ⬜ **Next: Route management view** — weekly route view, bulk skip for weather days
-   - ⬜ **Next: Earned revenue dashboard** — earned vs. invoiced comparison
+   - ✅ **Ticket generation logic** — three date distribution strategies: `generateSeasonalMowingDates()` (weekly Apr–Oct, biweekly Nov–Mar), `generateWeeklyDates()` (every week, 50-54 visits), `generateSimpleScheduleDates()` (even distribution). Item-level `itemVisits` override, ticket bundling by date, earned value with penny reconciliation, `previewTickets()` breakdown
+   - ✅ **GPS capture** at clock in/out — `captureGPS()` with high accuracy at 11 capture points (travel, day, ticket start/complete). Coordinates as `latIn/lngIn/latOut/lngOut`
+   - ✅ **Route management view** — day/week/month views with drag-drop reordering, crew filter, bulk skip day for weather/holidays, "Needs Reschedule" queue with badge count and per-ticket reschedule controls
+   - 🔶 **Earned revenue dashboard** — monthly earned vs collected chart, contract table, deferred revenue, completion % all built; **remaining: monthly P&L approximation**
 4. **Decide on cloud provider** — AWS or Azure. The architecture works on either. Pick based on your comfort level or your dev's experience.
 5. **Add IRR/CON/ENH division catalogs** — extend the item and service catalogs for irrigation, construction, and enhancement divisions
-6. **Then start Phase 0 with a code agent** — give it this document plus your existing code. Recommended: **Claude Code on the premium tier ($200/month)**. OpenAI's Codex is also strong. Given the level of project detail in this document and the proven business logic in the prototype, **a solo developer with Claude Code could realistically build the full production stack in under 2 weeks**. 26k lines of prototype → ~100k lines of production TypeScript is very doable when the spec is this detailed.
+6. **Then start Phase 0 with a code agent** — give it this document plus your existing code. Recommended: **Claude Code on the premium tier ($200/month)**. OpenAI's Codex is also strong. Given the level of project detail in this document and the proven business logic in the prototype, **a solo developer with Claude Code could realistically build the full production stack in under 2 weeks**. ~29k lines of prototype → ~100k lines of production TypeScript is very doable when the spec is this detailed.
 7. **Set up the monorepo first** — `packages/shared` types + `packages/ui` components + `packages/calculation-engine` (extracted from estimate.html) + `apps/platform` + `apps/crew` + `server/`
 8. **Enable RLS early** — it's simple to implement at project start and prevents data leaks from day one. Retrofitting is harder.
 9. **The iOS design system you already have** — apply those design principles to the new React crew app from the start.

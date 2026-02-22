@@ -102,6 +102,9 @@ function doPost(e) {
     if (data.rescheduleTicket) {
       return jsonResponse(rescheduleTicket(data));
     }
+    if (data.bulkSkipDay) {
+      return jsonResponse(bulkSkipDay(data));
+    }
     if (data.saveBid) {
       return jsonResponse(saveBid(data.bidData));
     }
@@ -942,6 +945,13 @@ function saveTickets(data) {
       sheet.getRange(1, nextCol + 1).setValue('Internal Cost');
       sheet.getRange(1, nextCol, 1, 2).setFontWeight('bold');
     }
+    // Auto-upgrade: add Needs Reschedule column if missing
+    headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    if (headerRow.indexOf('Needs Reschedule') === -1) {
+      var nrCol = sheet.getLastColumn() + 1;
+      sheet.getRange(1, nrCol).setValue('Needs Reschedule');
+      sheet.getRange(1, nrCol).setFontWeight('bold');
+    }
   }
 
   var tickets = data.tickets || [];
@@ -970,7 +980,8 @@ function saveTickets(data) {
     completedDate: headers.indexOf('Completed Date'),
     notes: headers.indexOf('Notes'),
     createdDate: headers.indexOf('Created Date'),
-    stopOrder: headers.indexOf('Stop Order')
+    stopOrder: headers.indexOf('Stop Order'),
+    needsReschedule: headers.indexOf('Needs Reschedule')
   };
 
   var maxId = 0;
@@ -1009,6 +1020,7 @@ function saveTickets(data) {
       else if (c === colIdx.notes) row.push('');
       else if (c === colIdx.createdDate) row.push(dateStr);
       else if (c === colIdx.stopOrder) row.push('');
+      else if (c === colIdx.needsReschedule) row.push('');
       else row.push('');
     }
     rows.push(row);
@@ -1035,6 +1047,7 @@ function getTickets(e) {
   var startDate = '';
   var endDate = '';
   var crew = '';
+  var needsRescheduleFilter = false;
 
   if (typeof e === 'string') {
     // Legacy: called as getTickets('CTR-001')
@@ -1045,6 +1058,7 @@ function getTickets(e) {
     startDate = e.parameter.startDate || '';
     endDate = e.parameter.endDate || '';
     crew = e.parameter.crew || '';
+    needsRescheduleFilter = e.parameter.needsReschedule === 'true';
   }
 
   var data = sheet.getDataRange().getValues();
@@ -1067,7 +1081,8 @@ function getTickets(e) {
     'completedDate': ['Completed Date'],
     'notes': ['Notes'],
     'createdDate': ['Created Date'],
-    'stopOrder': ['Stop Order']
+    'stopOrder': ['Stop Order'],
+    'needsReschedule': ['Needs Reschedule']
   };
 
   Object.keys(colAliases).forEach(function(key) {
@@ -1096,11 +1111,19 @@ function getTickets(e) {
       if (eventDateStr.indexOf('T') !== -1) eventDateStr = eventDateStr.split('T')[0];
     }
 
+    // Determine needsReschedule flag for this row
+    var rowNeedsReschedule = colMap.needsReschedule !== -1 && String(row[colMap.needsReschedule] || '').toUpperCase() === 'TRUE';
+
     // Apply filters
     if (contractId && String(row[colMap.contractId] || '') !== contractId) continue;
     if (crew && String(row[colMap.assignedCrew] || '') !== crew) continue;
-    if (startDate && eventDateStr < startDate) continue;
-    if (endDate && eventDateStr > endDate) continue;
+    if (needsRescheduleFilter) {
+      // When filtering for queue, skip date filters — queue spans all dates
+      if (!rowNeedsReschedule) continue;
+    } else {
+      if (startDate && eventDateStr < startDate) continue;
+      if (endDate && eventDateStr > endDate) continue;
+    }
 
     tickets.push({
       ticketId: colMap.ticketId !== -1 ? (row[colMap.ticketId] || '') : '',
@@ -1125,7 +1148,8 @@ function getTickets(e) {
       completedDate: colMap.completedDate !== -1 ? (row[colMap.completedDate] || '') : '',
       notes: colMap.notes !== -1 ? (row[colMap.notes] || '') : '',
       createdDate: colMap.createdDate !== -1 ? (row[colMap.createdDate] || '') : '',
-      stopOrder: colMap.stopOrder !== -1 ? (row[colMap.stopOrder] || null) : null
+      stopOrder: colMap.stopOrder !== -1 ? (row[colMap.stopOrder] || null) : null,
+      needsReschedule: rowNeedsReschedule
     });
   }
 
@@ -1178,6 +1202,7 @@ function updateTicketStatus(data) {
   var statusCol = headers.indexOf('Status');
   var completedDateCol = headers.indexOf('Completed Date');
   var notesCol = headers.indexOf('Notes');
+  var needsRescheduleCol = headers.indexOf('Needs Reschedule');
 
   if (ticketIdCol === -1) ticketIdCol = 0;
 
@@ -1191,6 +1216,10 @@ function updateTicketStatus(data) {
       }
       if (data.notes && notesCol !== -1) {
         sheet.getRange(i + 1, notesCol + 1).setValue(data.notes);
+      }
+      // Auto-set needsReschedule when status is skipped
+      if (needsRescheduleCol !== -1 && String(data.status || '').toLowerCase() === 'skipped') {
+        sheet.getRange(i + 1, needsRescheduleCol + 1).setValue('TRUE');
       }
       return { success: true };
     }
@@ -1253,6 +1282,7 @@ function rescheduleTicket(data) {
   var ticketIdCol = headers.indexOf('Ticket ID');
   var eventDateCol = headers.indexOf('Event Date');
   var statusCol = headers.indexOf('Status');
+  var needsRescheduleCol = headers.indexOf('Needs Reschedule');
 
   if (ticketIdCol === -1) ticketIdCol = 0;
 
@@ -1264,11 +1294,81 @@ function rescheduleTicket(data) {
       if (statusCol !== -1) {
         sheet.getRange(i + 1, statusCol + 1).setValue('rescheduled');
       }
+      // Clear needsReschedule flag when ticket is rescheduled
+      if (needsRescheduleCol !== -1) {
+        sheet.getRange(i + 1, needsRescheduleCol + 1).setValue('');
+      }
       return { success: true };
     }
   }
 
   return { success: false, error: 'Ticket not found' };
+}
+
+/**
+ * Bulk skip all tickets for a crew on a specific date.
+ * POST: { bulkSkipDay: true, crew: 'MNT-Jake', date: '2026-02-23', reason: 'Weather' }
+ * Sets status → 'skipped', Needs Reschedule → TRUE, Notes → reason
+ */
+function bulkSkipDay(data) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Scheduled Tickets');
+
+  if (!sheet) {
+    return { success: false, error: 'Scheduled Tickets sheet not found' };
+  }
+
+  var sheetData = sheet.getDataRange().getValues();
+  var headers = sheetData[0];
+  var ticketIdCol = headers.indexOf('Ticket ID');
+  var assignedCrewCol = headers.indexOf('Assigned Crew');
+  var eventDateCol = headers.indexOf('Event Date');
+  var statusCol = headers.indexOf('Status');
+  var notesCol = headers.indexOf('Notes');
+  var needsRescheduleCol = headers.indexOf('Needs Reschedule');
+
+  if (ticketIdCol === -1) ticketIdCol = 0;
+
+  var targetDate = String(data.date || '');
+  var targetCrew = String(data.crew || '');
+  var reason = String(data.reason || 'Skipped');
+  var skippedCount = 0;
+  var skippedIds = [];
+
+  for (var i = 1; i < sheetData.length; i++) {
+    var row = sheetData[i];
+
+    // Match crew
+    if (assignedCrewCol !== -1 && String(row[assignedCrewCol] || '') !== targetCrew) continue;
+
+    // Match date (normalize Date objects)
+    var rawDate = eventDateCol !== -1 ? row[eventDateCol] : '';
+    var eventDateStr = '';
+    if (rawDate instanceof Date) {
+      eventDateStr = rawDate.getFullYear() + '-' +
+        String(rawDate.getMonth() + 1).padStart(2, '0') + '-' +
+        String(rawDate.getDate()).padStart(2, '0');
+    } else {
+      eventDateStr = String(rawDate || '');
+      if (eventDateStr.indexOf('T') !== -1) eventDateStr = eventDateStr.split('T')[0];
+    }
+    if (eventDateStr !== targetDate) continue;
+
+    // Only skip tickets that are scheduled or partial
+    var currentStatus = statusCol !== -1 ? String(row[statusCol] || '').toLowerCase().trim() : 'scheduled';
+    if (currentStatus !== 'scheduled' && currentStatus !== 'partial') continue;
+
+    // Apply skip
+    var rowNum = i + 1;
+    if (statusCol !== -1) sheet.getRange(rowNum, statusCol + 1).setValue('skipped');
+    if (needsRescheduleCol !== -1) sheet.getRange(rowNum, needsRescheduleCol + 1).setValue('TRUE');
+    if (notesCol !== -1) sheet.getRange(rowNum, notesCol + 1).setValue(reason);
+
+    skippedCount++;
+    skippedIds.push(row[ticketIdCol] || '');
+  }
+
+  return { success: true, skippedCount: skippedCount, skippedIds: skippedIds };
 }
 
 

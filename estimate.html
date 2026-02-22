@@ -692,6 +692,46 @@
 
     .sched-stop-grip { color: var(--gw-border); cursor: grab; flex-shrink: 0; font-size: 16px; }
 
+    .sched-skip-day-btn {
+      font-size: 12px; color: #c5221f; background: none; border: none; cursor: pointer;
+      padding: 2px 8px; border-radius: 4px; font-weight: 500; white-space: nowrap;
+    }
+    .sched-skip-day-btn:hover { background: #fce8e6; }
+
+    .sched-queue-btn {
+      font-size: 12px; padding: 4px 10px; border-radius: 16px; cursor: pointer;
+      background: #fff; border: 1px solid #dadce0; color: #c5221f; font-weight: 500;
+      position: relative; display: none; align-items: center; gap: 6px; white-space: nowrap;
+    }
+    .sched-queue-btn.visible { display: inline-flex; }
+    .sched-queue-btn.active { background: #fce8e6; border-color: #c5221f; }
+    .sched-queue-btn:hover { background: #fce8e6; }
+
+    .sched-queue-badge {
+      background: #c5221f; color: white; font-size: 10px; font-weight: 700;
+      min-width: 18px; height: 18px; border-radius: 9px;
+      display: inline-flex; align-items: center; justify-content: center; padding: 0 4px;
+    }
+
+    .sched-queue-banner {
+      background: #fce8e6; border: 1px solid #f5c6cb; border-radius: 8px;
+      padding: 12px 16px; margin-bottom: 16px; color: #c5221f; font-size: 14px; font-weight: 500;
+    }
+
+    .sched-queue-ticket {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 14px; background: white; border-bottom: 1px solid var(--gw-divider);
+      cursor: pointer; transition: background 0.1s;
+    }
+    .sched-queue-ticket:last-child { border-bottom: none; }
+    .sched-queue-ticket:hover { background: var(--gw-surface-container); }
+
+    .sched-queue-skipped-date {
+      font-size: 11px; color: #c5221f; font-weight: 500;
+    }
+
+    .sched-stop-status.needs-reschedule { background: #fce8e6; color: #c5221f; }
+
     .sched-week-grid {
       display: grid; grid-template-columns: repeat(7, 1fr);
       gap: 1px; background: var(--gw-border);
@@ -6035,6 +6075,7 @@
               <button class="btn btn-secondary sched-nav-btn" onclick="schedPrev()">&larr;</button>
               <input type="date" id="sched-date-picker" class="sched-date-picker" onchange="schedPickDate(this.value)">
               <button class="btn btn-secondary sched-nav-btn" onclick="schedNext()">&rarr;</button>
+              <button class="sched-queue-btn" id="sched-queue-btn" onclick="toggleRescheduleQueue()">Needs Reschedule <span class="sched-queue-badge" id="sched-queue-badge">0</span></button>
             </div>
             <div class="sched-view-toggle">
               <button class="toggle-btn active" id="sched-toggle-day" onclick="setSchedMode('day')">Day</button>
@@ -15193,6 +15234,9 @@ let schedCrewsLoaded = false;
 let schedDragTicketId = null;
 let schedDragSourceIdx = null;
 let schedDayDragCrew = null;
+let schedQueueMode = false;
+let schedQueueCount = 0;
+let rescheduleQueueCache = [];
 
 function getCrewSizeForCrew(crewName) {
   return schedCrewSizes[crewName] || 1;
@@ -15228,7 +15272,7 @@ async function loadScheduleView() {
     await loadScheduleCrewFilter();
     schedCrewsLoaded = true;
   }
-  await fetchScheduleTickets();
+  await Promise.all([fetchScheduleTickets(), fetchRescheduleQueue()]);
   renderScheduleView();
   updateSchedDateLabel();
 }
@@ -15376,6 +15420,7 @@ function setSchedMode(mode) {
 }
 
 function renderScheduleView() {
+  if (schedQueueMode) { renderRescheduleQueue(); return; }
   if (schedMode === 'day') renderSchedDay();
   else if (schedMode === 'week') renderSchedWeek();
   else renderSchedMonth();
@@ -15421,10 +15466,15 @@ function renderSchedDay() {
     var dailyEarnedValue = stops.reduce(function(sum, t) { return sum + (parseFloat(t.earnedValue) || 0); }, 0);
     var earnedStr = dailyEarnedValue > 0 ? ' &middot; $' + dailyEarnedValue.toFixed(0) + ' earned' : '';
 
+    var skippableCount = stops.filter(function(t) { var s = String(t.status || '').toLowerCase(); return s === 'scheduled' || s === 'partial'; }).length;
+
     html += '<div class="sched-day-crew-section" data-crew="' + crew + '">';
     html += '<div class="sched-day-crew-header">';
     html += '<span class="sched-day-crew-name">' + crew + '</span>';
     html += '<span class="sched-day-crew-stats">' + stops.length + ' stops &middot; ' + crewTotalStr + ' budgeted (' + totalManHours.toFixed(2) + ' mh)' + earnedStr + ' &middot; ' + completed + ' done</span>';
+    if (skippableCount > 0) {
+      html += '<button class="sched-skip-day-btn" onclick="event.stopPropagation(); bulkSkipCrewDay(\'' + escapedCrew + '\')">Skip Day (' + skippableCount + ')</button>';
+    }
     html += '</div>';
     html += '<div class="sched-day-stops" data-crew="' + crew + '">';
 
@@ -15744,6 +15794,7 @@ async function schedMonthDrop(e, newDate) {
 
 function showSchedTicketDetail(ticketId) {
   var ticket = schedTicketsCache.find(function(t) { return t.ticketId === ticketId; });
+  if (!ticket) ticket = rescheduleQueueCache.find(function(t) { return t.ticketId === ticketId; });
   if (!ticket) return;
 
   var panel = document.getElementById('sched-ticket-detail');
@@ -15817,6 +15868,14 @@ function showSchedTicketDetail(ticketId) {
     html += '</div>';
     html += '<button class="btn btn-secondary" onclick="skipFromDetail(\'' + ticketId + '\')" style="color:#c5221f;">Skip This Visit</button>';
     html += '</div>';
+  } else if (ticket.needsReschedule) {
+    html += '<div style="margin-top:12px;padding:10px;background:#fce8e6;border-radius:8px;border:1px solid #f5c6cb;color:#c5221f;font-size:13px;font-weight:500;margin-bottom:8px;">Needs Reschedule</div>';
+    html += '<div style="margin-top:8px;display:flex;flex-direction:column;gap:8px;">';
+    html += '<div style="display:flex;gap:8px;align-items:center;">';
+    html += '<input type="date" id="sched-detail-new-date" class="form-input" style="flex:1;">';
+    html += '<button class="btn btn-secondary" onclick="rescheduleFromQueue(\'' + ticketId + '\')" style="white-space:nowrap;">Reschedule</button>';
+    html += '</div>';
+    html += '</div>';
   }
 
   document.getElementById('sched-detail-content').innerHTML = html;
@@ -15836,6 +15895,12 @@ async function rescheduleFromDetail(ticketId) {
 
   ticket.eventDate = newDate;
   ticket.status = 'rescheduled';
+  ticket.needsReschedule = false;
+
+  // Also update in queue cache
+  var qIdx = rescheduleQueueCache.findIndex(function(t) { return t.ticketId === ticketId; });
+  if (qIdx !== -1) rescheduleQueueCache.splice(qIdx, 1);
+  updateRescheduleQueueCount();
 
   try {
     await fetch(GOOGLE_SHEETS_URL, {
@@ -15852,7 +15917,13 @@ async function skipFromDetail(ticketId) {
   if (!confirm('Skip this visit?')) return;
 
   var ticket = schedTicketsCache.find(function(t) { return t.ticketId === ticketId; });
-  if (ticket) ticket.status = 'skipped';
+  if (ticket) {
+    ticket.status = 'skipped';
+    ticket.needsReschedule = true;
+    // Add to queue cache
+    rescheduleQueueCache.push(Object.assign({}, ticket));
+    updateRescheduleQueueCount();
+  }
 
   try {
     await fetch(GOOGLE_SHEETS_URL, {
@@ -15860,6 +15931,187 @@ async function skipFromDetail(ticketId) {
       body: JSON.stringify({ updateTicketStatus: true, ticketId: ticketId, status: 'skipped' })
     });
   } catch (err) { console.error('Skip failed:', err); }
+
+  closeSchedDetail();
+  renderScheduleView();
+}
+
+// ─── Bulk Skip Day + Reschedule Queue ────────────────────────
+
+async function bulkSkipCrewDay(crew) {
+  var dateStr = schedDate.toISOString().split('T')[0];
+  var dayTickets = schedTicketsCache.filter(function(t) {
+    return t.eventDate === dateStr && t.assignedCrew === crew;
+  });
+  var skippable = dayTickets.filter(function(t) {
+    var s = String(t.status || '').toLowerCase();
+    return s === 'scheduled' || s === 'partial';
+  });
+  if (skippable.length === 0) return;
+
+  var reason = prompt('Skip ' + skippable.length + ' ticket(s) for ' + crew + ' on ' + dateStr + '?\n\nEnter reason (e.g. Weather, Holiday):');
+  if (!reason) return;
+
+  // Optimistic UI: mark as skipped + needsReschedule in cache
+  skippable.forEach(function(t) {
+    t.status = 'skipped';
+    t.needsReschedule = true;
+    t.notes = reason;
+    rescheduleQueueCache.push(Object.assign({}, t));
+  });
+  updateRescheduleQueueCount();
+  renderScheduleView();
+
+  try {
+    var resp = await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ bulkSkipDay: true, crew: crew, date: dateStr, reason: reason })
+    });
+    var data = await resp.json();
+    if (data.success) {
+      showToast(data.skippedCount + ' ticket(s) skipped. Added to reschedule queue.');
+    }
+  } catch (err) {
+    console.error('Bulk skip failed:', err);
+    showToast('Bulk skip failed — please refresh.');
+  }
+}
+
+async function fetchRescheduleQueue() {
+  try {
+    var url = GOOGLE_SHEETS_URL + '?action=getTickets&needsReschedule=true';
+    var resp = await fetch(url);
+    var data = await resp.json();
+    if (data.success) {
+      rescheduleQueueCache = (data.tickets || []).map(function(t) {
+        return Object.assign({}, t, {
+          eventDate: normalizeDate(t.eventDate),
+          services: typeof t.services === 'string' ? JSON.parse(t.services) : (t.services || [])
+        });
+      });
+    }
+  } catch (err) {
+    console.error('Failed to fetch reschedule queue:', err);
+  }
+  updateRescheduleQueueCount();
+}
+
+function updateRescheduleQueueCount() {
+  schedQueueCount = rescheduleQueueCache.length;
+  var btn = document.getElementById('sched-queue-btn');
+  var badge = document.getElementById('sched-queue-badge');
+  if (btn && badge) {
+    badge.textContent = schedQueueCount;
+    btn.classList.toggle('visible', schedQueueCount > 0);
+  }
+  // Auto-exit queue mode if empty
+  if (schedQueueCount === 0 && schedQueueMode) {
+    schedQueueMode = false;
+    if (btn) btn.classList.remove('active');
+    renderScheduleView();
+  }
+}
+
+function toggleRescheduleQueue() {
+  schedQueueMode = !schedQueueMode;
+  var btn = document.getElementById('sched-queue-btn');
+  if (btn) btn.classList.toggle('active', schedQueueMode);
+
+  if (schedQueueMode) {
+    // Show queue in the active view panel (day view container)
+    document.getElementById('sched-day-view').style.display = 'block';
+    document.getElementById('sched-week-view').style.display = 'none';
+    document.getElementById('sched-month-view').style.display = 'none';
+    renderRescheduleQueue();
+  } else {
+    // Restore current mode
+    setSchedMode(schedMode);
+  }
+}
+
+function renderRescheduleQueue() {
+  var container = document.getElementById('sched-day-content');
+  if (rescheduleQueueCache.length === 0) {
+    container.innerHTML = '<div class="sched-empty"><h3>No Tickets Need Rescheduling</h3><p>All skipped tickets have been rescheduled.</p></div>';
+    return;
+  }
+
+  var html = '<div class="sched-queue-banner">' + rescheduleQueueCache.length + ' ticket(s) skipped and awaiting new dates</div>';
+
+  // Group by crew
+  var crewGroups = {};
+  rescheduleQueueCache.forEach(function(t) {
+    var crew = t.assignedCrew || 'Unassigned';
+    if (!crewGroups[crew]) crewGroups[crew] = [];
+    crewGroups[crew].push(t);
+  });
+
+  Object.keys(crewGroups).sort().forEach(function(crew) {
+    var tickets = crewGroups[crew];
+    html += '<div class="sched-day-crew-section">';
+    html += '<div class="sched-day-crew-header">';
+    html += '<span class="sched-day-crew-name">' + crew + '</span>';
+    html += '<span class="sched-day-crew-stats">' + tickets.length + ' ticket(s) to reschedule</span>';
+    html += '</div>';
+    html += '<div class="sched-day-stops">';
+
+    tickets.forEach(function(ticket) {
+      var serviceNames = (ticket.services || []).map(function(s) {
+        return typeof s === 'string' ? s : (s.name || s.serviceName || s.proposalName || s.sectionName || 'Service');
+      }).join(', ');
+
+      var skippedDateLabel = '';
+      if (ticket.eventDate) {
+        try {
+          skippedDateLabel = new Date(ticket.eventDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        } catch(e) { skippedDateLabel = ticket.eventDate; }
+      }
+
+      html += '<div class="sched-queue-ticket" onclick="showSchedTicketDetail(\'' + ticket.ticketId + '\')">';
+      html += '<div class="sched-stop-number skipped">!</div>';
+      html += '<div class="sched-stop-info">';
+      html += '<div class="sched-stop-address">' + ((ticket.propertyAddress || 'No Address').split(',')[0]) + '</div>';
+      html += '<div class="sched-stop-services">' + (serviceNames || 'No services') + '</div>';
+      html += '<div class="sched-queue-skipped-date">Skipped from ' + skippedDateLabel + (ticket.notes ? ' — ' + ticket.notes : '') + '</div>';
+      html += '</div>';
+      var manHrs = parseFloat(ticket.totalEstHours) || 0;
+      html += '<div class="sched-stop-hours">' + manHrs.toFixed(2) + ' mh</div>';
+      html += '<span class="sched-stop-status needs-reschedule">needs reschedule</span>';
+      html += '</div>';
+    });
+
+    html += '</div></div>';
+  });
+
+  container.innerHTML = html;
+}
+
+async function rescheduleFromQueue(ticketId) {
+  var newDate = document.getElementById('sched-detail-new-date').value;
+  if (!newDate) { alert('Please select a new date.'); return; }
+
+  // Update main cache
+  var ticket = schedTicketsCache.find(function(t) { return t.ticketId === ticketId; });
+  if (ticket) {
+    ticket.eventDate = newDate;
+    ticket.status = 'rescheduled';
+    ticket.needsReschedule = false;
+  }
+
+  // Remove from queue cache
+  var qIdx = rescheduleQueueCache.findIndex(function(t) { return t.ticketId === ticketId; });
+  if (qIdx !== -1) rescheduleQueueCache.splice(qIdx, 1);
+  updateRescheduleQueueCount();
+
+  try {
+    await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ rescheduleTicket: true, ticketId: ticketId, newDate: newDate })
+    });
+  } catch (err) { console.error('Reschedule from queue failed:', err); }
+
+  var dateLabel = new Date(newDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  showToast('Ticket rescheduled to ' + dateLabel);
 
   closeSchedDetail();
   renderScheduleView();
