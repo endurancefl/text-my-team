@@ -11826,15 +11826,16 @@ async function finalizeEstimate() {
   }
 
   // Validate linked contact has email and billing address
-  if (!currentContact) {
+  const linkedContact = currentContact || (currentEstimate.contactId ? contacts.find(c => c.contactId === currentEstimate.contactId) : null);
+  if (!linkedContact) {
     showToast('Please link a contact before finalizing.', 'error');
     return;
   }
-  if (!currentContact.email || !currentContact.email.trim()) {
+  if (!linkedContact.email || !linkedContact.email.trim()) {
     showToast('Linked contact is missing an email address. Please update the contact first.', 'error');
     return;
   }
-  if (!currentContact.billingAddress || !currentContact.billingAddress.trim()) {
+  if (!linkedContact.billingAddress || !linkedContact.billingAddress.trim()) {
     showToast('Linked contact is missing a billing address. Please update the contact first.', 'error');
     return;
   }
@@ -12218,6 +12219,8 @@ async function generateContractPdf() {
   const pdfBtn = document.getElementById('btn-generate-contract-pdf');
   if (pdfBtn) pdfBtn.classList.add('btn--loading');
 
+  const ct = currentContact || (currentEstimate.contactId ? contacts.find(c => c.contactId === currentEstimate.contactId) : null);
+
   try {
     const tierTotals = calculateTierTotals();
     const totals = calculateBidTotals();
@@ -12275,12 +12278,12 @@ async function generateContractPdf() {
       companyWebsite: 'endurancefl.com',
       companyCity: 'Orlando, FL',
       // Customer
-      customerName: currentContact ? ((currentContact.firstName || '') + ' ' + (currentContact.lastName || '')).trim() : '',
-      customerCompany: currentContact ? (currentContact.company || '') : '',
-      billingAddress: currentContact ? (currentContact.billingAddress || '') : '',
+      customerName: ct ? ((ct.firstName || '') + ' ' + (ct.lastName || '')).trim() : '',
+      customerCompany: ct ? (ct.company || '') : '',
+      billingAddress: ct ? (ct.billingAddress || '') : '',
       propertyAddress: currentEstimate.propertyAddress || '',
-      customerEmail: currentContact ? (currentContact.email || '') : '',
-      customerPhone: currentContact ? (currentContact.phone || '') : '',
+      customerEmail: ct ? (ct.email || '') : '',
+      customerPhone: ct ? (ct.phone || '') : '',
       // Contract
       contractId: currentEstimate.contractId,
       startDate: currentEstimate.contract.startDate || '',
