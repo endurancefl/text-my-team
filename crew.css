@@ -1788,6 +1788,30 @@
     .ba-orientation-hint.hint-mismatch {
       background: rgba(255, 59, 48, 0.85);
     }
+    .ba-landscape-take {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 10001;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 16px 32px;
+      font-size: 18px;
+      font-weight: 600;
+      color: #fff;
+      background: rgba(76, 175, 80, 0.95);
+      border: none;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .ba-landscape-take:active {
+      transform: translate(-50%, -50%) scale(0.95);
+    }
     .ba-no-after {
       text-align: center;
       color: var(--ios-text-secondary);
