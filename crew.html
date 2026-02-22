@@ -807,6 +807,7 @@
           <div class="ba-detail-label">After</div>
           <div id="ba-after-wrap" class="ba-after-wrap">
             <div id="ba-no-after" class="ba-no-after">
+              <div id="ba-orientation-hint" class="ba-orientation-hint" style="display:none;"></div>
               <p>No after photo yet</p>
               <div style="display:flex;gap:10px;margin-top:16px;">
                 <button id="ba-take-after" class="ios-btn ios-btn-primary" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;">
@@ -8682,6 +8683,24 @@
       baAfterNote.value = photo.afterNote || '';
       baUpdateNoteCounter();
 
+      // Detect before photo orientation for hint banner
+      var hintEl = document.getElementById('ba-orientation-hint');
+      var orientImg = new Image();
+      orientImg.onload = function() {
+        var isLandscape = orientImg.naturalWidth > orientImg.naturalHeight;
+        photo.beforeIsLandscape = isLandscape;
+        if (isLandscape) {
+          hintEl.textContent = '\u{1F4F7} Original is landscape \u2014 rotate your phone sideways';
+        } else {
+          hintEl.textContent = '\u{1F4F7} Original is portrait \u2014 hold your phone upright';
+        }
+        hintEl.style.display = 'block';
+      };
+      orientImg.onerror = function() {
+        hintEl.style.display = 'none';
+      };
+      orientImg.src = photo.beforeBase64 || photo.beforeUrl || '';
+
       // Validate after image
       if (photo.afterBase64 && photo.afterBase64.startsWith('data:')) {
         baAfterImg.src = photo.afterBase64;
@@ -8757,40 +8776,61 @@
             }
           }
 
-          var c = document.createElement('canvas');
-          c.width = w;
-          c.height = h;
-          var ctx = c.getContext('2d');
-          ctx.drawImage(img, 0, 0, w, h);
-          var base64 = c.toDataURL('image/jpeg', 0.85);
+          function saveAfterPhoto() {
+            var c = document.createElement('canvas');
+            c.width = w;
+            c.height = h;
+            var ctx = c.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
+            var base64 = c.toDataURL('image/jpeg', 0.85);
 
-          // Generate thumbnail for after photo
-          var thumbSize = 200;
-          var tw = w, th = h;
-          if (tw > thumbSize || th > thumbSize) {
-            if (tw > th) {
-              th = Math.round(th * thumbSize / tw);
-              tw = thumbSize;
-            } else {
-              tw = Math.round(tw * thumbSize / th);
-              th = thumbSize;
+            // Generate thumbnail for after photo
+            var thumbSize = 200;
+            var tw = w, th = h;
+            if (tw > thumbSize || th > thumbSize) {
+              if (tw > th) {
+                th = Math.round(th * thumbSize / tw);
+                tw = thumbSize;
+              } else {
+                tw = Math.round(tw * thumbSize / th);
+                th = thumbSize;
+              }
+            }
+            var thumbCanvas = document.createElement('canvas');
+            thumbCanvas.width = tw;
+            thumbCanvas.height = th;
+            thumbCanvas.getContext('2d').drawImage(img, 0, 0, tw, th);
+            var thumbBase64 = thumbCanvas.toDataURL('image/jpeg', 0.6);
+
+            // Save to the captured photo reference (not current index)
+            photo.afterBase64 = base64;
+            photo.afterThumb = thumbBase64;
+
+            // Only update modal if still viewing same photo
+            if (baState.currentPhotoIndex === photoIndex) {
+              baAfterImg.src = base64;
+              baNoAfter.style.display = 'none';
+              baHasAfter.style.display = 'block';
             }
           }
-          var thumbCanvas = document.createElement('canvas');
-          thumbCanvas.width = tw;
-          thumbCanvas.height = th;
-          thumbCanvas.getContext('2d').drawImage(img, 0, 0, tw, th);
-          var thumbBase64 = thumbCanvas.toDataURL('image/jpeg', 0.6);
 
-          // Save to the captured photo reference (not current index)
-          photo.afterBase64 = base64;
-          photo.afterThumb = thumbBase64;
-
-          // Only update modal if still viewing same photo
-          if (baState.currentPhotoIndex === photoIndex) {
-            baAfterImg.src = base64;
-            baNoAfter.style.display = 'none';
-            baHasAfter.style.display = 'block';
+          // Check orientation mismatch against before photo
+          var afterIsLandscape = w > h;
+          if (photo.beforeIsLandscape !== undefined && afterIsLandscape !== photo.beforeIsLandscape) {
+            var afterOrientation = afterIsLandscape ? 'landscape' : 'portrait';
+            var beforeOrientation = photo.beforeIsLandscape ? 'landscape' : 'portrait';
+            iosConfirm(
+              'This photo is ' + afterOrientation + ' but the original was ' + beforeOrientation + '. The report looks best with matching orientations.',
+              'Use Anyway',
+              function(confirmed) {
+                if (confirmed) {
+                  saveAfterPhoto();
+                }
+                // If not confirmed ("Cancel" = Choose Different), photo is discarded
+              }
+            );
+          } else {
+            saveAfterPhoto();
           }
         };
         img.onerror = function() {

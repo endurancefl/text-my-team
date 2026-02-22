@@ -104,7 +104,7 @@ The platform supports four divisions, each representing a distinct revenue strea
 - **Report Issue** — crew-submitted internal tickets with property search, photo capture
 - **Quick Photos** — batch photo upload to Google Drive organized by property
 - **Site Report Wizard** — multi-step flow: property selection → mode choice → photo capture with categories/notes → thumbnail strip → **service offer attachment** (recommend services with photos and catalog pricing) → PDF generation via AWS Lambda (ReportLab) → auto-upload to Google Drive → customer receives report with embedded approval buttons for offered services
-- **Before & After Reports** — pulls photos from previous site reports, pairs with new "after" photos, generates comparison PDF. **Planned: photo orientation matching** — three-layer approach to handle landscape/portrait mismatches between before and after photos (see PDF Generation section below)
+- **Before & After Reports** — pulls photos from previous site reports, pairs with new "after" photos, generates comparison PDF. **Photo orientation matching (Layers 1 & 2 built)** — orientation hint banner in detail modal shows landscape/portrait guidance based on before photo's `naturalWidth`/`naturalHeight`; mismatch warning dialog via `iosConfirm()` when after photo orientation doesn't match before photo. Layer 3 (ReportLab) unnecessary — existing fill-and-crop scaling handles mixed orientations
 - iOS design system: SF Pro typography, exact system colors, dark mode, frosted glass tab bar with `backdrop-filter`, iOS spring animations, 44px touch targets, `prefers-reduced-motion` support
 - Bottom tab bar: Schedule (home) | Requests | Report Issue | Reports
 
@@ -340,13 +340,13 @@ Both apps live in the same monorepo, share the component library (`packages/ui`)
 - CORS configured at API Gateway level + Lambda response headers for GitHub Pages origins
 - Demo mode: `crew.html` intercepts `execute-api` URLs (and legacy `cloudfunctions.net`) to return mock PDF blobs
 
-**Planned: Before & After photo orientation matching (three layers):**
+**Built: Before & After photo orientation matching (Layers 1 & 2):**
 
-1. **Layer 1 — Camera guidance overlay** (crew.html): When capturing an "after" photo, detect the paired "before" photo's orientation (`naturalWidth` vs `naturalHeight`). Show a banner recommending landscape or portrait to match. Use `screen.orientation.type` API to detect device orientation in real time. Banner turns green when orientation matches, amber when it doesn't. Non-blocking — user can still take the photo regardless. Listen to `screen.orientation` change events for real-time color updates. Semi-transparent backgrounds: `rgba(76, 175, 80, 0.85)` green, `rgba(255, 152, 0, 0.85)` amber. Do not use deprecated `window.orientation`.
+1. **Layer 1 — Orientation hint banner** (crew.html, ✅ built): In `baOpenDetailModal()`, a new `Image()` loads the before photo and reads `naturalWidth`/`naturalHeight`. Stores `photo.beforeIsLandscape` on the photo object. Shows a persistent blue banner (`#ba-orientation-hint`, `.ba-orientation-hint` in crew.css) above the Take Photo / Upload buttons: "📷 Original is landscape — rotate your phone sideways" or "📷 Original is portrait — hold your phone upright".
 
-2. **Layer 2 — Camera roll mismatch warning** (crew.html): When selecting an "after" photo from camera roll, compare its orientation to the paired "before" photo. If mismatched, show confirmation dialog: "This photo is [portrait/landscape] but the original was [landscape/portrait]. The report will look best with matching orientations." Two buttons: "Use Anyway" (proceeds) and "Choose Different Photo" (re-opens file picker). Lightweight nudge, not a hard block.
+2. **Layer 2 — Mismatch warning dialog** (crew.html, ✅ built): In `baProcessAfterPhoto()`, after the after image loads and dimensions are known (`w > h` vs `photo.beforeIsLandscape`), if orientations mismatch, shows `iosConfirm()` dialog: "This photo is [portrait/landscape] but the original was [landscape/portrait]. The report looks best with matching orientations." Buttons: "Use Anyway" (saves the photo) / Cancel (discards the photo). Save logic wrapped in `saveAfterPhoto()` inner function called by both paths.
 
-3. **Layer 3 — ReportLab layout normalization** (cloud-function/main.py): Safety net — PDF must look clean even with mismatched orientations. Fixed bounding boxes with identical dimensions for both cells in a pair. Aspect-fit scaling (preserve ratio, no crop, no stretch). Center image within bounding box with `#F5F5F5` light gray background fill for remaining space. Matched orientations fill boxes almost completely; mismatched orientations show centered images with intentional padding. Uses `fit_image_in_box(image_path, box_width, box_height)` → `(x_offset, y_offset, draw_width, draw_height)`. Draw gray background rectangle first, then image on top at calculated offset.
+3. **Layer 3 — ReportLab layout normalization** (not needed): The PDF renderer already handles mixed orientations with fill-and-crop scaling inside fixed bounding boxes. Client-side guidance is sufficient.
 
 - Production options (future): Puppeteer/Playwright (HTML → PDF), or move into main API as a route
 - The right choice depends on template complexity and whether you want static layouts or dynamic/AI-generated content
@@ -2065,7 +2065,7 @@ Before the full React/PostgreSQL migration, the ticket generation and schedule f
 10. ✅ Actual vs. estimated comparison display in Clock-Out modal
 11. ✅ **Day summary screen**: direct hours, indirect hours, total, direct %, crew members
 12. ✅ Job completion flow (notes, service checklist, partial/complete decision)
-13. ⬜ **Before & After photo orientation matching** — three-layer approach: (a) camera guidance overlay with real-time `screen.orientation` detection, green/amber banner matching before photo orientation, (b) camera roll mismatch warning dialog with "Use Anyway" / "Choose Different Photo", (c) ReportLab layout normalization with aspect-fit scaling, centered images in fixed bounding boxes, `#F5F5F5` gray fill for mismatched pairs
+13. ✅ **Before & After photo orientation matching** — Layer 1: orientation hint banner in detail modal (`#ba-orientation-hint`) detects before photo orientation via `naturalWidth`/`naturalHeight`, shows landscape/portrait guidance. Layer 2: mismatch warning dialog in `baProcessAfterPhoto()` via `iosConfirm()` when after photo orientation doesn't match before. Layer 3 (ReportLab) not needed — existing fill-and-crop handles mixed orientations
 
 ### Phase D: Route Management (estimate.html / management view) — ✅ Built
 1. ✅ **Schedule view** — day/week/month display modes with property stop cards, drag-drop stop reordering (`schedDrop()` + `saveRouteOrder()`), crew filter dropdown. Day view with earned value and margin per stop, week calendar grid with drag-to-reschedule, month calendar with ticket dots. Functions: `loadScheduleView()`, `renderSchedDay()`, `renderSchedWeek()`, `renderSchedMonth()`, `showSchedTicketDetail()`, `rescheduleFromDetail()`, `skipFromDetail()`
