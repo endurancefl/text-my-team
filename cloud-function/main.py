@@ -1,10 +1,8 @@
-import functions_framework
 import io
 import json
 import os
 from collections import OrderedDict
 
-from flask import make_response
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
 from reportlab.lib.utils import ImageReader
@@ -46,10 +44,10 @@ def cors_preflight(origin):
     return ("", 204, cors_headers(origin))
 
 
-def allowed_origin(request):
-    origin = request.headers.get("Origin", "")
-    if origin in ALLOWED_ORIGINS:
-        return origin
+def allowed_origin_from_header(origin_header):
+    """Check if origin is allowed. Returns the origin or the default."""
+    if origin_header in ALLOWED_ORIGINS:
+        return origin_header
     return ALLOWED_ORIGINS[0]
 
 
@@ -318,69 +316,45 @@ class NumberedCanvas(pdf_canvas.Canvas):
         pdf_canvas.Canvas.save(self)
 
 
-# ── Main entry point ────────────────────────────────
+# ── Photo buffer helpers ───────────────────────────
 
-@functions_framework.http
-def generate_site_report(request):
-    origin = allowed_origin(request)
+def parse_photo_buffers(raw_files):
+    """Convert a list of raw file bytes into JPEG BytesIO buffers.
 
-    if request.method == "OPTIONS":
-        return cors_preflight(origin)
+    Args:
+        raw_files: list of bytes objects (raw image data)
 
-    try:
-        metadata = json.loads(request.form["metadata"])
-    except Exception as e:
-        return (
-            json.dumps({"error": f"Bad request: {e}"}),
-            400,
-            cors_headers(origin),
-        )
-
-    # Check if this is a before/after report
-    report_type = metadata.get("type", "standard")
-
-    if report_type == "before_after":
-        return generate_before_after_report(request, metadata, origin)
-    else:
-        return generate_standard_report(request, metadata, origin)
-
-
-def generate_standard_report(request, metadata, origin):
-    """Generate standard site recommendation report with strict layout rules.
-
-    Layout rules (from spec):
-    - Page 1: Header + 2 rows (4 photos)
-    - Subsequent pages: 3 rows (6 photos)
-    - New categories always start on a new page
-    - Consistent photo size and ROW_GAP spacing throughout
-    - Category header only on first page of each section
-    - Note box borders align exactly with photo edges (same X and WIDTH)
+    Returns:
+        list of BytesIO buffers (JPEG, seeked to 0)
     """
-    try:
-        photo_files = request.files.getlist("photos")
-    except Exception as e:
-        return (
-            json.dumps({"error": f"Bad request: {e}"}),
-            400,
-            cors_headers(origin),
-        )
-
-    address = metadata.get("address", "Unknown Property")
-    inspector = metadata.get("inspector", "")
-    report_date = metadata.get("date", "")
-    photo_metas = metadata.get("photos", [])
-
-    # Read all photos into memory buffers
-    photo_buffers = []
-    for pf in photo_files:
-        file_content = pf.stream.read()
-        img = Image.open(io.BytesIO(file_content))
+    buffers = []
+    for file_bytes in raw_files:
+        img = Image.open(io.BytesIO(file_bytes))
         if img.mode in ("RGBA", "P"):
             img = img.convert("RGB")
         buf = io.BytesIO()
         img.save(buf, format="JPEG", quality=85)
         buf.seek(0)
-        photo_buffers.append(buf)
+        buffers.append(buf)
+    return buffers
+
+
+# ── PDF Generation (platform-agnostic) ─────────────
+
+def generate_standard_report(metadata, photo_buffers):
+    """Generate standard site recommendation report.
+
+    Args:
+        metadata: dict with address, inspector, date, photos (list of {category, note})
+        photo_buffers: list of BytesIO buffers (JPEG images, seeked to 0)
+
+    Returns:
+        tuple: (pdf_bytes, filename) where pdf_bytes is the raw PDF content
+    """
+    address = metadata.get("address", "Unknown Property")
+    inspector = metadata.get("inspector", "")
+    report_date = metadata.get("date", "")
+    photo_metas = metadata.get("photos", [])
 
     # Group photos by category (preserve order of first appearance)
     categories = OrderedDict()
@@ -692,63 +666,25 @@ def generate_standard_report(request, metadata, origin):
     c.save()
     buffer.seek(0)
 
-    response = make_response(buffer.getvalue())
-    response.headers["Content-Type"] = "application/pdf"
-    response.headers["Content-Disposition"] = 'attachment; filename="site-report.pdf"'
-    for k, v in cors_headers(origin).items():
-        response.headers[k] = v
-    return response
+    return (buffer.getvalue(), "site-report.pdf")
 
 
-def generate_before_after_report(request, metadata, origin):
-    """Generate before/after comparison report with strict layout rules.
+def generate_before_after_report(metadata, before_buffers, after_buffers):
+    """Generate before/after comparison report.
 
-    Layout rules:
-    - Page 1: Header + 2 photo pairs
-    - Subsequent pages: 3 photo pairs
-    - New sections (categories) always start on a new page
-    - Consistent photo size and FIXED pair_gap throughout
-    - Category header only on first page of each section (not repeated)
-    - Numbered notes: "1. Note: [text]" format, restarting per category
+    Args:
+        metadata: dict with address, inspector, date, originalReport, photos
+        before_buffers: list of BytesIO buffers (before photos)
+        after_buffers: list of BytesIO buffers (after photos)
+
+    Returns:
+        tuple: (pdf_bytes, filename) where pdf_bytes is the raw PDF content
     """
-    try:
-        before_files = request.files.getlist("before_photos")
-        after_files = request.files.getlist("after_photos")
-    except Exception as e:
-        return (
-            json.dumps({"error": f"Bad request: {e}"}),
-            400,
-            cors_headers(origin),
-        )
-
     address = metadata.get("address", "Unknown Property")
     inspector = metadata.get("inspector", "")
     original_report = metadata.get("originalReport", "")
     report_date = metadata.get("date", "")
     photo_metas = metadata.get("photos", [])
-
-    # Read photos into buffers
-    before_buffers = []
-    for pf in before_files:
-        file_content = pf.stream.read()
-        img = Image.open(io.BytesIO(file_content))
-        if img.mode in ("RGBA", "P"):
-            img = img.convert("RGB")
-        buf = io.BytesIO()
-        img.save(buf, format="JPEG", quality=85)
-        buf.seek(0)
-        before_buffers.append(buf)
-
-    after_buffers = []
-    for pf in after_files:
-        file_content = pf.stream.read()
-        img = Image.open(io.BytesIO(file_content))
-        if img.mode in ("RGBA", "P"):
-            img = img.convert("RGB")
-        buf = io.BytesIO()
-        img.save(buf, format="JPEG", quality=85)
-        buf.seek(0)
-        after_buffers.append(buf)
 
     # Group photos by category (preserving order of first appearance)
     categories = OrderedDict()
@@ -1137,13 +1073,10 @@ def generate_before_after_report(request, metadata, origin):
     c.save()
     buffer.seek(0)
 
-    response = make_response(buffer.getvalue())
-    response.headers["Content-Type"] = "application/pdf"
-    response.headers["Content-Disposition"] = 'attachment; filename="before-after-report.pdf"'
-    for k, v in cors_headers(origin).items():
-        response.headers[k] = v
-    return response
+    return (buffer.getvalue(), "before-after-report.pdf")
 
+
+# ── Legacy helpers (unused but kept for reference) ──
 
 def _build_header(address, inspector, report_date, usable_w):
     """Build the page 1 header: logo left, info box right, title below."""

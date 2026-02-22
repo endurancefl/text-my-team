@@ -1,0 +1,56 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: PDF generation for Site Reports and Before & After Reports
+
+Globals:
+  Function:
+    Timeout: 60
+    MemorySize: 512
+    Runtime: python3.11
+
+Resources:
+  PdfGeneratorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: lambda_function.lambda_handler
+      CodeUri: ../
+      Architectures:
+        - x86_64
+      Events:
+        GeneratePdf:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref PdfApi
+            Path: /generate_site_report
+            Method: POST
+        CorsOptions:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref PdfApi
+            Path: /generate_site_report
+            Method: OPTIONS
+
+  PdfApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: prod
+      CorsConfiguration:
+        AllowOrigins:
+          - "https://endurancefl.github.io"
+          - "https://enduranceservices.github.io"
+          - "http://localhost:8000"
+          - "http://127.0.0.1:8000"
+        AllowMethods:
+          - POST
+          - OPTIONS
+        AllowHeaders:
+          - Content-Type
+        MaxAge: 3600
+
+Outputs:
+  ApiUrl:
+    Description: API Gateway endpoint URL for PDF generation
+    Value: !Sub "https://${PdfApi}.execute-api.${AWS::Region}.amazonaws.com/prod/generate_site_report"
+  FunctionArn:
+    Description: Lambda function ARN
+    Value: !GetAtt PdfGeneratorFunction.Arn

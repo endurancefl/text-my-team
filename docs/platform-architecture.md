@@ -91,7 +91,7 @@ The platform supports four divisions, each representing a distinct revenue strea
   - **Timer target vibration**: when a ticket's elapsed time crosses the estimated target, fires `haptic('warning')` once and turns the timer text red. Tracked in `timerTargetFired` map (ticketId → boolean). Implemented in `updateTicketCountdown()`.
   - **Pull-to-refresh visual indicator**: spinner pill (`#pull-refresh-indicator`) appears during pull-down gesture at scroll top. Rotation tracks pull progress, transitions to spinning animation on release past threshold (80px), auto-hides after 1.2s. Triggers `loadSchedule()` or `loadRequests()` depending on active tab. CSS: `.pull-refresh-indicator`, `.pulling`, `.refreshing`.
   - **Swipe-back gesture on push overlays**: `enableSwipeBack()` attaches touch listeners to full-screen push overlays. Tracks horizontal swipe starting from left 30px edge, translates overlay in real-time, dismisses on 100px+ swipe. Applied to: check-in overlay, clock-out overlay, all `.ios-screen` push views. Cancels if vertical movement exceeds horizontal.
-  - **Demo mode** (`?demo=true` URL parameter): enables full-day testing without backend. Monkey-patches `fetch` to intercept all Google Apps Script calls and Cloud Function calls, returning mock data. Provides 5 crew members (Jake Miller/1111, Carlos Rivera/2222, Sam Thompson/3333, Dani Brooks/4444, Tyler Nguyen/5555), 5 tickets across 4 properties with 2-3 services each, with per-service `estimatedHours` matching `totalEstHours` totals. Two demo services have `durationType: 'fixed'` (Irrigation Check, Fertilizer Application) for testing fixed-duration behavior. Demo requests include 4 entries (3 open, 1 completed) across demo properties — including one at Oak Ridge Dr to trigger the open request row when that stop card is expanded, one with a photo indicator, and one internal request. **Demo properties**: 8 properties across 3 crews for Site Report and Before & After property search. **Demo reports**: prior site reports with 2-5 placeholder photos each (colored PNG images with notes and categories) for Oak Ridge Dr, Magnolia Blvd, and Mallard Circle — enables full Before & After workflow testing including report selection, photo loading, and comparison. **Demo PDF generation**: Cloud Function calls intercepted and return a minimal valid PDF blob, allowing full site report and before-after wizard flows to complete. Auto-skips login, shows dashboard immediately. All write operations (saveTimeEntry, updateTimeEntry, deleteTimeEntry, completeJob, updateTicketStatus, reopenTicketService, saveSiteReport, inspectionPhoto) return mock success with `DEMO-*` entry IDs. Split operations logged with `[DEMO] saveTimeEntry` and `[DEMO] closeEntry` details. All intercepted calls logged to console with `[DEMO]` prefix.
+  - **Demo mode** (`?demo=true` URL parameter): enables full-day testing without backend. Monkey-patches `fetch` to intercept all Google Apps Script calls and Cloud Function calls, returning mock data. Provides 5 crew members (Jake Miller/1111, Carlos Rivera/2222, Sam Thompson/3333, Dani Brooks/4444, Tyler Nguyen/5555), 5 tickets across 4 properties with 2-3 services each, with per-service `estimatedHours` matching `totalEstHours` totals. Two demo services have `durationType: 'fixed'` (Irrigation Check, Fertilizer Application) for testing fixed-duration behavior. Demo requests include 4 entries (3 open, 1 completed) across demo properties — including one at Oak Ridge Dr to trigger the open request row when that stop card is expanded, one with a photo indicator, and one internal request. **Demo properties**: 8 properties across 3 crews for Site Report and Before & After property search. **Demo reports**: prior site reports with 2-5 placeholder photos each (colored PNG images with notes and categories) for Oak Ridge Dr, Magnolia Blvd, and Mallard Circle — enables full Before & After workflow testing including report selection, photo loading, and comparison. **Demo PDF generation**: Lambda/Cloud Function calls intercepted (checks for `execute-api` and `cloudfunctions.net` in URL) and return a minimal valid PDF blob, allowing full site report and before-after wizard flows to complete. Auto-skips login, shows dashboard immediately. All write operations (saveTimeEntry, updateTimeEntry, deleteTimeEntry, completeJob, updateTicketStatus, reopenTicketService, saveSiteReport, inspectionPhoto) return mock success with `DEMO-*` entry IDs. Split operations logged with `[DEMO] saveTimeEntry` and `[DEMO] closeEntry` details. All intercepted calls logged to console with `[DEMO]` prefix.
   - **Cancel started ticket**: "Cancel Ticket" button in active ticket expanded view, only visible before any services are completed. Deletes the job time entry and any active service time entries from backend via `deleteTimeEntry`. Stops timer, resets ticket status to `scheduled`, dismisses reassignment overlay if open. Auto-starts travel if no other non-Shop tickets are active. Function: `cancelStartedTicket()`.
   - **Undo completed service** (15-second toast): after marking a service done, a toast slides up from bottom with "[Service] marked done" text and "Undo" button. Blue progress bar counts down 15 seconds then auto-dismisses. Undo reopens the service clock (clears `endTime`), removes service from `completedServices`, clears clock-out on backend via `updateTimeEntry` with empty `clockOut`, and dismisses the reassignment wizard if open. Only one undo active at a time — new completion replaces previous. State: `undoServiceData`, `undoToastTimer`. Functions: `showUndoServiceToast()`, `dismissUndoToast()`, `undoCompleteService()`. CSS: `.undo-toast` with `@keyframes undoCountdown`.
   - **Reopen completed service** (post-undo window): after the 15-second undo window expires, tapping a completed service row prompts "Reopen {name}? A new time entry will be created." via `iosConfirm()`. On confirm, opens member assignment overlay (title: "Reopen Service: {name}", button: "Reopen Service"), then creates a NEW time entry with `reopened: true` flag. Original entry stays closed — enables crew leader training reports on reopens. Progress resumes from prior man-hours (`manHoursConsumed` carries over). Notes auto-populated: "Reopened — originally completed at {time}". **Completed-ticket edge case**: if ALL services were completed and the ticket is fully closed, tapping a completed service reverts ticket status to `partial` via `reopenTicketService` endpoint, reactivates the ticket via `startTicket()`, then auto-triggers reopen flow. Backend `reopenTicketService()` endpoint removes service from `Completed Services` JSON column and optionally reverts ticket status. Time Entries sheet auto-upgrades with `Reopened` column. **Undo guard**: while undo toast is visible (first 15s), completed service rows are NOT tappable — undo is the primary action. State: `pendingReopenContext`, `pendingReopenService`. Functions: `promptReopenService()`, `reopenService()`, `confirmReopenService()`. CSS: `.service-row[onclick]` tap feedback. Translation keys: `reopenService`, `reopenConfirm`, `reopened`, `reopenedNote` (en + es). Demo mode: `reopenTicketService` logged to console, `saveTimeEntry` log includes `(REOPENED)` label when `body.reopened` is truthy.
@@ -103,8 +103,8 @@ The platform supports four divisions, each representing a distinct revenue strea
 - Spanish translation support in request messages
 - **Report Issue** — crew-submitted internal tickets with property search, photo capture
 - **Quick Photos** — batch photo upload to Google Drive organized by property
-- **Site Report Wizard** — multi-step flow: property selection → mode choice → photo capture with categories/notes → thumbnail strip → **service offer attachment** (recommend services with photos and catalog pricing) → PDF generation via Cloud Function (ReportLab) → auto-upload to Google Drive → customer receives report with embedded approval buttons for offered services
-- **Before & After Reports** — pulls photos from previous site reports, pairs with new "after" photos, generates comparison PDF
+- **Site Report Wizard** — multi-step flow: property selection → mode choice → photo capture with categories/notes → thumbnail strip → **service offer attachment** (recommend services with photos and catalog pricing) → PDF generation via AWS Lambda (ReportLab) → auto-upload to Google Drive → customer receives report with embedded approval buttons for offered services
+- **Before & After Reports** — pulls photos from previous site reports, pairs with new "after" photos, generates comparison PDF. **Planned: photo orientation matching** — three-layer approach to handle landscape/portrait mismatches between before and after photos (see PDF Generation section below)
 - iOS design system: SF Pro typography, exact system colors, dark mode, frosted glass tab bar with `backdrop-filter`, iOS spring animations, 44px touch targets, `prefers-reduced-motion` support
 - Bottom tab bar: Schedule (home) | Requests | Report Issue | Reports
 
@@ -139,7 +139,7 @@ The platform supports four divisions, each representing a distinct revenue strea
 
 ### Backend & Infrastructure
 - **Backend** — Single consolidated Google Apps Script (Code.gs) serving both Estimating and Crew endpoints from one "Estimating" spreadsheet
-- **PDF Generation** — Google Cloud Function (Python/ReportLab)
+- **PDF Generation** — AWS Lambda + API Gateway (Python/ReportLab)
 - **Hosting** — GitHub Pages (endurancefl.github.io)
 - **Auth** — Crew leaders: phone number against Crew Members sheet (Role = "Leader"). Customers: 4-digit PIN against Properties sheet.
 - **Data storage** — Google Sheets as database, Google Drive for files (estimates JSON, photos, site reports), localStorage for auto-save
@@ -323,10 +323,32 @@ Both apps live in the same monorepo, share the component library (`packages/ui`)
 - Pick based on your cloud provider choice
 
 ### PDF Generation
-**TBD — checking with dev on current method**
-- Current prototype uses Google Cloud Function (Python/ReportLab) — works well
-- Production options: ReportLab in a Cloud Function, Puppeteer/Playwright (HTML → PDF), or an LLM-assisted approach for dynamic document generation
-- Could also move PDF generation into the main API as a route
+**Current: AWS Lambda + API Gateway (Python/ReportLab) — `cloud-function/main.py` + `cloud-function/lambda_function.py`**
+- Endpoint: `https://ibjyxrp542.execute-api.us-east-1.amazonaws.com/prod/generate_site_report` (replace YOUR_API_ID after deployment)
+- **Architecture**: API Gateway HTTP API receives multipart/form-data → Lambda parses event → `main.py` generates PDF → base64-encoded response
+- `main.py` is a platform-agnostic PDF library — no Flask or framework dependencies. Entry points (`lambda_function.py`) handle HTTP parsing
+- `lambda_function.py` — Lambda handler: parses multipart boundary from API Gateway event, extracts metadata JSON + photo blobs, calls `generate_standard_report()` or `generate_before_after_report()`, returns base64-encoded PDF
+- Lambda config: Python 3.11, 512MB memory, 60s timeout
+- **Deployment**: AWS SAM template in `cloud-function/deploy/template.yaml`, one-command deploy via `cloud-function/deploy/deploy.sh` (`sam build && sam deploy`)
+- Handles both Site Report and Before & After report types (distinguished by `metadata.type` field)
+- **Site Report layout**: 2-column, 3-row grid per page (page 1 has 2 rows for header). Photos grouped by category with category headers, notes below each photo, page numbering, logo on page 1
+- **Before & After layout**: Side-by-side comparison — BEFORE (red banner) left, AFTER (green banner) right. 2 pairs on page 1 (header), 3 pairs per page after. New page per category
+- Request format: `multipart/form-data` with JSON `metadata` field + photo blobs (`photos`, `before_photos`, `after_photos`)
+- Photos composited client-side (annotations burned onto canvas) before upload. Site Report: max 1600px, 85% JPEG quality. Before & After: max 1000px, 75% quality
+- PDF returned as binary blob (base64 via API Gateway) → auto-downloaded to device → uploaded to Google Drive via Apps Script (`siteReportPdf: true`)
+- Individual photos and report JSON also uploaded to Drive for future reference (Before & After pulls prior photos from these)
+- CORS configured at API Gateway level + Lambda response headers for GitHub Pages origins
+- Demo mode: `crew.html` intercepts `execute-api` URLs (and legacy `cloudfunctions.net`) to return mock PDF blobs
+
+**Planned: Before & After photo orientation matching (three layers):**
+
+1. **Layer 1 — Camera guidance overlay** (crew.html): When capturing an "after" photo, detect the paired "before" photo's orientation (`naturalWidth` vs `naturalHeight`). Show a banner recommending landscape or portrait to match. Use `screen.orientation.type` API to detect device orientation in real time. Banner turns green when orientation matches, amber when it doesn't. Non-blocking — user can still take the photo regardless. Listen to `screen.orientation` change events for real-time color updates. Semi-transparent backgrounds: `rgba(76, 175, 80, 0.85)` green, `rgba(255, 152, 0, 0.85)` amber. Do not use deprecated `window.orientation`.
+
+2. **Layer 2 — Camera roll mismatch warning** (crew.html): When selecting an "after" photo from camera roll, compare its orientation to the paired "before" photo. If mismatched, show confirmation dialog: "This photo is [portrait/landscape] but the original was [landscape/portrait]. The report will look best with matching orientations." Two buttons: "Use Anyway" (proceeds) and "Choose Different Photo" (re-opens file picker). Lightweight nudge, not a hard block.
+
+3. **Layer 3 — ReportLab layout normalization** (cloud-function/main.py): Safety net — PDF must look clean even with mismatched orientations. Fixed bounding boxes with identical dimensions for both cells in a pair. Aspect-fit scaling (preserve ratio, no crop, no stretch). Center image within bounding box with `#F5F5F5` light gray background fill for remaining space. Matched orientations fill boxes almost completely; mismatched orientations show centered images with intentional padding. Uses `fit_image_in_box(image_path, box_width, box_height)` → `(x_offset, y_offset, draw_width, draw_height)`. Draw gray background rectangle first, then image on top at calculated offset.
+
+- Production options (future): Puppeteer/Playwright (HTML → PDF), or move into main API as a route
 - The right choice depends on template complexity and whether you want static layouts or dynamic/AI-generated content
 
 ### Hosting (Frontend)
@@ -1782,6 +1804,221 @@ Service offers can be priced three ways:
 
 ---
 
+## Weekly Property Report Generator (AI-Powered)
+
+Automated end-of-week customer-facing property reports, generated by Claude and reviewed by an account manager before sending.
+
+### Architecture
+
+```
+Friday 2pm (scheduled job)
+    │
+    ▼
+Query all activity per property this week
+(site visits, photos, notes, categories, before/after reports)
+    │
+    ▼
+Call Claude API with structured data + system prompt
+    │
+    ▼
+Claude generates draft report
+    │
+    ▼
+Draft saved to app with status: "pending_review"
+    │
+    ▼
+Account manager gets notification
+(push notification / email / in-app alert)
+    │
+    ▼
+Account manager opens review screen
+    ├── Edit text directly (inline editing)
+    ├── Approve & Send
+    ├── Reject with note (re-generates with feedback)
+    └── Skip (no report this week)
+    │
+    ▼
+Approved report sent to customer
+(email with PDF attachment or inline HTML)
+```
+
+### System Prompt
+
+```
+You are a professional report writer for a property maintenance and inspection company. Your job is to write clear, friendly, end-of-week summary reports that get sent directly to property owners and customers.
+
+AUDIENCE:
+- Property owners, landlords, property managers, and commercial clients
+- They are NOT contractors or tradespeople — avoid technical jargon
+- They want to know: what happened, what was found, what's been fixed, and what's next
+- They are busy — keep it scannable and concise
+
+TONE:
+- Professional but warm — like a trusted project manager giving a weekly update
+- Confident and reassuring — the customer should feel their property is in good hands
+- Direct — lead with the most important information
+- Use plain language — say "fixed" not "remediated", say "roof" not "roofing substrate"
+
+REPORT STRUCTURE:
+
+1. **Opening line** — One sentence summarizing the week. Reference the property by street name, not full address. Example: "Here's your weekly update for the Elm Street property."
+
+2. **Work completed** — What was done this week. Lead with finished items. If before/after photos exist, reference them naturally: "The gutter replacement is now complete — you'll find the before and after photos attached." Group related work together rather than listing visit-by-visit.
+
+3. **New findings** — Anything new the inspectors flagged. Describe what was found in plain terms, why it matters, and what the recommended next step is. Don't alarm the customer — frame new findings as proactive, not urgent, unless the inspector's notes indicate urgency.
+
+4. **Coming up next** — What's planned or recommended for the following week. If nothing specific is planned, say something like "We'll continue monitoring and will update you if anything needs attention."
+
+5. **Closing** — One friendly line. Keep it simple: "As always, feel free to reach out if you have any questions."
+
+FORMATTING RULES:
+- Use short paragraphs, 2-3 sentences each
+- No bullet points or numbered lists — write in natural prose
+- Bold section headers: **Work Completed**, **New Findings**, **Looking Ahead**
+- Keep the total report between 150-300 words — this is a summary, not a detailed log
+- Never include inspector names, internal reference numbers, or timestamps
+- Never include the full street address — use just the street name for privacy
+- If no activity happened in a category, don't mention that category
+
+DATA HANDLING:
+- You will receive structured JSON with this week's activity
+- Photos are referenced by filename — mention them as "attached photos" or "the photos included below", the system will handle actual attachment
+- If a visit has no notes, skip it rather than saying "no notes were recorded"
+- If the only activity was a routine check with no findings, keep the report very short — 2-3 sentences total is fine
+- If before/after pairs exist, always highlight them — customers love seeing visible progress
+- Category names from the inspection system (e.g., "exterior", "roofing", "plumbing") should be written naturally in the report, not as labels
+
+THINGS TO NEVER DO:
+- Never invent or assume work that isn't in the data
+- Never make promises about timelines unless the data explicitly includes a scheduled date
+- Never mention pricing, costs, or quotes
+- Never reference other properties or other customers
+- Never use phrases like "as per our records" or "please be advised" — these sound robotic
+- Never start with "Dear" or "To whom it may concern" — start with the summary line directly
+```
+
+### API Call Structure
+
+```python
+import anthropic
+
+def generate_weekly_report(property_data: dict) -> str:
+    """
+    property_data should include:
+    {
+        "property_name": "123 Elm Street",
+        "customer_name": "Jane Smith",
+        "week_ending": "2026-02-20",
+        "visits": [
+            {
+                "date": "2026-02-16",
+                "type": "site_report",
+                "categories": ["roofing", "exterior"],
+                "photos": [
+                    {
+                        "filename": "photo_0.jpg",
+                        "category": "roofing",
+                        "notes": "Missing shingles on north-facing slope, approx 3ft x 2ft area"
+                    }
+                ]
+            }
+        ],
+        "before_after_reports": [
+            {
+                "date": "2026-02-18",
+                "category": "exterior",
+                "description": "Gutter replacement - east side",
+                "before_notes": "Rusted through, pulling away from fascia",
+                "after_notes": "New aluminum gutters installed, sealed and secured"
+            }
+        ],
+        "previous_week_open_items": [
+            "Gutter replacement scheduled for east side"
+        ]
+    }
+    """
+
+    client = anthropic.Anthropic()
+
+    message = client.messages.create(
+        model="claude-sonnet-4-5-20250514",
+        max_tokens=1024,
+        system=SYSTEM_PROMPT,  # The system prompt defined above
+        messages=[
+            {
+                "role": "user",
+                "content": f"""Generate the weekly property report for the week ending {property_data['week_ending']}.
+
+Customer: {property_data['customer_name']}
+Property: {property_data['property_name']}
+
+Activity data:
+{json.dumps(property_data, indent=2)}"""
+            }
+        ]
+    )
+
+    return message.content[0].text
+```
+
+### Human Review Screen
+
+**Report Queue:**
+- List of all generated reports for the week, grouped by status: **Pending Review**, **Approved**, **Sent**, **Skipped**
+- Show property name, customer name, and a preview of the opening line
+- Badge count on "Pending Review" so they can see at a glance how many need attention
+
+**Review View:**
+- Full report text displayed in an editable text area
+- The raw activity data shown in a collapsible sidebar so the reviewer can cross-reference what Claude wrote against what actually happened
+- Attached photos displayed as thumbnails below the report
+
+**Actions:**
+- **Approve & Send** — locks the report and queues it for delivery
+- **Edit** — inline text editing with a save button, then approve
+- **Regenerate** — text field for feedback (e.g., "Emphasize the urgency of the roof issue"), sends the original data + feedback back to Claude for a new draft
+- **Skip** — no report sent this week, with an optional reason field
+
+**Regenerate prompt pattern** — append reviewer feedback as a follow-up message:
+
+```python
+messages=[
+    {
+        "role": "user",
+        "content": f"Generate the weekly property report...\n{json.dumps(property_data)}"
+    },
+    {
+        "role": "assistant",
+        "content": first_draft_text
+    },
+    {
+        "role": "user",
+        "content": f"Please revise this report with the following feedback from the account manager: {reviewer_feedback}"
+    }
+]
+```
+
+### Delivery
+
+Once approved, the report can be delivered as:
+- **Email** — HTML formatted body with photos embedded or attached
+- **PDF** — Generated via the existing ReportLab Lambda function, styled as a branded customer report
+- **Both** — PDF attached to the email, with a plain text summary in the email body
+
+The customer-facing email should come from the account manager's name/email so it feels personal, not automated.
+
+### Edge Cases
+
+| Scenario | Handling |
+|----------|----------|
+| No activity this week | Generate a very short "no activity" report: "No visits were scheduled for Elm Street this week. Everything remains on track and we'll be back on-site next week." Reviewer can skip if preferred. |
+| Only one brief visit with no findings | Short 2-3 sentence report. Don't pad it. |
+| Urgent issue flagged by inspector | Claude should detect urgency language in notes ("immediate", "safety concern", "damage spreading") and adjust tone accordingly. Reviewer should pay extra attention to these. |
+| Multiple properties for same customer | Generate separate reports per property. The reviewer can choose to combine them manually if desired. |
+| Photos but no notes | Reference the photos but don't describe what's in them — say "photos from this week's visit are attached below" and let the images speak for themselves. |
+
+---
+
 ## Prototype Implementation Order (Current Stack)
 
 Before the full React/PostgreSQL migration, the ticket generation and schedule features can be built into the existing prototype to validate the workflow. This is the fastest path to crew-usable scheduling.
@@ -1828,6 +2065,7 @@ Before the full React/PostgreSQL migration, the ticket generation and schedule f
 10. ✅ Actual vs. estimated comparison display in Clock-Out modal
 11. ✅ **Day summary screen**: direct hours, indirect hours, total, direct %, crew members
 12. ✅ Job completion flow (notes, service checklist, partial/complete decision)
+13. ⬜ **Before & After photo orientation matching** — three-layer approach: (a) camera guidance overlay with real-time `screen.orientation` detection, green/amber banner matching before photo orientation, (b) camera roll mismatch warning dialog with "Use Anyway" / "Choose Different Photo", (c) ReportLab layout normalization with aspect-fit scaling, centered images in fixed bounding boxes, `#F5F5F5` gray fill for mismatched pairs
 
 ### Phase D: Route Management (estimate.html / management view) — ✅ Built
 1. ✅ **Schedule view** — day/week/month display modes with property stop cards, drag-drop stop reordering (`schedDrop()` + `saveRouteOrder()`), crew filter dropdown. Day view with earned value and margin per stop, week calendar grid with drag-to-reschedule, month calendar with ticket dots. Functions: `loadScheduleView()`, `renderSchedDay()`, `renderSchedWeek()`, `renderSchedMonth()`, `showSchedTicketDetail()`, `rescheduleFromDetail()`, `skipFromDetail()`
