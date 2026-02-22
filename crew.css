@@ -1771,7 +1771,6 @@
       position: relative;
     }
     .ba-orientation-hint {
-      background: var(--ios-blue, #007AFF);
       color: #fff;
       font-size: 14px;
       font-weight: 500;
@@ -1780,6 +1779,14 @@
       margin-bottom: 12px;
       text-align: center;
       line-height: 1.4;
+      transition: background-color 0.3s ease;
+      background: rgba(255, 59, 48, 0.85);
+    }
+    .ba-orientation-hint.hint-match {
+      background: rgba(76, 175, 80, 0.85);
+    }
+    .ba-orientation-hint.hint-mismatch {
+      background: rgba(255, 59, 48, 0.85);
     }
     .ba-no-after {
       text-align: center;

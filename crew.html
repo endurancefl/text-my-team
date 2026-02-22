@@ -8683,18 +8683,50 @@
       baAfterNote.value = photo.afterNote || '';
       baUpdateNoteCounter();
 
-      // Detect before photo orientation for hint banner
+      // Detect before photo orientation and set up real-time hint banner
       var hintEl = document.getElementById('ba-orientation-hint');
+      // Clean up any prior orientation listener
+      if (baState._orientationHandler) {
+        try { screen.orientation.removeEventListener('change', baState._orientationHandler); } catch(e) {}
+        baState._orientationHandler = null;
+      }
       var orientImg = new Image();
       orientImg.onload = function() {
         var isLandscape = orientImg.naturalWidth > orientImg.naturalHeight;
         photo.beforeIsLandscape = isLandscape;
-        if (isLandscape) {
-          hintEl.textContent = '\u{1F4F7} Original is landscape \u2014 rotate your phone sideways';
-        } else {
-          hintEl.textContent = '\u{1F4F7} Original is portrait \u2014 hold your phone upright';
+
+        function updateOrientationHint() {
+          var deviceIsLandscape = false;
+          try {
+            var orientType = screen.orientation.type || '';
+            deviceIsLandscape = orientType.indexOf('landscape') !== -1;
+          } catch(e) {
+            // screen.orientation not supported — fall back to window size
+            deviceIsLandscape = window.innerWidth > window.innerHeight;
+          }
+          var matches = deviceIsLandscape === isLandscape;
+          hintEl.classList.toggle('hint-match', matches);
+          hintEl.classList.toggle('hint-mismatch', !matches);
+          if (matches) {
+            hintEl.textContent = '\u2705 Orientation matches \u2014 ready to shoot';
+          } else if (isLandscape) {
+            hintEl.textContent = '\u{1F4F7} Original is landscape \u2014 rotate your phone sideways';
+          } else {
+            hintEl.textContent = '\u{1F4F7} Original is portrait \u2014 hold your phone upright';
+          }
+          hintEl.style.display = 'block';
         }
-        hintEl.style.display = 'block';
+
+        updateOrientationHint();
+        // Listen for real-time orientation changes
+        try {
+          baState._orientationHandler = updateOrientationHint;
+          screen.orientation.addEventListener('change', updateOrientationHint);
+        } catch(e) {
+          // Fallback: listen to resize for desktop/older browsers
+          baState._orientationHandler = updateOrientationHint;
+          window.addEventListener('resize', updateOrientationHint);
+        }
       };
       orientImg.onerror = function() {
         hintEl.style.display = 'none';
@@ -8719,6 +8751,12 @@
       var photo = baState.beforePhotos[baState.currentPhotoIndex];
       if (photo) {
         photo.afterNote = baAfterNote.value;
+      }
+      // Clean up orientation listener
+      if (baState._orientationHandler) {
+        try { screen.orientation.removeEventListener('change', baState._orientationHandler); } catch(e) {}
+        try { window.removeEventListener('resize', baState._orientationHandler); } catch(e) {}
+        baState._orientationHandler = null;
       }
       baDetailModal.classList.remove('active');
       baRenderPhotoGrid();
