@@ -10795,6 +10795,7 @@ function showView(viewId) {
   // Render Property Setup tables when builder view is shown
   if (viewId === 'builder') {
     renderPropertySetupTables();
+    updateHeaderActions();
   }
 
   // Load schedule view when shown
@@ -11032,6 +11033,13 @@ async function openSavedEstimate(bidId) {
         isTemplateMode = false;
         currentTemplateId = null;
 
+        // If finalized or revision, restore contract link and status BEFORE rendering
+        if (bid.status === 'Finalized' || bid.status === 'Revision') {
+          currentEstimate.status = bid.status;
+          currentEstimate.contractId = bid.contractId || '';
+          currentEstimate.revisionCount = parseInt(bid.revisionCount) || 0;
+        }
+
         // Re-render everything
         renderPropertySetupTables();
         renderTableBody();
@@ -11045,13 +11053,6 @@ async function openSavedEstimate(bidId) {
 
         estimateDirty = false;
         debugLog('Loaded saved estimate from Drive:', bid.propertyAddress);
-
-        // If finalized or revision, restore contract link and status
-        if (bid.status === 'Finalized' || bid.status === 'Revision') {
-          currentEstimate.status = bid.status;
-          currentEstimate.contractId = bid.contractId || '';
-          currentEstimate.revisionCount = parseInt(bid.revisionCount) || 0;
-        }
         return;
       }
     } catch (err) {
@@ -11071,6 +11072,13 @@ async function openSavedEstimate(bidId) {
       isTemplateMode = false;
       currentTemplateId = null;
 
+      // If finalized or revision, restore contract link and status BEFORE rendering
+      if (bid.status === 'Finalized' || bid.status === 'Revision') {
+        currentEstimate.status = bid.status;
+        currentEstimate.contractId = bid.contractId || '';
+        currentEstimate.revisionCount = parseInt(bid.revisionCount) || 0;
+      }
+
       renderPropertySetupTables();
       renderTableBody();
       calculateBidTotals();
@@ -11082,13 +11090,6 @@ async function openSavedEstimate(bidId) {
 
       estimateDirty = false;
       debugLog('Loaded saved estimate from inline JSON:', bid.propertyAddress);
-
-      // If finalized or revision, restore contract link and status
-      if (bid.status === 'Finalized' || bid.status === 'Revision') {
-        currentEstimate.status = bid.status;
-        currentEstimate.contractId = bid.contractId || '';
-        currentEstimate.revisionCount = parseInt(bid.revisionCount) || 0;
-      }
       return;
     } catch (err) {
       console.error('Error loading saved estimate:', err);
