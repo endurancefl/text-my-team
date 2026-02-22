@@ -8685,9 +8685,13 @@
 
       // Detect before photo orientation and set up real-time hint banner
       var hintEl = document.getElementById('ba-orientation-hint');
-      // Clean up any prior orientation listener
+      // Clean up any prior orientation listeners
       if (baState._orientationHandler) {
-        try { screen.orientation.removeEventListener('change', baState._orientationHandler); } catch(e) {}
+        window.removeEventListener('resize', baState._orientationHandler);
+        if (baState._orientationChangeHandler) {
+          window.removeEventListener('orientationchange', baState._orientationChangeHandler);
+          baState._orientationChangeHandler = null;
+        }
         baState._orientationHandler = null;
       }
       var orientImg = new Image();
@@ -8696,14 +8700,8 @@
         photo.beforeIsLandscape = isLandscape;
 
         function updateOrientationHint() {
-          var deviceIsLandscape = false;
-          try {
-            var orientType = screen.orientation.type || '';
-            deviceIsLandscape = orientType.indexOf('landscape') !== -1;
-          } catch(e) {
-            // screen.orientation not supported — fall back to window size
-            deviceIsLandscape = window.innerWidth > window.innerHeight;
-          }
+          // Use window dimensions — works reliably on all platforms including iOS
+          var deviceIsLandscape = window.innerWidth > window.innerHeight;
           var matches = deviceIsLandscape === isLandscape;
           hintEl.classList.toggle('hint-match', matches);
           hintEl.classList.toggle('hint-mismatch', !matches);
@@ -8718,15 +8716,15 @@
         }
 
         updateOrientationHint();
-        // Listen for real-time orientation changes
-        try {
-          baState._orientationHandler = updateOrientationHint;
-          screen.orientation.addEventListener('change', updateOrientationHint);
-        } catch(e) {
-          // Fallback: listen to resize for desktop/older browsers
-          baState._orientationHandler = updateOrientationHint;
-          window.addEventListener('resize', updateOrientationHint);
+        // Listen for real-time orientation changes on all platforms
+        function delayedOrientationHint() {
+          // orientationchange fires before dimensions update — delay the check
+          setTimeout(updateOrientationHint, 150);
         }
+        baState._orientationHandler = updateOrientationHint;
+        baState._orientationChangeHandler = delayedOrientationHint;
+        window.addEventListener('resize', updateOrientationHint);
+        window.addEventListener('orientationchange', delayedOrientationHint);
       };
       orientImg.onerror = function() {
         hintEl.style.display = 'none';
@@ -8752,10 +8750,13 @@
       if (photo) {
         photo.afterNote = baAfterNote.value;
       }
-      // Clean up orientation listener
+      // Clean up orientation listeners
       if (baState._orientationHandler) {
-        try { screen.orientation.removeEventListener('change', baState._orientationHandler); } catch(e) {}
-        try { window.removeEventListener('resize', baState._orientationHandler); } catch(e) {}
+        window.removeEventListener('resize', baState._orientationHandler);
+        if (baState._orientationChangeHandler) {
+          window.removeEventListener('orientationchange', baState._orientationChangeHandler);
+          baState._orientationChangeHandler = null;
+        }
         baState._orientationHandler = null;
       }
       baDetailModal.classList.remove('active');
