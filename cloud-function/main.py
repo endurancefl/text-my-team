@@ -1076,6 +1076,998 @@ def generate_before_after_report(metadata, before_buffers, after_buffers):
     return (buffer.getvalue(), "before-after-report.pdf")
 
 
+# ── Contract PDF Generation ──────────────────────────
+
+# Color palette for contracts
+CONTRACT_GREEN = HexColor("#3A5F4B")
+CONTRACT_DARK = HexColor("#1A2E24")
+CONTRACT_GRAY = HexColor("#666666")
+CONTRACT_LIGHT_GRAY = HexColor("#F5F5F5")
+CONTRACT_RED = HexColor("#C62828")
+CONTRACT_BORDER = HexColor("#CCCCCC")
+
+# Default service descriptions for residential contracts
+RESIDENTIAL_SERVICE_DESCRIPTIONS = {
+    "Weekly Grounds Maintenance": [
+        ("Weekly Maintenance", [
+            "Scheduled service will occur on the same day each week, weather permitting. In the event of inclement weather, service will be rescheduled to the next available day within the same work week."
+        ]),
+        ("Trash and Debris Removal", [
+            "Light trash and debris pickup will be performed during each visit, including removal of litter, fallen branches (under 3 inches in diameter), and other small debris from maintained areas."
+        ]),
+        ("Mowing", [
+            "Turf areas will be mowed at the appropriate height for the grass type, typically maintaining a height of 3.5–4 inches for St. Augustine and 1–2 inches for Bermuda and Zoysia.",
+            "Mowing patterns will be rotated regularly to prevent ruts and promote even growth."
+        ]),
+        ("Edging", [
+            "All hard edges along sidewalks, driveways, curbs, and planting beds will be mechanically edged to maintain clean, defined lines."
+        ]),
+        ("String Trimming", [
+            "Areas inaccessible to mowers, including around fences, trees, signs, light poles, and other obstacles, will be string-trimmed to match the height of surrounding turf."
+        ]),
+        ("Blowing", [
+            "All walkways, driveways, patios, porches, and other hard surfaces will be cleared of grass clippings and debris after each service."
+        ]),
+        ("Weeding", [
+            "Routine weed control will be performed in landscape beds, tree rings, and hardscape joints during each visit. This includes hand-pulling and spot treatment of visible weeds."
+        ]),
+        ("Pruning and Hedge Trimming", [
+            "Shrubs, hedges, and ornamental plants under 10 feet in height will be trimmed and shaped as needed to maintain a clean, manicured appearance.",
+            "Trees and palms over 10 feet require a separate estimate for trimming services."
+        ]),
+        ("Irrigation", [
+            "A total of 12 irrigation inspections will be performed per year (approximately once per month). Each inspection includes a full system check, head adjustments, and minor repairs.",
+            "Repairs under $100 in parts/labor are authorized and will be completed during the inspection visit. Repairs exceeding $100 require written approval before work begins."
+        ]),
+    ],
+}
+
+# Terms & Conditions clauses (shared between residential and commercial)
+def _get_terms_clauses(metadata):
+    """Return the 12 standard contract clauses with template variables filled in."""
+    duration = metadata.get("duration", 12)
+    start = metadata.get("startDate", "___")
+    end = metadata.get("endDate", "___")
+    terms = metadata.get("paymentTerms", "Net 30")
+    increase = metadata.get("priceIncrease", 0)
+
+    return [
+        ("Term", f"This agreement shall be for a period of {duration} months, commencing on {start} and ending on {end}, unless terminated earlier in accordance with the terms herein."),
+        ("Regular Monthly Maintenance Billing", "Client will be invoiced monthly for all fixed-payment maintenance services outlined in this agreement. Payment is due in accordance with the invoice terms specified below."),
+        ("Enhancement Work Billing", "Any additional work requested by the Client beyond the scope of this agreement (enhancements, additions, or one-time projects) will be quoted separately and billed upon completion."),
+        ("Invoice Terms", f"{terms} on all invoices. Late payments may be subject to a finance charge of 1.5% per month on the outstanding balance."),
+        ("Sales Tax", "Applicable sales tax will be added to all invoices as required by Florida state and local regulations."),
+        ("Background Check", "All Endurance Services team members undergo thorough background checks prior to employment. We are committed to providing trustworthy and reliable personnel on your property."),
+        ("Uniform", "All crew members will wear company-branded uniforms and identification while on your property. This ensures easy identification and maintains a professional appearance."),
+        ("Insurance", "Endurance Services maintains comprehensive Workers' Compensation and General Liability insurance coverage. Certificates of insurance are available upon request."),
+        ("Termination", "Either party may terminate this agreement with 30 days' written notice. Upon termination, the Client is responsible for payment of all services rendered through the termination date."),
+        ("Contract Renewal", "This agreement will automatically renew for successive terms of equal duration unless either party provides written notice of non-renewal at least 60 days prior to the end of the current term."),
+        ("Price Increase", f"Upon renewal, pricing may be adjusted by the greater of {increase}% or the annual change in the Consumer Price Index for All Urban Consumers (CPI-U). The Client will be notified of any price adjustment at least 60 days before the renewal date."),
+        ("Named Tropical Event Policy", "In the event of a named tropical storm or hurricane, Endurance Services will provide emergency cleanup and restoration services on a time-and-materials basis at a rate of $65.00 per man-hour, plus materials and equipment costs. Pre-authorization is not required for emergency response within 72 hours of the event."),
+    ]
+
+
+def generate_contract_pdf(metadata, service_map_buffer=None):
+    """Generate a contract PDF — residential (3 pages) or commercial (5-6 pages).
+
+    Args:
+        metadata: dict with contract details, services, customer info, etc.
+        service_map_buffer: optional BytesIO buffer of service map image (commercial only)
+
+    Returns:
+        tuple: (pdf_bytes, filename)
+    """
+    prop_type = metadata.get("propertyType", "residential").lower()
+    if prop_type == "commercial":
+        return _generate_commercial_contract(metadata, service_map_buffer)
+    else:
+        return _generate_residential_contract(metadata)
+
+
+def _generate_residential_contract(metadata):
+    """Generate a 3-page residential contract PDF."""
+    buffer = io.BytesIO()
+    page_w, page_h = letter  # 612 x 792
+
+    LEFT = 40
+    RIGHT = page_w - 40  # 572
+    WIDTH = RIGHT - LEFT  # 532
+    TOP = page_h - 40  # 752
+    BOTTOM = 50
+
+    company = metadata.get("companyName", "Endurance Services")
+    phone = metadata.get("companyPhone", "(407) 579-4403")
+    website = metadata.get("companyWebsite", "endurancefl.com")
+    city = metadata.get("companyCity", "Orlando, FL")
+    footer_text = f"{phone}  |  {website}  |  {city}"
+
+    customer = metadata.get("customerName", "")
+    customer_company = metadata.get("customerCompany", "")
+    billing_addr = metadata.get("billingAddress", "")
+    prop_addr = metadata.get("propertyAddress", "")
+    contract_id = metadata.get("contractId", "")
+    generated_date = metadata.get("generatedDate", "")
+    monthly = metadata.get("monthlyPayment", 0)
+    services = metadata.get("services", [])
+    contract_value = metadata.get("contractValue", 0)
+
+    c = pdf_canvas.Canvas(buffer, pagesize=letter)
+    page_count = 3
+    page_num = [1]  # mutable for closure
+
+    def draw_footer():
+        c.setFont("Helvetica", 8)
+        c.setFillColor(CONTRACT_GRAY)
+        c.drawString(LEFT, 24, footer_text)
+        c.drawRightString(RIGHT, 24, f"Page {page_num[0]} of {page_count}")
+
+    # ── PAGE 1: Quote Page ──────────────────────────
+    y = TOP
+
+    # Bold company header
+    c.setFont("Helvetica-Bold", 18)
+    c.setFillColor(CONTRACT_DARK)
+    c.drawString(LEFT, y - 4, company)
+
+    # Gray info box (top-right)
+    box_w = 170
+    box_h = 72
+    box_x = RIGHT - box_w
+    box_y = y - box_h + 8
+    c.setFillColor(HexColor("#F0F0F0"))
+    c.rect(box_x, box_y, box_w, box_h, fill=True, stroke=False)
+    c.setStrokeColor(CONTRACT_BORDER)
+    c.setLineWidth(0.5)
+    c.rect(box_x, box_y, box_w, box_h, fill=False, stroke=True)
+
+    info_y = box_y + box_h - 14
+    c.setFont("Helvetica-Bold", 8)
+    c.setFillColor(CONTRACT_DARK)
+    c.drawString(box_x + 8, info_y, "Contract #:")
+    c.setFont("Helvetica", 9)
+    c.drawString(box_x + 80, info_y, _escape(contract_id))
+    info_y -= 14
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(box_x + 8, info_y, "Date:")
+    c.setFont("Helvetica", 9)
+    c.drawString(box_x + 80, info_y, _escape(generated_date))
+    info_y -= 14
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(box_x + 8, info_y, "Monthly:")
+    c.setFont("Helvetica-Bold", 11)
+    c.setFillColor(CONTRACT_GREEN)
+    c.drawString(box_x + 80, info_y, f"${monthly:,.2f}")
+    info_y -= 14
+    c.setFont("Helvetica-Bold", 8)
+    c.setFillColor(CONTRACT_DARK)
+    c.drawString(box_x + 8, info_y, "Annual:")
+    c.setFont("Helvetica", 9)
+    c.drawString(box_x + 80, info_y, f"${contract_value:,.2f}")
+
+    # Recipient section
+    y -= 90
+    c.setFont("Helvetica-Bold", 9)
+    c.setFillColor(CONTRACT_GRAY)
+    c.drawString(LEFT, y, "RECIPIENT")
+    y -= 14
+    c.setFont("Helvetica", 10)
+    c.setFillColor(CONTRACT_DARK)
+    if customer:
+        c.drawString(LEFT, y, _escape(customer))
+        y -= 14
+    if customer_company:
+        c.drawString(LEFT, y, _escape(customer_company))
+        y -= 14
+    if billing_addr:
+        # Split address if long
+        addr_parts = billing_addr.split(",")
+        for part in addr_parts:
+            c.drawString(LEFT, y, _escape(part.strip()))
+            y -= 14
+
+    # Property address
+    y -= 6
+    c.setFont("Helvetica-Bold", 9)
+    c.setFillColor(CONTRACT_GRAY)
+    c.drawString(LEFT, y, "SERVICE LOCATION")
+    y -= 14
+    c.setFont("Helvetica", 10)
+    c.setFillColor(CONTRACT_DARK)
+    if prop_addr:
+        addr_parts = prop_addr.split(",")
+        for part in addr_parts:
+            c.drawString(LEFT, y, _escape(part.strip()))
+            y -= 14
+
+    # Horizontal rule
+    y -= 8
+    c.setStrokeColor(CONTRACT_BORDER)
+    c.setLineWidth(0.5)
+    c.line(LEFT, y, RIGHT, y)
+    y -= 16
+
+    # Services table header
+    col_widths = [WIDTH * 0.35, WIDTH * 0.30, WIDTH * 0.10, WIDTH * 0.12, WIDTH * 0.13]
+    headers_labels = ["Product/Service", "Description", "Qty", "Unit Price", "Total"]
+
+    c.setFillColor(CONTRACT_GREEN)
+    c.rect(LEFT, y - 16, WIDTH, 18, fill=True, stroke=False)
+    c.setFillColor(white)
+    c.setFont("Helvetica-Bold", 8)
+    x_pos = LEFT + 4
+    for i, hdr in enumerate(headers_labels):
+        if i >= 3:  # right-align numbers
+            c.drawRightString(x_pos + col_widths[i] - 4, y - 12, hdr)
+        else:
+            c.drawString(x_pos, y - 12, hdr)
+        x_pos += col_widths[i]
+    y -= 20
+
+    # Service rows
+    c.setFont("Helvetica", 9)
+    c.setFillColor(CONTRACT_DARK)
+    annual_total = 0
+    for svc in services:
+        if y < BOTTOM + 60:
+            break  # Safety — shouldn't happen for residential
+        name = svc.get("name", "")
+        desc = svc.get("description", "")[:40]
+        freq = svc.get("frequency", "")
+        annual = svc.get("annualTotal", 0)
+        cost_per = svc.get("costPerOccurrence", 0)
+        annual_total += annual
+
+        # Alternate row background
+        if services.index(svc) % 2 == 1:
+            c.setFillColor(CONTRACT_LIGHT_GRAY)
+            c.rect(LEFT, y - 14, WIDTH, 16, fill=True, stroke=False)
+            c.setFillColor(CONTRACT_DARK)
+
+        x_pos = LEFT + 4
+        c.setFont("Helvetica", 8)
+        c.drawString(x_pos, y - 10, _escape(name)[:35])
+        x_pos += col_widths[0]
+        c.drawString(x_pos, y - 10, _escape(desc)[:30])
+        x_pos += col_widths[1]
+        c.drawString(x_pos, y - 10, str(freq))
+        x_pos += col_widths[2]
+        c.drawRightString(x_pos + col_widths[3] - 4, y - 10, f"${cost_per:,.2f}")
+        x_pos += col_widths[3]
+        c.drawRightString(x_pos + col_widths[4] - 4, y - 10, f"${annual:,.2f}")
+        y -= 16
+
+    # Total row
+    y -= 4
+    c.setStrokeColor(CONTRACT_DARK)
+    c.setLineWidth(1)
+    c.line(LEFT, y, RIGHT, y)
+    y -= 16
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(LEFT + 4, y, "Total Annual Value")
+    c.drawRightString(RIGHT - 4, y, f"${annual_total:,.2f}")
+
+    # Valid for 30 days note
+    y -= 30
+    c.setFont("Helvetica-Oblique", 8)
+    c.setFillColor(CONTRACT_GRAY)
+    c.drawString(LEFT, y, "This quote is valid for the next 30 days from the date shown above.")
+
+    draw_footer()
+    c.showPage()
+    page_num[0] += 1
+
+    # ── PAGE 2: Description of Services ────────────
+    y = TOP
+
+    # Get primary service name
+    primary_svc = services[0].get("name", "Landscape Maintenance") if services else "Landscape Maintenance"
+    c.setFont("Helvetica-Bold", 16)
+    c.setFillColor(CONTRACT_DARK)
+    c.drawString(LEFT, y - 4, _escape(primary_svc))
+    y -= 20
+    c.setFont("Helvetica", 10)
+    c.setFillColor(CONTRACT_GRAY)
+    c.drawString(LEFT, y, "Description of Services")
+    y -= 8
+    c.setStrokeColor(CONTRACT_BORDER)
+    c.setLineWidth(0.5)
+    c.line(LEFT, y, RIGHT, y)
+    y -= 20
+
+    # Get descriptions — use defaults if not provided
+    desc_items = RESIDENTIAL_SERVICE_DESCRIPTIONS.get(primary_svc, [])
+    if not desc_items:
+        # Build from service data
+        for svc in services:
+            svc_name = svc.get("name", "")
+            svc_desc = svc.get("description", "Service included as specified.")
+            desc_items.append((svc_name, [svc_desc]))
+
+    for idx, (heading, sub_items) in enumerate(desc_items):
+        # Bold numbered heading
+        c.setFont("Helvetica-Bold", 10)
+        c.setFillColor(CONTRACT_DARK)
+        line = f"{idx + 1}. {heading}"
+        c.drawString(LEFT + 8, y, line)
+        y -= 16
+
+        # Sub-items with letter prefix
+        for si, text in enumerate(sub_items):
+            letter = chr(ord('a') + si)
+            c.setFont("Helvetica", 9)
+            c.setFillColor(CONTRACT_DARK)
+
+            # Word-wrap long text
+            prefix = f"    {letter}. "
+            max_chars = 80
+            full_text = prefix + text
+            lines = []
+            while len(full_text) > max_chars:
+                # Find last space before limit
+                break_at = full_text.rfind(' ', 0, max_chars)
+                if break_at <= len(prefix):
+                    break_at = max_chars
+                lines.append(full_text[:break_at])
+                full_text = "       " + full_text[break_at:].lstrip()
+            lines.append(full_text)
+
+            # Highlight irrigation repair clause
+            is_highlight = "irrigation" in heading.lower() and "$100" in text.lower()
+
+            for line in lines:
+                if y < BOTTOM + 30:
+                    draw_footer()
+                    c.showPage()
+                    page_num[0] += 1
+                    page_count += 1  # Dynamic page count adjustment
+                    y = TOP
+
+                if is_highlight:
+                    c.setFillColor(HexColor("#FFF3E0"))
+                    c.rect(LEFT, y - 4, WIDTH, 14, fill=True, stroke=False)
+                    c.setFillColor(CONTRACT_DARK)
+
+                c.drawString(LEFT + 16, y, line)
+                y -= 13
+
+        y -= 6  # Gap between sections
+
+    draw_footer()
+    c.showPage()
+    page_num[0] += 1
+
+    # ── PAGE 3: Terms & Conditions + Signatures ────
+    y = TOP
+
+    c.setFont("Helvetica-Bold", 16)
+    c.setFillColor(CONTRACT_DARK)
+    c.drawString(LEFT, y - 4, "Terms and Conditions")
+    y -= 22
+
+    effective = metadata.get("effectiveDate", metadata.get("startDate", ""))
+    c.setFont("Helvetica", 10)
+    c.setFillColor(CONTRACT_DARK)
+    c.drawString(LEFT, y, f"Effective Date: {_escape(effective)}")
+    y -= 8
+    c.setStrokeColor(CONTRACT_BORDER)
+    c.setLineWidth(0.5)
+    c.line(LEFT, y, RIGHT, y)
+    y -= 16
+
+    clauses = _get_terms_clauses(metadata)
+    for idx, (title, text) in enumerate(clauses):
+        # Check page space
+        if y < BOTTOM + 50:
+            draw_footer()
+            c.showPage()
+            page_num[0] += 1
+            page_count += 1
+            y = TOP
+
+        # Numbered bold title
+        c.setFont("Helvetica-Bold", 9)
+        c.setFillColor(CONTRACT_DARK)
+        c.drawString(LEFT + 4, y, f"{idx + 1}. {title}")
+        y -= 13
+
+        # Highlight specific clauses (price increase and tropical event)
+        is_red = idx >= 10  # clauses 11 and 12
+
+        c.setFont("Helvetica", 8)
+        if is_red:
+            c.setFillColor(CONTRACT_RED)
+        else:
+            c.setFillColor(CONTRACT_DARK)
+
+        # Word-wrap clause text
+        max_chars = 90
+        remaining = text
+        indent = LEFT + 16
+        while remaining:
+            if len(remaining) <= max_chars:
+                c.drawString(indent, y, remaining)
+                y -= 11
+                remaining = ""
+            else:
+                break_at = remaining.rfind(' ', 0, max_chars)
+                if break_at <= 0:
+                    break_at = max_chars
+                c.drawString(indent, y, remaining[:break_at])
+                y -= 11
+                remaining = remaining[break_at:].lstrip()
+
+                if y < BOTTOM + 50:
+                    draw_footer()
+                    c.showPage()
+                    page_num[0] += 1
+                    page_count += 1
+                    y = TOP
+                    if is_red:
+                        c.setFont("Helvetica", 8)
+                        c.setFillColor(CONTRACT_RED)
+
+        y -= 4  # Gap between clauses
+
+    # ── Signature Section ──
+    y -= 10
+    if y < BOTTOM + 120:
+        draw_footer()
+        c.showPage()
+        page_num[0] += 1
+        page_count += 1
+        y = TOP
+
+    c.setFont("Helvetica-Bold", 14)
+    c.setFillColor(CONTRACT_DARK)
+    c.drawString(LEFT, y, "Signature Section")
+    y -= 8
+    c.setStrokeColor(CONTRACT_BORDER)
+    c.line(LEFT, y, RIGHT, y)
+    y -= 40
+
+    # Two-column signatures
+    mid = LEFT + WIDTH / 2
+    sig_line_w = WIDTH / 2 - 20
+
+    # Left column — Company
+    c.setStrokeColor(CONTRACT_DARK)
+    c.setLineWidth(0.5)
+    c.line(LEFT, y, LEFT + sig_line_w, y)
+    y_left = y - 14
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(LEFT, y_left, "Jack McMahon")
+    y_left -= 14
+    c.setFont("Helvetica", 9)
+    c.drawString(LEFT, y_left, company)
+    y_left -= 14
+    c.drawString(LEFT, y_left, f"Date: {_escape(generated_date)}")
+
+    # Right column — Customer
+    c.line(mid + 10, y, mid + 10 + sig_line_w, y)
+    y_right = y - 14
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(mid + 10, y_right, _escape(customer) if customer else "________________")
+    y_right -= 14
+    c.setFont("Helvetica", 9)
+    c.drawString(mid + 10, y_right, _escape(prop_addr)[:40] if prop_addr else "")
+    y_right -= 14
+    c.drawString(mid + 10, y_right, f"Date: {_escape(generated_date)}")
+
+    draw_footer()
+    c.save()
+    buffer.seek(0)
+
+    contract_id_clean = contract_id.replace(" ", "-") if contract_id else "contract"
+    return (buffer.getvalue(), f"{contract_id_clean}-contract.pdf")
+
+
+def _generate_commercial_contract(metadata, service_map_buffer=None):
+    """Generate a 5-6 page commercial contract PDF."""
+    buffer = io.BytesIO()
+    page_w, page_h = letter  # 612 x 792
+
+    LEFT = 40
+    RIGHT = page_w - 40  # 572
+    WIDTH = RIGHT - LEFT  # 532
+    TOP = page_h - 40  # 752
+    BOTTOM = 50
+
+    company = metadata.get("companyName", "Endurance Services")
+    phone = metadata.get("companyPhone", "(407) 579-4403")
+    website = metadata.get("companyWebsite", "endurancefl.com")
+    city = metadata.get("companyCity", "Orlando, FL")
+    footer_text = f"{phone}  |  {website}  |  {city}"
+
+    customer = metadata.get("customerName", "")
+    customer_company = metadata.get("customerCompany", "")
+    billing_addr = metadata.get("billingAddress", "")
+    prop_addr = metadata.get("propertyAddress", "")
+    contract_id = metadata.get("contractId", "")
+    generated_date = metadata.get("generatedDate", "")
+    start_date = metadata.get("startDate", "")
+    end_date = metadata.get("endDate", "")
+    duration = metadata.get("duration", 12)
+    services = metadata.get("services", [])
+    payment_schedule = metadata.get("paymentSchedule", [])
+    contract_value = metadata.get("contractValue", 0)
+    monthly = metadata.get("monthlyPayment", 0)
+
+    # Parse dates for title
+    try:
+        from datetime import datetime
+        sd = datetime.strptime(start_date, "%Y-%m-%d")
+        ed = datetime.strptime(end_date, "%Y-%m-%d")
+        start_month = sd.strftime("%B")
+        start_year = sd.strftime("%Y")
+        end_month = ed.strftime("%B")
+        end_year = ed.strftime("%Y")
+        fy_year = sd.strftime("%Y")
+    except Exception:
+        start_month = start_year = end_month = end_year = fy_year = ""
+
+    # Split services by billing tier
+    fixed_services = [s for s in services if s.get("billingTier", "fixed") == "fixed"]
+    billed_services = [s for s in services if s.get("billingTier") == "billed"]
+    recommended_services = [s for s in services if s.get("billingTier") == "recommended"]
+
+    fixed_total = sum(s.get("annualTotal", 0) for s in fixed_services)
+    billed_total = sum(s.get("annualTotal", 0) for s in billed_services)
+    recommended_total = sum(s.get("annualTotal", 0) for s in recommended_services)
+
+    c = pdf_canvas.Canvas(buffer, pagesize=letter)
+    page_num = [1]
+    total_pages = [0]  # Will be filled after we know how many pages
+
+    def draw_footer():
+        c.setFont("Helvetica", 8)
+        c.setFillColor(CONTRACT_GRAY)
+        c.drawString(LEFT, 24, footer_text)
+        c.drawRightString(RIGHT, 24, f"Page {page_num[0]}")
+
+    def draw_gray_header_bar(y_pos, text):
+        """Draw a full-width gray header bar with white text. Returns y below bar."""
+        c.setFillColor(CONTRACT_GRAY)
+        c.rect(LEFT, y_pos - 18, WIDTH, 20, fill=True, stroke=False)
+        c.setFillColor(white)
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(LEFT + 8, y_pos - 14, text)
+        return y_pos - 26
+
+    def new_page():
+        draw_footer()
+        c.showPage()
+        page_num[0] += 1
+        return TOP
+
+    # ── PAGE 1: Cover Page ─────────────────────────
+    y = TOP
+
+    # Logo
+    logo_path = os.path.join(os.path.dirname(__file__), "assets", "logo.png")
+    if os.path.exists(logo_path):
+        try:
+            c.drawImage(logo_path, LEFT, y - 42, width=180, height=42, preserveAspectRatio=True)
+        except Exception:
+            pass
+
+    # Gray info box (top-right)
+    box_w = 200
+    box_h = 120
+    box_x = RIGHT - box_w
+    box_y = y - box_h + 8
+
+    c.setFillColor(HexColor("#F0F0F0"))
+    c.rect(box_x, box_y, box_w, box_h, fill=True, stroke=False)
+    c.setStrokeColor(CONTRACT_BORDER)
+    c.setLineWidth(0.5)
+    c.rect(box_x, box_y, box_w, box_h, fill=False, stroke=True)
+
+    info_y = box_y + box_h - 14
+    info_items = [
+        ("Date:", generated_date),
+        ("Proposal #:", contract_id),
+        ("Property:", prop_addr[:35] if prop_addr else ""),
+        ("", prop_addr[35:70] if len(prop_addr) > 35 else ""),
+        ("Billing Contact:", customer),
+        ("Company:", customer_company),
+        ("Billing Address:", billing_addr[:35] if billing_addr else ""),
+    ]
+
+    for label, val in info_items:
+        if not label and not val:
+            continue
+        c.setFont("Helvetica-Bold", 7)
+        c.setFillColor(CONTRACT_DARK)
+        if label:
+            c.drawString(box_x + 6, info_y, label)
+        c.setFont("Helvetica", 8)
+        if label:
+            c.drawString(box_x + 85, info_y, _escape(val))
+        else:
+            c.drawString(box_x + 85, info_y, _escape(val))
+        info_y -= 13
+
+    # Title bar
+    y -= 140
+    prop_name = prop_addr.split(",")[0] if prop_addr else "Property"
+    title = f"FY{fy_year} Landscape Maintenance Agreement"
+    subtitle = f"{_escape(prop_name)} ({start_month} {start_year} - {end_month} {end_year})"
+
+    c.setFont("Helvetica-Bold", 14)
+    c.setFillColor(CONTRACT_DARK)
+    c.drawString(LEFT, y, title)
+    y -= 18
+    c.setFont("Helvetica", 11)
+    c.setFillColor(CONTRACT_GRAY)
+    c.drawString(LEFT, y, subtitle)
+    y -= 16
+    c.setStrokeColor(CONTRACT_GREEN)
+    c.setLineWidth(2)
+    c.line(LEFT, y, RIGHT, y)
+    y -= 20
+
+    # Service map image (optional)
+    if service_map_buffer:
+        try:
+            service_map_buffer.seek(0)
+            map_w = WIDTH
+            map_h = min(y - BOTTOM - 40, 340)
+            c.drawImage(
+                ImageReader(service_map_buffer), LEFT, y - map_h,
+                width=map_w, height=map_h,
+                preserveAspectRatio=True, anchor='c'
+            )
+            c.setStrokeColor(CONTRACT_BORDER)
+            c.setLineWidth(0.5)
+            c.rect(LEFT, y - map_h, map_w, map_h, fill=False, stroke=True)
+        except Exception:
+            pass
+
+    draw_footer()
+    c.showPage()
+    page_num[0] += 1
+
+    # ── PAGE 2: Services Tables ────────────────────
+    y = TOP
+
+    def draw_services_table(y_pos, svc_list, show_initials=False):
+        """Draw a services table. Returns y position after table."""
+        # Column headers
+        if show_initials:
+            cols = [WIDTH * 0.06, WIDTH * 0.34, WIDTH * 0.18, WIDTH * 0.20, WIDTH * 0.22]
+            col_headers = ["Initial", "Service", "Frequency", "Cost/Occ.", "Annual Cost"]
+        else:
+            cols = [WIDTH * 0.40, WIDTH * 0.18, WIDTH * 0.20, WIDTH * 0.22]
+            col_headers = ["Service", "Frequency", "Cost/Occ.", "Annual Cost"]
+
+        c.setFillColor(HexColor("#E8E8E8"))
+        c.rect(LEFT, y_pos - 14, WIDTH, 16, fill=True, stroke=False)
+        c.setFont("Helvetica-Bold", 7)
+        c.setFillColor(CONTRACT_DARK)
+        x = LEFT + 4
+        for i, h in enumerate(col_headers):
+            if i >= len(col_headers) - 2:
+                c.drawRightString(x + cols[i] - 4, y_pos - 10, h)
+            else:
+                c.drawString(x, y_pos - 10, h)
+            x += cols[i]
+        y_pos -= 18
+
+        # Group by category
+        current_cat = None
+        total = 0
+
+        for svc in svc_list:
+            if y_pos < BOTTOM + 40:
+                y_pos = new_page()
+
+            cat = svc.get("category", "")
+            if cat and cat != current_cat:
+                current_cat = cat
+                # Category sub-header
+                c.setFont("Helvetica-Bold", 8)
+                c.setFillColor(CONTRACT_GREEN)
+                c.drawString(LEFT + 4, y_pos - 10, _escape(cat))
+                y_pos -= 16
+
+            name = svc.get("name", "")
+            freq = svc.get("frequency", "")
+            cost_per = svc.get("costPerOccurrence", 0)
+            annual = svc.get("annualTotal", 0)
+            total += annual
+
+            c.setFont("Helvetica", 8)
+            c.setFillColor(CONTRACT_DARK)
+            x = LEFT + 4
+            if show_initials:
+                # Draw initial box
+                c.setStrokeColor(CONTRACT_BORDER)
+                c.rect(x + 2, y_pos - 12, 12, 12, fill=False, stroke=True)
+                x += cols[0]
+
+            start_col = 1 if show_initials else 0
+            c.drawString(x, y_pos - 10, _escape(name)[:40])
+            x += cols[start_col]
+            c.drawString(x, y_pos - 10, str(freq))
+            x += cols[start_col + 1]
+            c.drawRightString(x + cols[start_col + 2] - 4, y_pos - 10, f"${cost_per:,.2f}")
+            x += cols[start_col + 2]
+            c.drawRightString(x + cols[start_col + 3] - 4, y_pos - 10, f"${annual:,.2f}")
+            y_pos -= 14
+
+        # Total row
+        y_pos -= 4
+        c.setStrokeColor(CONTRACT_DARK)
+        c.setLineWidth(0.5)
+        c.line(LEFT, y_pos, RIGHT, y_pos)
+        y_pos -= 14
+        c.setFont("Helvetica-Bold", 9)
+        c.drawRightString(RIGHT - 4, y_pos, f"${total:,.2f}")
+        y_pos -= 10
+
+        return y_pos
+
+    # Fixed Payment Services
+    if fixed_services:
+        y = draw_gray_header_bar(y, "Fixed Payment Services")
+        y = draw_services_table(y, fixed_services)
+        y -= 10
+
+    # Services Billed Separately
+    if billed_services:
+        if y < BOTTOM + 100:
+            y = new_page()
+        y = draw_gray_header_bar(y, "Services Billed Separately Once Completed")
+        y = draw_services_table(y, billed_services)
+        y -= 10
+
+    # Recommended Services
+    if recommended_services:
+        if y < BOTTOM + 100:
+            y = new_page()
+        y = draw_gray_header_bar(y, "Recommended Services")
+        c.setFont("Helvetica-Oblique", 8)
+        c.setFillColor(CONTRACT_GRAY)
+        c.drawString(LEFT + 4, y, "Initial next to optional service(s) you would like added to your contract")
+        y -= 14
+        y = draw_services_table(y, recommended_services, show_initials=True)
+
+    draw_footer()
+    c.showPage()
+    page_num[0] += 1
+
+    # ── PAGE 3: Payment Schedule ───────────────────
+    y = TOP
+    y = draw_gray_header_bar(y, "Payment Schedule (Fixed Payment Services Only)")
+    y -= 6
+
+    # Table headers
+    sched_cols = [WIDTH * 0.40, WIDTH * 0.30, WIDTH * 0.30]
+    c.setFillColor(HexColor("#E8E8E8"))
+    c.rect(LEFT, y - 14, WIDTH, 16, fill=True, stroke=False)
+    c.setFont("Helvetica-Bold", 9)
+    c.setFillColor(CONTRACT_DARK)
+    c.drawString(LEFT + 8, y - 10, "Schedule")
+    c.drawRightString(LEFT + sched_cols[0] + sched_cols[1] - 4, y - 10, "Price")
+    c.drawRightString(RIGHT - 4, y - 10, "Total Price")
+    y -= 20
+
+    running_total = 0
+    for i, pay in enumerate(payment_schedule):
+        month_name = pay.get("month", "")
+        amount = pay.get("amount", 0)
+        running_total += amount
+
+        if i % 2 == 1:
+            c.setFillColor(CONTRACT_LIGHT_GRAY)
+            c.rect(LEFT, y - 12, WIDTH, 16, fill=True, stroke=False)
+
+        c.setFont("Helvetica", 9)
+        c.setFillColor(CONTRACT_DARK)
+        c.drawString(LEFT + 8, y - 8, month_name)
+        c.drawRightString(LEFT + sched_cols[0] + sched_cols[1] - 4, y - 8, f"${amount:,.2f}")
+        c.drawRightString(RIGHT - 4, y - 8, f"${running_total:,.2f}")
+        y -= 16
+
+    # Bold total
+    y -= 4
+    c.setStrokeColor(CONTRACT_DARK)
+    c.setLineWidth(1)
+    c.line(LEFT, y, RIGHT, y)
+    y -= 16
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(LEFT + 8, y, "Total")
+    c.drawRightString(RIGHT - 4, y, f"${running_total:,.2f}")
+
+    draw_footer()
+    c.showPage()
+    page_num[0] += 1
+
+    # ── PAGE 4+: Description of Services ───────────
+    y = TOP
+    y = draw_gray_header_bar(y, "Description of Services")
+    y -= 6
+
+    tier_groups = [
+        ("Fixed Payment Services", fixed_services),
+        ("Services Billed Separately", billed_services),
+        ("Recommended Services", recommended_services),
+    ]
+
+    for tier_label, tier_svcs in tier_groups:
+        if not tier_svcs:
+            continue
+
+        if y < BOTTOM + 80:
+            y = new_page()
+            y = draw_gray_header_bar(y, "Description of Services (continued)")
+            y -= 6
+
+        # Tier sub-header
+        c.setFont("Helvetica-Bold", 10)
+        c.setFillColor(CONTRACT_GREEN)
+        c.drawString(LEFT, y, tier_label)
+        y -= 6
+        c.setStrokeColor(CONTRACT_GREEN)
+        c.setLineWidth(0.5)
+        c.line(LEFT, y, RIGHT, y)
+        y -= 14
+
+        for svc in tier_svcs:
+            name = svc.get("name", "")
+            desc = svc.get("description", "Service included as specified in the agreement.")
+
+            if y < BOTTOM + 60:
+                y = new_page()
+                y = draw_gray_header_bar(y, "Description of Services (continued)")
+                y -= 6
+
+            # Service name (bold, underlined)
+            c.setFont("Helvetica-Bold", 9)
+            c.setFillColor(CONTRACT_DARK)
+            c.drawString(LEFT + 8, y, _escape(name))
+            name_w = c.stringWidth(_escape(name), "Helvetica-Bold", 9)
+            c.setStrokeColor(CONTRACT_DARK)
+            c.setLineWidth(0.3)
+            c.line(LEFT + 8, y - 2, LEFT + 8 + name_w, y - 2)
+            y -= 14
+
+            # Description paragraph (word-wrapped)
+            c.setFont("Helvetica", 8)
+            c.setFillColor(CONTRACT_DARK)
+            max_chars = 85
+            remaining = desc
+            while remaining:
+                if y < BOTTOM + 30:
+                    y = new_page()
+                    y = draw_gray_header_bar(y, "Description of Services (continued)")
+                    y -= 6
+
+                if len(remaining) <= max_chars:
+                    c.drawString(LEFT + 16, y, _escape(remaining))
+                    y -= 11
+                    remaining = ""
+                else:
+                    break_at = remaining.rfind(' ', 0, max_chars)
+                    if break_at <= 0:
+                        break_at = max_chars
+                    c.drawString(LEFT + 16, y, _escape(remaining[:break_at]))
+                    y -= 11
+                    remaining = remaining[break_at:].lstrip()
+
+            y -= 8  # Gap between services
+
+    draw_footer()
+    c.showPage()
+    page_num[0] += 1
+
+    # ── Terms & Conditions Page ────────────────────
+    y = TOP
+    y = draw_gray_header_bar(y, "Terms and Conditions")
+    y -= 6
+
+    effective = metadata.get("effectiveDate", start_date)
+    c.setFont("Helvetica", 9)
+    c.setFillColor(CONTRACT_DARK)
+    c.drawString(LEFT, y, f"Effective Date: {_escape(effective)}")
+    y -= 6
+    c.setStrokeColor(CONTRACT_BORDER)
+    c.line(LEFT, y, RIGHT, y)
+    y -= 14
+
+    clauses = _get_terms_clauses(metadata)
+    for idx, (title, text) in enumerate(clauses):
+        if y < BOTTOM + 50:
+            y = new_page()
+
+        c.setFont("Helvetica-Bold", 8)
+        c.setFillColor(CONTRACT_DARK)
+        c.drawString(LEFT + 4, y, f"{idx + 1}. {title}")
+        y -= 12
+
+        is_red = idx >= 10
+        c.setFont("Helvetica", 7.5)
+        if is_red:
+            c.setFillColor(CONTRACT_RED)
+        else:
+            c.setFillColor(CONTRACT_DARK)
+
+        max_chars = 95
+        remaining = text
+        while remaining:
+            if y < BOTTOM + 30:
+                y = new_page()
+                if is_red:
+                    c.setFont("Helvetica", 7.5)
+                    c.setFillColor(CONTRACT_RED)
+
+            if len(remaining) <= max_chars:
+                c.drawString(LEFT + 16, y, remaining)
+                y -= 10
+                remaining = ""
+            else:
+                break_at = remaining.rfind(' ', 0, max_chars)
+                if break_at <= 0:
+                    break_at = max_chars
+                c.drawString(LEFT + 16, y, remaining[:break_at])
+                y -= 10
+                remaining = remaining[break_at:].lstrip()
+
+        y -= 3
+
+    draw_footer()
+    c.showPage()
+    page_num[0] += 1
+
+    # ── Last Page: Signature Page ──────────────────
+    y = TOP
+
+    # White space at top, then signature at bottom
+    sig_y = 240  # Position signatures about 1/3 from bottom
+
+    c.setFont("Helvetica-Bold", 14)
+    c.setFillColor(CONTRACT_DARK)
+    c.drawString(LEFT, sig_y + 60, "Signature Section")
+    c.setStrokeColor(CONTRACT_BORDER)
+    c.line(LEFT, sig_y + 52, RIGHT, sig_y + 52)
+
+    mid = LEFT + WIDTH / 2
+    sig_line_w = WIDTH / 2 - 20
+
+    # Left column — Company
+    c.setFont("Helvetica-Bold", 9)
+    c.setFillColor(CONTRACT_GRAY)
+    c.drawString(LEFT, sig_y + 30, "By")
+    c.setStrokeColor(CONTRACT_DARK)
+    c.setLineWidth(0.5)
+    c.line(LEFT, sig_y, LEFT + sig_line_w, sig_y)
+    c.setFont("Helvetica-Bold", 10)
+    c.setFillColor(CONTRACT_DARK)
+    c.drawString(LEFT, sig_y - 14, "Jack McMahon")
+    c.setFont("Helvetica", 9)
+    c.drawString(LEFT, sig_y - 28, company)
+    c.drawString(LEFT, sig_y - 42, f"Date: {_escape(generated_date)}")
+
+    # Right column — Customer
+    c.setFont("Helvetica-Bold", 9)
+    c.setFillColor(CONTRACT_GRAY)
+    c.drawString(mid + 10, sig_y + 30, "By")
+    c.line(mid + 10, sig_y, mid + 10 + sig_line_w, sig_y)
+    c.setFont("Helvetica-Bold", 10)
+    c.setFillColor(CONTRACT_DARK)
+    c.drawString(mid + 10, sig_y - 14, _escape(customer) if customer else "________________")
+    c.setFont("Helvetica", 9)
+    c.drawString(mid + 10, sig_y - 28, _escape(customer_company) if customer_company else "")
+    c.drawString(mid + 10, sig_y - 42, f"Date: {_escape(generated_date)}")
+
+    draw_footer()
+    c.save()
+    buffer.seek(0)
+
+    contract_id_clean = contract_id.replace(" ", "-") if contract_id else "contract"
+    return (buffer.getvalue(), f"{contract_id_clean}-contract.pdf")
+
+
 # ── Legacy helpers (unused but kept for reference) ──
 
 def _build_header(address, inspector, report_date, usable_w):

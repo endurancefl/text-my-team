@@ -15,6 +15,7 @@ from main import (
     parse_photo_buffers,
     generate_standard_report,
     generate_before_after_report,
+    generate_contract_pdf,
 )
 
 
@@ -63,7 +64,18 @@ def lambda_handler(event, context):
         metadata = json.loads(metadata_raw)
         report_type = metadata.get("type", "standard")
 
-        if report_type == "before_after":
+        if report_type == "contract":
+            # Parse optional service map photo (commercial only)
+            service_map_files = parts.get("files", {}).get("service_map", [])
+            service_map_buffer = None
+            if service_map_files:
+                buffers = parse_photo_buffers(service_map_files)
+                if buffers:
+                    service_map_buffer = buffers[0]
+
+            pdf_bytes, filename = generate_contract_pdf(metadata, service_map_buffer)
+
+        elif report_type == "before_after":
             # Parse before and after photo files
             before_files = parts.get("files", {}).get("before_photos", [])
             after_files = parts.get("files", {}).get("after_photos", [])

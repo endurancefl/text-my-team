@@ -108,7 +108,7 @@ The platform supports four divisions, each representing a distinct revenue strea
 - iOS design system: SF Pro typography, exact system colors, dark mode, frosted glass tab bar with `backdrop-filter`, iOS spring animations, 44px touch targets, `prefers-reduced-motion` support
 - Bottom tab bar: Schedule (home) | Requests | Report Issue | Reports
 
-**estimate.html — Bidding & Estimating Tool (~16,677 lines)**
+**estimate.html — Bidding & Estimating Tool (~17,170 lines)**
 - **Division: Maintenance (MNT) fully built** — Irrigation, Construction, and Enhancement divisions planned, will reuse the same engine with division-specific catalogs and takeoffs
 - Three-panel Google Workspace layout (sidebar, main content, summary panel)
 - **Bid Builder**: Spreadsheet-style table with columns: Item, OCC, QTY, Unit, P/H, AH, TH, P/P, TP, GM%
@@ -125,9 +125,17 @@ The platform supports four divisions, each representing a distinct revenue strea
 - **Item Catalog**: 20+ items with production rates by difficulty (SF/Hour, LF/Hour), material pricing (purchase unit, cost per unit, coverage per unit, default depth)
 - **Service Catalog**: Pre-configured service templates with default visits, billing tiers, proposal names, descriptions, map colors, line item assignments, duration type (scalable or fixed)
 - **Template System**: Save/load estimate structures (services, tiers, visits, travel %, contract duration), excludes property-specific data
-- **Contract Settings**: Start/end dates, duration, payment months, price increase %, payment terms (Net 30, etc.)
+- **Contract Settings**: Start/end dates, duration, payment months, price increase %, payment terms (Net 30, etc.), CC processing fee %, CC gross-up toggle
+- **CC Gross-Up**: When enabled, monthly payment is adjusted: `grossedUpMonthly = baseMonthly / (1 - ccFeePercent/100)`. Applied in summary panel, payment schedule, and finalize calculations. Data model fields: `ccFeePercent` (number), `ccGrossUp` (boolean).
 - **Payment Schedule Generator**: Monthly payment distribution with penny rounding algorithm
+- **Contract PDF Generation**: Generates professional contract PDFs via AWS Lambda/ReportLab pipeline. Two templates based on `propertyType`:
+  - **Residential (3 pages)**: Quote page (services table, totals, recipient info), Description of Services (numbered list with sub-items from service catalog defaults), Terms & Conditions (12 clauses with template variables) + signature section
+  - **Commercial (5-6 pages)**: Cover page (logo, property info, optional service map image), Three-tier services tables (Fixed/Billed Separately/Recommended with category groupings), Payment schedule (12-month breakdown with penny rounding), Description of services (per-service paragraphs), Terms & Conditions, Signature page
+  - T&C clauses 11-12 (Price Increase, Tropical Event Policy) highlighted in red
+  - "Generate Contract PDF" button appears in summary panel after estimate is finalized
+  - PDF auto-downloads and uploads to Google Drive (property folder → Contracts subfolder)
 - **Estimate Revision & Re-Finalize Workflow**: Three-status lifecycle (Draft → Finalized → Revision → Finalized). When a finalized estimate is reopened and edited, status transitions to "Revision" (amber badge) instead of resetting to Draft. Re-finalizing updates the existing contract row and regenerates only future scheduled tickets — completed, skipped, and today's tickets are never touched. `revisionCount` tracks how many times a contract has been revised. The "Revise Estimate" button enters revision mode explicitly; "Update Contract" opens the finalize modal with revision-aware text ("Update Contract & Regenerate Tickets"). First-time finalization is unchanged.
+- **Finalization Contact Validation**: Before finalizing, linked contact must have both email address and billing address populated. Shows toast error if missing. Prevents creating contracts without essential invoicing data.
 - **Weekly Reports**: per-property visit summaries with services performed, dates, notes, customer email — send individually or batch send to all customers
 - **Service Offers in Weekly Reports**: attach recommended services with catalog pricing and photos to weekly reports — customer approves with one tap from their email
 - **Contacts (Lite CRM)**: Lightweight contact management built into estimate.html as a placeholder until HubSpot integration. Contacts have lifecycle stages (Lead → Prospect → Customer), are linked to estimates via `contactId`, and auto-promote to "Customer" when an estimate is finalized. Searchable by name, email, phone, address. Contact picker in the estimate builder auto-fills property address. Stored in a "Contacts" Google Sheet. The `contactId` foreign key pattern survives the HubSpot migration — the field becomes `hubspot_contact_id` but the linking pattern is the same.
@@ -179,8 +187,8 @@ The platform supports four divisions, each representing a distinct revenue strea
 | `updateContact` | Estimating | Updates an existing contact by contactId |
 | `deleteContact` | Estimating | Deletes a contact by contactId |
 | `uploadEstimateJson` | Estimating | Saves estimate JSON to Drive |
-| `createContract` | Estimating | Creates contract row |
-| `updateContract` | Estimating | Updates existing contract row by contractId (crew, day, dates, months, payment) — used during estimate revision |
+| `createContract` | Estimating | Creates contract row with fields: bidId, propertyAddress, assignedCrew, preferredDay, startDate, endDate, contractMonths, monthlyPayment, paymentTerms, contractValue, ccFeePercent, ccGrossUp, contactName, contactEmail, billingAddress. Auto-creates new columns on existing sheets |
+| `updateContract` | Estimating | Updates existing contract row by contractId — all fields including paymentTerms, contractValue, ccFeePercent, ccGrossUp, contactName, contactEmail, billingAddress |
 | `saveTickets` | Estimating | Batch-creates scheduled tickets |
 | `deleteFutureTickets` | Estimating | Deletes future scheduled tickets for a contractId (status='scheduled' AND eventDate > afterDate) — used during estimate revision to regenerate tickets |
 | `updateTicketStatus` | Estimating | Updates ticket status/completed date; auto-sets `Needs Reschedule=TRUE` when status is `skipped` |
@@ -202,6 +210,7 @@ The platform supports four divisions, each representing a distinct revenue strea
 | `updateStatus` | Crew | Updates request status |
 | `uploadInspectionPhoto` | Crew | Quick Photos upload with subfolder organization |
 | `uploadSiteReportPdf` | Crew | Uploads site report PDF to Drive |
+| `uploadContractPdf` | Estimating | Uploads contract PDF to Drive (property folder → Contracts subfolder) |
 | `saveSiteReportJson` | Crew | Saves report JSON data to Drive |
 | `saveServiceOffer` | Crew/Estimating | Creates service offer attached to a report |
 | `approveServiceOffer` | Customer (token) | Customer approves an offered service |
@@ -327,12 +336,13 @@ Both apps live in the same monorepo, share the component library (`packages/ui`)
 - Endpoint: `https://ibjyxrp542.execute-api.us-east-1.amazonaws.com/prod/generate_site_report` (replace YOUR_API_ID after deployment)
 - **Architecture**: API Gateway HTTP API receives multipart/form-data → Lambda parses event → `main.py` generates PDF → base64-encoded response
 - `main.py` is a platform-agnostic PDF library — no Flask or framework dependencies. Entry points (`lambda_function.py`) handle HTTP parsing
-- `lambda_function.py` — Lambda handler: parses multipart boundary from API Gateway event, extracts metadata JSON + photo blobs, calls `generate_standard_report()` or `generate_before_after_report()`, returns base64-encoded PDF
+- `lambda_function.py` — Lambda handler: parses multipart boundary from API Gateway event, extracts metadata JSON + photo blobs, routes by `metadata.type`: `standard` → `generate_standard_report()`, `before_after` → `generate_before_after_report()`, `contract` → `generate_contract_pdf()`
 - Lambda config: Python 3.11, 512MB memory, 60s timeout
 - **Deployment**: AWS SAM template in `cloud-function/deploy/template.yaml`, one-command deploy via `cloud-function/deploy/deploy.sh` (`sam build && sam deploy`)
-- Handles both Site Report and Before & After report types (distinguished by `metadata.type` field)
+- Handles Site Report, Before & After, and Contract PDF types (distinguished by `metadata.type` field)
 - **Site Report layout**: 2-column, 3-row grid per page (page 1 has 2 rows for header). Photos grouped by category with category headers, notes below each photo, page numbering, logo on page 1
 - **Before & After layout**: Side-by-side comparison — BEFORE (red banner) left, AFTER (green banner) right. 2 pairs on page 1 (header), 3 pairs per page after. New page per category
+- **Contract PDF layout**: Two templates based on `propertyType`. Residential: 3-page (quote, service descriptions, T&C + signatures). Commercial: 5-6 page (cover, three-tier services tables, payment schedule, service descriptions, T&C, signatures). Both include 12 standard terms clauses with template variables. Optional `service_map` photo for commercial cover page. Functions: `generate_contract_pdf()`, `_generate_residential_contract()`, `_generate_commercial_contract()`, `_get_terms_clauses()`
 - Request format: `multipart/form-data` with JSON `metadata` field + photo blobs (`photos`, `before_photos`, `after_photos`)
 - Photos composited client-side (annotations burned onto canvas) before upload. Site Report: max 1600px, 85% JPEG quality. Before & After: max 1000px, 75% quality
 - PDF returned as binary blob (base64 via API Gateway) → auto-downloaded to device → uploaded to Google Drive via Apps Script (`siteReportPdf: true`)
@@ -2149,7 +2159,7 @@ All sheets live in one spreadsheet with one Code.gs serving both estimate.html a
 **New Sheets (Built):**
 | Sheet | Purpose |
 |-------|---------|
-| Contracts | contractId, bidId, propertyAddress, assignedCrew, preferredDay, startDate, endDate, contractMonths, monthlyPayment, status, createdDate (updatable via `updateContract` during revision) |
+| Contracts | contractId, bidId, propertyAddress, assignedCrew, preferredDay, startDate, endDate, contractMonths, monthlyPayment, status, createdDate, paymentTerms, contractValue, ccFeePercent, ccGrossUp, contactName, contactEmail, billingAddress (updatable via `updateContract` during revision) |
 | Scheduled Tickets | ticketId, contractId, propertyAddress, assignedCrew, eventDate, servicesJson (each service has name, estimatedHours, items[]; each item has name, hours, and optionally quantities {easy,medium,hard}, unit, complexityFactor for production rate analysis), totalEstHours, travelHours, status, completedDate, notes, completedServices (JSON array of completed service names for partial tickets), createdDate, needsReschedule (boolean — auto-set TRUE when status=skipped, cleared when rescheduled) |
 | Crew Members | name, phone, role (Leader/Member), crew (MNT Crew 1), pin (4-digit identity PIN), status (Active/Inactive) |
 | Time Entries | entryId, crew, date, entryType (day_clock/job/indirect/service), ticketId, propertyAddress, serviceName, indirectCategory, clockIn, clockOut, durationMinutes, crewMembers (JSON), memberCount, notes, createdDate, durationType (scalable/fixed — auto-upgraded column), reopened ('true'/'' — auto-upgraded column, flags entries created by reopening a completed service), estimatedHours (auto-upgraded column — service-level estimated hours from ticket, passed by crew.html on service start/reopen/split) |

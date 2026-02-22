@@ -171,6 +171,9 @@ function doPost(e) {
     if (data.siteReportPdf) {
       return jsonResponse(uploadSiteReportPdf(data));
     }
+    if (data.contractPdf) {
+      return jsonResponse(uploadContractPdf(data));
+    }
     if (data.siteReportPhoto) {
       return jsonResponse(uploadSiteReportPhoto(data));
     }
@@ -745,12 +748,24 @@ function createContract(data) {
 
   if (!sheet) {
     sheet = ss.insertSheet('Contracts');
-    sheet.getRange(1, 1, 1, 11).setValues([['Contract ID', 'Bid ID', 'Property Address', 'Assigned Crew', 'Preferred Day', 'Start Date', 'End Date', 'Contract Months', 'Monthly Payment', 'Status', 'Created Date']]);
-    sheet.getRange(1, 1, 1, 11).setFontWeight('bold');
+    sheet.getRange(1, 1, 1, 18).setValues([['Contract ID', 'Bid ID', 'Property Address', 'Assigned Crew', 'Preferred Day', 'Start Date', 'End Date', 'Contract Months', 'Monthly Payment', 'Status', 'Created Date', 'Payment Terms', 'Contract Value', 'CC Fee %', 'CC Gross-Up', 'Contact Name', 'Contact Email', 'Billing Address']]);
+    sheet.getRange(1, 1, 1, 18).setFontWeight('bold');
   }
 
+  // Ensure new columns exist on existing sheets
   var existingData = sheet.getDataRange().getValues();
   var headers = existingData[0];
+  var newCols = ['Payment Terms', 'Contract Value', 'CC Fee %', 'CC Gross-Up', 'Contact Name', 'Contact Email', 'Billing Address'];
+  newCols.forEach(function(colName) {
+    if (headers.indexOf(colName) === -1) {
+      var nextCol = headers.length + 1;
+      sheet.getRange(1, nextCol).setValue(colName).setFontWeight('bold');
+      headers.push(colName);
+    }
+  });
+  // Re-read after potential additions
+  existingData = sheet.getDataRange().getValues();
+  headers = existingData[0];
   var numCols = headers.length;
 
   var col = {
@@ -764,7 +779,14 @@ function createContract(data) {
     contractMonths: headers.indexOf('Contract Months'),
     monthlyPayment: headers.indexOf('Monthly Payment'),
     status: headers.indexOf('Status'),
-    createdDate: headers.indexOf('Created Date')
+    createdDate: headers.indexOf('Created Date'),
+    paymentTerms: headers.indexOf('Payment Terms'),
+    contractValue: headers.indexOf('Contract Value'),
+    ccFeePercent: headers.indexOf('CC Fee %'),
+    ccGrossUp: headers.indexOf('CC Gross-Up'),
+    contactName: headers.indexOf('Contact Name'),
+    contactEmail: headers.indexOf('Contact Email'),
+    billingAddress: headers.indexOf('Billing Address')
   };
 
   var idCol = col.contractId !== -1 ? col.contractId : 0;
@@ -795,6 +817,13 @@ function createContract(data) {
     else if (c === col.monthlyPayment) row.push(data.monthlyPayment || 0);
     else if (c === col.status) row.push('active');
     else if (c === col.createdDate) row.push(dateStr);
+    else if (c === col.paymentTerms) row.push(data.paymentTerms || 'Net 30');
+    else if (c === col.contractValue) row.push(data.contractValue || 0);
+    else if (c === col.ccFeePercent) row.push(data.ccFeePercent || 0);
+    else if (c === col.ccGrossUp) row.push(data.ccGrossUp ? 'Yes' : 'No');
+    else if (c === col.contactName) row.push(data.contactName || '');
+    else if (c === col.contactEmail) row.push(data.contactEmail || '');
+    else if (c === col.billingAddress) row.push(data.billingAddress || '');
     else row.push('');
   }
 
@@ -824,7 +853,14 @@ function updateContract(data) {
         'End Date': data.endDate,
         'Contract Months': data.contractMonths,
         'Monthly Payment': data.monthlyPayment,
-        'Status': data.status || 'active'
+        'Status': data.status || 'active',
+        'Payment Terms': data.paymentTerms,
+        'Contract Value': data.contractValue,
+        'CC Fee %': data.ccFeePercent,
+        'CC Gross-Up': data.ccGrossUp !== undefined ? (data.ccGrossUp ? 'Yes' : 'No') : undefined,
+        'Contact Name': data.contactName,
+        'Contact Email': data.contactEmail,
+        'Billing Address': data.billingAddress
       };
 
       for (var field in fieldsToUpdate) {
@@ -900,7 +936,14 @@ function getContracts() {
     contractMonths: headers.indexOf('Contract Months'),
     monthlyPayment: headers.indexOf('Monthly Payment'),
     status: headers.indexOf('Status'),
-    createdDate: headers.indexOf('Created Date')
+    createdDate: headers.indexOf('Created Date'),
+    paymentTerms: headers.indexOf('Payment Terms'),
+    contractValue: headers.indexOf('Contract Value'),
+    ccFeePercent: headers.indexOf('CC Fee %'),
+    ccGrossUp: headers.indexOf('CC Gross-Up'),
+    contactName: headers.indexOf('Contact Name'),
+    contactEmail: headers.indexOf('Contact Email'),
+    billingAddress: headers.indexOf('Billing Address')
   };
 
   var contracts = [];
@@ -920,7 +963,14 @@ function getContracts() {
         contractMonths: col.contractMonths !== -1 ? (row[col.contractMonths] || 12) : 12,
         monthlyPayment: col.monthlyPayment !== -1 ? (row[col.monthlyPayment] || 0) : 0,
         status: col.status !== -1 ? (row[col.status] || 'active') : 'active',
-        createdDate: col.createdDate !== -1 ? (row[col.createdDate] || '') : ''
+        createdDate: col.createdDate !== -1 ? (row[col.createdDate] || '') : '',
+        paymentTerms: col.paymentTerms !== -1 ? (row[col.paymentTerms] || 'Net 30') : 'Net 30',
+        contractValue: col.contractValue !== -1 ? (row[col.contractValue] || 0) : 0,
+        ccFeePercent: col.ccFeePercent !== -1 ? (row[col.ccFeePercent] || 0) : 0,
+        ccGrossUp: col.ccGrossUp !== -1 ? (row[col.ccGrossUp] === 'Yes') : false,
+        contactName: col.contactName !== -1 ? (row[col.contactName] || '') : '',
+        contactEmail: col.contactEmail !== -1 ? (row[col.contactEmail] || '') : '',
+        billingAddress: col.billingAddress !== -1 ? (row[col.billingAddress] || '') : ''
       });
     }
   }
@@ -1802,6 +1852,31 @@ function uploadInspectionPhoto(data) {
 function uploadSiteReportPdf(data) {
   var folder = getPropertyFolder(data.property, 'Site Reports');
   var filename = (data.filename || 'Site Report') + '.pdf';
+
+  // Strip data URL prefix if present
+  var pdfData = data.pdfBase64;
+  if (pdfData && pdfData.indexOf(',') !== -1) {
+    pdfData = pdfData.split(',')[1];
+  }
+
+  var blob = Utilities.newBlob(Utilities.base64Decode(pdfData), 'application/pdf', filename);
+  var file = folder.createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+  return {
+    success: true,
+    pdfUrl: file.getUrl(),
+    fileId: file.getId()
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CONTRACT PDF UPLOAD
+// ═══════════════════════════════════════════════════════════════
+
+function uploadContractPdf(data) {
+  var folder = getPropertyFolder(data.property, 'Contracts');
+  var filename = (data.filename || 'Contract') + '.pdf';
 
   // Strip data URL prefix if present
   var pdfData = data.pdfBase64;
