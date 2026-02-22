@@ -1393,12 +1393,12 @@ def _generate_residential_contract(metadata):
 
         # Sub-items with letter prefix
         for si, text in enumerate(sub_items):
-            letter = chr(ord('a') + si)
+            sub_letter = chr(ord('a') + si)
             c.setFont("Helvetica", 9)
             c.setFillColor(CONTRACT_DARK)
 
             # Word-wrap long text
-            prefix = f"    {letter}. "
+            prefix = f"    {sub_letter}. "
             max_chars = 80
             full_text = prefix + text
             lines = []
