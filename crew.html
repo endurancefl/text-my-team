@@ -791,13 +791,15 @@
         <span class="ba-detail-title">Photo <span id="ba-detail-counter">1/1</span></span>
         <div style="width:40px;"></div>
       </div>
-      <button id="ba-landscape-take" class="ba-landscape-take" style="display:none;">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:28px;height:28px;">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
-          <path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
-        </svg>
-        Take Photo
-      </button>
+      <div id="ba-landscape-overlay" class="ba-landscape-overlay" style="display:none;">
+        <button id="ba-landscape-take" class="ba-landscape-take">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:40px;height:40px;">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+          </svg>
+          Take Photo
+        </button>
+      </div>
       <div class="ba-detail-content">
         <div class="ba-detail-section">
           <div class="ba-detail-label">Before</div>
@@ -8722,7 +8724,7 @@
           hintEl.style.display = 'block';
           // Show floating Take Photo button in landscape when no after photo yet
           var hasAfter = photo.afterBase64 && photo.afterBase64.startsWith('data:');
-          baLandscapeTake.style.display = (deviceIsLandscape && matches && !hasAfter) ? 'flex' : 'none';
+          baLandscapeOverlay.style.display = (deviceIsLandscape && matches && !hasAfter) ? 'flex' : 'none';
         }
 
         updateOrientationHint();
@@ -8769,7 +8771,7 @@
         }
         baState._orientationHandler = null;
       }
-      baLandscapeTake.style.display = 'none';
+      baLandscapeOverlay.style.display = 'none';
       baDetailModal.classList.remove('active');
       baRenderPhotoGrid();
     }
@@ -8777,6 +8779,7 @@
     baDetailBack.addEventListener('click', baCloseDetailModal);
     baDetailSave.addEventListener('click', baCloseDetailModal);
 
+    var baLandscapeOverlay = document.getElementById('ba-landscape-overlay');
     var baLandscapeTake = document.getElementById('ba-landscape-take');
 
     baTakeAfter.addEventListener('click', function() {
@@ -8867,7 +8870,7 @@
               baAfterImg.src = base64;
               baNoAfter.style.display = 'none';
               baHasAfter.style.display = 'block';
-              baLandscapeTake.style.display = 'none';
+              baLandscapeOverlay.style.display = 'none';
             }
           }
 
