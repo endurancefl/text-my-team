@@ -10822,6 +10822,11 @@ function showView(viewId) {
     initProductionView();
   }
 
+  // Render contacts list when contacts view is shown
+  if (viewId === 'contacts') {
+    renderContactsList();
+  }
+
   // Load contacts when contacts view is shown
   if (viewId === 'contacts') {
     renderContactsList();
