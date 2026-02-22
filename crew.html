@@ -912,6 +912,10 @@
     var undoServiceData = null;          // Snapshot for undo: {ticketId, serviceName, svcClock, entryId, completedServiceMembers}
     var undoToastTimer = null;           // Timer ID for auto-dismiss
 
+    // ─── Reopen Service State ───
+    var pendingReopenContext = null;     // {ticketId, serviceName, carriedManHours, originalEndTime}
+    var pendingReopenService = null;     // {ticketId, serviceName} for completed-ticket reopen edge case
+
     // ─── Language / i18n ───
     var currentLang = localStorage.getItem('preferredLang') || 'en';
     var translations = {
@@ -1088,7 +1092,11 @@
         addCrewWontSpeed: 'Adding crew won\'t speed this up',
         allCrewBusy: 'All crew busy \u2014 finish a service to free someone up',
         sendToOffice: 'Office',
-        sendToOfficeMsg: 'Crew cannot handle this request on-site.\n\nProperty: {property}\nCustomer: {customer}\nRequest: {message}\nCrew Leader: {crew}'
+        sendToOfficeMsg: 'Crew cannot handle this request on-site.\n\nProperty: {property}\nCustomer: {customer}\nRequest: {message}\nCrew Leader: {crew}',
+        reopenService: 'Reopen Service',
+        reopenConfirm: 'Reopen {name}? A new time entry will be created.',
+        reopened: 'Reopened',
+        reopenedNote: 'Reopened — originally completed at {time}'
       },
       es: {
         langToggle: 'English',
@@ -1242,7 +1250,11 @@
         addCrewWontSpeed: 'Agregar equipo no acelerar\u00e1 esto',
         allCrewBusy: 'Todo el equipo ocupado \u2014 termine un servicio para liberar a alguien',
         sendToOffice: 'Oficina',
-        sendToOfficeMsg: 'El equipo no puede manejar esta solicitud en el sitio.\n\nPropiedad: {property}\nCliente: {customer}\nSolicitud: {message}\nL\u00edder de equipo: {crew}'
+        sendToOfficeMsg: 'El equipo no puede manejar esta solicitud en el sitio.\n\nPropiedad: {property}\nCliente: {customer}\nSolicitud: {message}\nL\u00edder de equipo: {crew}',
+        reopenService: 'Reabrir Servicio',
+        reopenConfirm: '\u00bfReabrir {name}? Se crear\u00e1 un nuevo registro de tiempo.',
+        reopened: 'Reabierto',
+        reopenedNote: 'Reabierto \u2014 completado originalmente a las {time}'
       }
     };
 
@@ -1394,6 +1406,7 @@
             propertyAddress: opts.propertyAddress || '',
             serviceName: opts.serviceName || '',
             durationType: opts.durationType || '',
+            estimatedHours: opts.estimatedHours || '',
             clockIn: clockOutStr,
             crewMembers: newMemberNames,
             memberCount: newMemberNames.length,
@@ -1565,7 +1578,10 @@
 
             // Log split operations for debugging
             if (body.saveTimeEntry && body.entryType) {
-              console.log('[DEMO] saveTimeEntry:', body.entryType, body.ticketId || '', body.serviceName || '', 'crew:', body.crewMembers, '→', newEntryId);
+              console.log('[DEMO] saveTimeEntry:', body.entryType, body.ticketId || '', body.serviceName || '', 'crew:', body.crewMembers, (body.reopened ? '(REOPENED)' : ''), '→', newEntryId);
+            }
+            if (body.reopenTicketService) {
+              console.log('[DEMO] reopenTicketService:', body.ticketId, body.serviceName, body.revertStatus ? '(revertStatus)' : '');
             }
             if (body.updateTimeEntry && body.clockOut) {
               console.log('[DEMO] closeEntry:', body.entryId, 'clockOut:', body.clockOut, 'duration:', body.durationMinutes + 'min');
@@ -2337,7 +2353,9 @@
         var svcIsFixed = svcDurationType === 'fixed';
         var isLastService = svcIdx === services.length - 1;
 
-        html += '<div class="service-row' + (isLastService ? ' last-service' : '') + '" style="margin-left:0;flex-wrap:wrap;">';
+        var undoActiveForThis = undoServiceData && undoServiceData.ticketId === ticket.ticketId && undoServiceData.serviceName === svcName;
+        var reopenOnclick = (svcCompleted && !undoActiveForThis) ? ' onclick="promptReopenService(\'' + ticket.ticketId + '\', \'' + escapedSvcName + '\')"' : '';
+        html += '<div class="service-row' + (isLastService ? ' last-service' : '') + '"' + reopenOnclick + ' style="margin-left:0;flex-wrap:wrap;">';
         html += '<span class="service-row-name" style="flex:1;font-size:14px;' + (svcCompleted ? 'text-decoration:line-through;color:#8E8E93;' : '') + '">' + escapeHtml(svcName) + (svcIsFixed ? ' <span class="fixed-badge">' + t('fixed') + '</span>' : '') + '</span>';
 
         if (svcCompleted) {
@@ -2920,7 +2938,8 @@
                     ticketId: tid,
                     propertyAddress: ticket ? ticket.propertyAddress : '',
                     serviceName: svcName,
-                    durationType: getServiceDurationType(ticket, svcName)
+                    durationType: getServiceDurationType(ticket, svcName),
+                    estimatedHours: getServiceEstHours(ticket, svcName)
                   }).then(function(newId) {
                     if (newId) {
                       svcClock.entryId = newId;
@@ -3956,6 +3975,20 @@
       renderStopCards();
       checkPropertyRequests(ticket.propertyAddress);
 
+      // Check if this ticket was started to reopen a completed service
+      if (pendingReopenService && pendingReopenService.ticketId === ticketId) {
+        var reopenSvc = pendingReopenService;
+        pendingReopenService = null;
+        // Remove the reopened service from completedServices in the active ticket
+        var atReopen = activeTickets[ticketId];
+        if (atReopen && atReopen.completedServices) {
+          var rIdx = atReopen.completedServices.indexOf(reopenSvc.serviceName);
+          if (rIdx >= 0) atReopen.completedServices.splice(rIdx, 1);
+        }
+        setTimeout(function() { reopenService(ticketId, reopenSvc.serviceName); }, 300);
+        return;
+      }
+
       // Immediately trigger service assignment wizard
       var services = ticket.services || [];
       if (services.length > 0) {
@@ -4105,6 +4138,19 @@
 
       startTicketTimer(ticketId);
       renderStopCards();
+
+      // Check if this ticket was started to reopen a completed service
+      if (pendingReopenService && pendingReopenService.ticketId === ticketId) {
+        var reopenSvc = pendingReopenService;
+        pendingReopenService = null;
+        var atReopen = activeTickets[ticketId];
+        if (atReopen && atReopen.completedServices) {
+          var rIdx = atReopen.completedServices.indexOf(reopenSvc.serviceName);
+          if (rIdx >= 0) atReopen.completedServices.splice(rIdx, 1);
+        }
+        setTimeout(function() { reopenService(ticketId, reopenSvc.serviceName); }, 300);
+        return;
+      }
 
       // Check for open requests
       checkPropertyRequests(ticket.propertyAddress);
@@ -4445,6 +4491,7 @@
           propertyAddress: ticket ? ticket.propertyAddress : '',
           serviceName: serviceName,
           durationType: svcDurType,
+          estimatedHours: getServiceEstHours(ticket, serviceName),
           clockIn: now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
           crewMembers: assignedNames,
           memberCount: assigned.length,
@@ -4552,7 +4599,8 @@
           ticketId: ticketId,
           propertyAddress: ticket ? ticket.propertyAddress : '',
           serviceName: serviceName,
-          durationType: svcDurType
+          durationType: svcDurType,
+          estimatedHours: getServiceEstHours(ticket, serviceName)
         }).then(function(newId) {
           if (newId) {
             svcClock.entryId = newId;
@@ -4759,6 +4807,176 @@
       renderStopCards();
     }
 
+    // ─── Reopen Completed Service ───
+    function promptReopenService(ticketId, serviceName) {
+      // Guard: abort if undo toast is active for this service
+      if (undoServiceData && undoServiceData.ticketId === ticketId && undoServiceData.serviceName === serviceName) return;
+
+      iosConfirm(t('reopenConfirm').replace('{name}', serviceName), t('reopenService'), function(yes) {
+        if (yes) reopenService(ticketId, serviceName);
+      });
+    }
+
+    function reopenService(ticketId, serviceName) {
+      var at = activeTickets[ticketId];
+
+      if (at) {
+        // ── Normal case: ticket is still active ──
+        var svcClock = (at.serviceClocks || {})[serviceName];
+        var carriedManHours = 0;
+        var originalEndTime = null;
+        if (svcClock) {
+          // Accumulate man-hours from the completed segment
+          var segmentMs = (svcClock.endTime || new Date()) - (svcClock.startTime || new Date());
+          var segmentMin = segmentMs / 60000;
+          var crewCount = (svcClock.assignedMembers || []).length || 1;
+          carriedManHours = (svcClock.manHoursConsumed || 0) + (segmentMin * crewCount);
+          originalEndTime = svcClock.endTime;
+        }
+
+        // Remove from completedServices locally
+        if (at.completedServices) {
+          var idx = at.completedServices.indexOf(serviceName);
+          if (idx >= 0) at.completedServices.splice(idx, 1);
+        }
+
+        // POST to backend to update Completed Services column
+        queueableFetch(GOOGLE_SHEETS_URL, {
+          method: 'POST',
+          body: JSON.stringify({
+            reopenTicketService: true,
+            ticketId: ticketId,
+            serviceName: serviceName
+          })
+        });
+
+        // Store context for confirmReopenService
+        pendingReopenContext = {
+          ticketId: ticketId,
+          serviceName: serviceName,
+          carriedManHours: carriedManHours,
+          originalEndTime: originalEndTime
+        };
+
+        // Show member assignment overlay for reopened service
+        showServiceMemberAssignment(ticketId, serviceName, false);
+
+        // Override confirm button to reopen flow
+        var confirmBtn = document.getElementById('assignment-confirm-btn');
+        var titleEl = document.getElementById('assignment-title');
+        titleEl.textContent = t('reopenService') + ': ' + serviceName;
+        confirmBtn.textContent = t('reopenService');
+        confirmBtn.onclick = function() {
+          confirmReopenService(ticketId, serviceName);
+        };
+      } else {
+        // ── Edge case: ticket is fully completed, not in activeTickets ──
+        var ticket = todayTickets.find(function(tk) { return tk.ticketId === ticketId; });
+        if (!ticket) return;
+
+        // Revert ticket status locally
+        ticket.status = 'partial';
+
+        // POST to backend to remove service + revert status
+        queueableFetch(GOOGLE_SHEETS_URL, {
+          method: 'POST',
+          body: JSON.stringify({
+            reopenTicketService: true,
+            ticketId: ticketId,
+            serviceName: serviceName,
+            revertStatus: true
+          })
+        });
+
+        // Store pending reopen so confirmStartTicket/autoStartTicket can pick it up
+        pendingReopenService = { ticketId: ticketId, serviceName: serviceName };
+
+        // Reactivate the ticket via normal start flow
+        startTicket(ticketId);
+      }
+    }
+
+    function confirmReopenService(ticketId, serviceName) {
+      var at = activeTickets[ticketId];
+      if (!at) return;
+      var ctx = pendingReopenContext;
+      pendingReopenContext = null;
+
+      // Gather selected members (same pattern as confirmStartService)
+      var overlay = document.getElementById('member-assignment-overlay');
+      var availableNames = [];
+      try { availableNames = JSON.parse(overlay.getAttribute('data-available-members') || '[]'); } catch(e) {}
+      var ticketMembers = at.assignedMembers || [];
+      var checkboxes = document.querySelectorAll('#assignment-members-list .assign-cb');
+      var assigned = [];
+      checkboxes.forEach(function(cb, i) {
+        if (cb.checked && availableNames[i]) {
+          var matchName = availableNames[i];
+          var member = ticketMembers.find(function(m) { return (typeof m === 'string' ? m : m.name) === matchName; });
+          if (member) assigned.push(member);
+        }
+      });
+      if (assigned.length === 0) {
+        iosAlert(t('selectOneMember'));
+        return;
+      }
+
+      // Create new service clock with carried man-hours
+      if (!at.serviceClocks) at.serviceClocks = {};
+      at.serviceClocks[serviceName] = {
+        startTime: new Date(),
+        endTime: null,
+        assignedMembers: assigned,
+        manHoursConsumed: ctx ? ctx.carriedManHours : 0
+      };
+
+      closeAssignmentOverlay();
+
+      // Build reopened note
+      var originalTimeStr = '';
+      if (ctx && ctx.originalEndTime) {
+        originalTimeStr = ctx.originalEndTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      }
+      var reopenNote = t('reopenedNote').replace('{time}', originalTimeStr);
+
+      // Save new time entry to backend with reopened flag
+      var ticket = todayTickets.find(function(tk) { return tk.ticketId === ticketId; });
+      var crewName = scheduleData ? scheduleData.crewName : currentCrewName;
+      var now = new Date();
+      var assignedNames = assigned.map(function(m) { return typeof m === 'string' ? m : m.name; });
+      var svcDurType = getServiceDurationType(ticket, serviceName);
+      fetch(GOOGLE_SHEETS_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+          saveTimeEntry: true,
+          crew: crewName,
+          date: now.toISOString().split('T')[0],
+          entryType: 'service',
+          ticketId: ticketId,
+          propertyAddress: ticket ? ticket.propertyAddress : '',
+          serviceName: serviceName,
+          durationType: svcDurType,
+          estimatedHours: getServiceEstHours(ticket, serviceName),
+          clockIn: now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+          crewMembers: assignedNames,
+          memberCount: assigned.length,
+          reopened: true,
+          notes: reopenNote
+        })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(result) {
+        if (result.success && result.entryId) {
+          at.serviceClocks[serviceName].entryId = result.entryId;
+        }
+      })
+      .catch(function(err) { console.error('Failed to save reopened service:', err); });
+
+      haptic('success');
+      renderStopCards();
+      checkUnassignedMembers(ticketId);
+    }
+
     function showServiceReassignmentModal(ticketId, freedMembers, notStartedServices) {
       var overlay = document.getElementById('crew-reassign-overlay');
 
@@ -4928,7 +5146,8 @@
             ticketId: ticketId,
             propertyAddress: ticket ? ticket.propertyAddress : '',
             serviceName: serviceName,
-            durationType: svcDurType
+            durationType: svcDurType,
+            estimatedHours: getServiceEstHours(ticket, serviceName)
           }).then(function(newId) {
             if (newId) {
               svcClock.entryId = newId;

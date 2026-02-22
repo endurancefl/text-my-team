@@ -3362,6 +3362,14 @@
     .service-row.last-service {
       border-bottom: none;
     }
+    .service-row[onclick] {
+      cursor: pointer;
+      -webkit-tap-highlight-color: rgba(0,122,255,0.1);
+    }
+    .service-row[onclick]:active {
+      background: var(--ios-grouped-bg);
+      transition: background 0.1s;
+    }
     .service-status-icon {
       width: 18px;
       height: 18px;

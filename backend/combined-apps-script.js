@@ -60,6 +60,10 @@ function doGet(e) {
       case 'verifyPin':
         return verifyPin(e.parameter.pin);
 
+      // ─── Production Analysis ───
+      case 'getProductionAnalysis':
+        return jsonResponse(getProductionAnalysis(e));
+
       // ─── Contacts ───
       case 'getContacts':
         return jsonResponse(getContacts());
@@ -135,6 +139,9 @@ function doPost(e) {
     }
     if (data.sendWeeklyReport) {
       return jsonResponse(sendWeeklyReport(data));
+    }
+    if (data.reopenTicketService) {
+      return jsonResponse(reopenTicketService(data));
     }
 
     // ─── Contacts POST handlers ───
@@ -1192,6 +1199,47 @@ function updateTicketStatus(data) {
   return { success: false, error: 'Ticket not found' };
 }
 
+/**
+ * Reopen a completed service on a ticket.
+ * Removes the service from the Completed Services JSON column.
+ * If revertStatus is true and ticket is completed, reverts to partial.
+ * POST: { reopenTicketService: true, ticketId, serviceName, revertStatus }
+ */
+function reopenTicketService(data) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Scheduled Tickets');
+  if (!sheet) return { success: false, error: 'Scheduled Tickets sheet not found' };
+
+  var sheetData = sheet.getDataRange().getValues();
+  var headers = sheetData[0];
+  var ticketIdCol = headers.indexOf('Ticket ID');
+  var statusCol = headers.indexOf('Status');
+  var completedServicesCol = headers.indexOf('Completed Services');
+
+  if (ticketIdCol === -1) ticketIdCol = 0;
+
+  for (var i = 1; i < sheetData.length; i++) {
+    if (sheetData[i][ticketIdCol] === data.ticketId) {
+      // Remove service from Completed Services JSON
+      if (completedServicesCol !== -1) {
+        var raw = sheetData[i][completedServicesCol] || '[]';
+        var completedArr = [];
+        try { completedArr = JSON.parse(raw); } catch(e) {}
+        var idx = completedArr.indexOf(data.serviceName);
+        if (idx >= 0) completedArr.splice(idx, 1);
+        sheet.getRange(i + 1, completedServicesCol + 1).setValue(JSON.stringify(completedArr));
+      }
+      // Revert status from completed to partial if requested
+      if (data.revertStatus && statusCol !== -1 && sheetData[i][statusCol] === 'completed') {
+        sheet.getRange(i + 1, statusCol + 1).setValue('partial');
+      }
+      return { success: true };
+    }
+  }
+
+  return { success: false, error: 'Ticket not found' };
+}
+
 function rescheduleTicket(data) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('Scheduled Tickets');
@@ -2196,6 +2244,20 @@ function saveTimeEntry(data) {
       sheet.getRange(1, nextCol3).setValue('Duration Type');
       sheet.getRange(1, nextCol3).setFontWeight('bold');
     }
+    // Auto-upgrade: add Reopened column if missing
+    headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    if (headerRow.indexOf('Reopened') === -1) {
+      var nextCol4 = sheet.getLastColumn() + 1;
+      sheet.getRange(1, nextCol4).setValue('Reopened');
+      sheet.getRange(1, nextCol4).setFontWeight('bold');
+    }
+    // Auto-upgrade: add Estimated Hours column if missing
+    headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    if (headerRow.indexOf('Estimated Hours') === -1) {
+      var nextCol5 = sheet.getLastColumn() + 1;
+      sheet.getRange(1, nextCol5).setValue('Estimated Hours');
+      sheet.getRange(1, nextCol5).setFontWeight('bold');
+    }
   }
 
   // Re-read headers after potential upgrade
@@ -2203,6 +2265,8 @@ function saveTimeEntry(data) {
   var serviceNameCol = currentHeaders.indexOf('Service Name');
   var memberCountCol = currentHeaders.indexOf('Member Count');
   var durationTypeCol = currentHeaders.indexOf('Duration Type');
+  var reopenedCol = currentHeaders.indexOf('Reopened');
+  var estimatedHoursCol = currentHeaders.indexOf('Estimated Hours');
 
   // Generate entry ID
   var existingData = sheet.getDataRange().getValues();
@@ -2247,6 +2311,8 @@ function saveTimeEntry(data) {
   if (serviceNameCol !== -1) baseRow[serviceNameCol] = data.serviceName || '';
   if (memberCountCol !== -1) baseRow[memberCountCol] = data.memberCount || '';
   if (durationTypeCol !== -1) baseRow[durationTypeCol] = data.durationType || '';
+  if (reopenedCol !== -1) baseRow[reopenedCol] = data.reopened ? 'true' : '';
+  if (estimatedHoursCol !== -1) baseRow[estimatedHoursCol] = data.estimatedHours || '';
 
   sheet.appendRow(baseRow);
 
@@ -2930,4 +2996,328 @@ function deleteContact(data) {
     }
   }
   return { success: false, error: 'Contact not found' };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PRODUCTION ANALYSIS
+// ═══════════════════════════════════════════════════════════════
+
+function getProductionAnalysis(e) {
+  var startDate = (e.parameter && e.parameter.startDate) || '';
+  var endDate = (e.parameter && e.parameter.endDate) || '';
+  var crewFilter = (e.parameter && e.parameter.crew) || 'all';
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // ─── Read Scheduled Tickets ───
+  var ticketSheet = ss.getSheetByName('Scheduled Tickets');
+  if (!ticketSheet) return { success: true, services: [], items: [] };
+
+  var ticketData = ticketSheet.getDataRange().getValues();
+  var ticketHeaders = ticketData[0];
+  var tCol = {};
+  ['Ticket ID', 'Property Address', 'Assigned Crew', 'Event Date', 'Services JSON', 'Total Est Hours', 'Status'].forEach(function(h) {
+    tCol[h] = ticketHeaders.indexOf(h);
+  });
+
+  // Filter tickets to completed/partial within date range
+  var tickets = [];
+  for (var i = 1; i < ticketData.length; i++) {
+    var row = ticketData[i];
+    if (!row[tCol['Ticket ID']]) continue;
+
+    var status = String(row[tCol['Status']] || '').toLowerCase().trim();
+    if (status !== 'completed' && status !== 'partial') continue;
+
+    var rawDate = row[tCol['Event Date']];
+    var dateStr = '';
+    if (rawDate instanceof Date) {
+      dateStr = rawDate.getFullYear() + '-' + String(rawDate.getMonth() + 1).padStart(2, '0') + '-' + String(rawDate.getDate()).padStart(2, '0');
+    } else {
+      dateStr = String(rawDate || '');
+      if (dateStr.indexOf('T') !== -1) dateStr = dateStr.split('T')[0];
+    }
+
+    if (startDate && dateStr < startDate) continue;
+    if (endDate && dateStr > endDate) continue;
+
+    var crew = String(row[tCol['Assigned Crew']] || '');
+    if (crewFilter !== 'all' && crew !== crewFilter) continue;
+
+    var servicesRaw = row[tCol['Services JSON']] || '[]';
+    var services;
+    try { services = typeof servicesRaw === 'string' ? JSON.parse(servicesRaw) : servicesRaw; } catch(ex) { services = []; }
+
+    tickets.push({
+      ticketId: String(row[tCol['Ticket ID']]),
+      propertyAddress: String(row[tCol['Property Address']] || ''),
+      crew: crew,
+      eventDate: dateStr,
+      services: services
+    });
+  }
+
+  // ─── Read Time Entries (service type only) ───
+  var teSheet = ss.getSheetByName('Time Entries');
+  var timeEntries = [];
+  if (teSheet) {
+    var teData = teSheet.getDataRange().getValues();
+    var teHeaders = teData[0];
+    var te = {};
+    ['Entry ID', 'Ticket ID', 'Entry Type', 'Date', 'Duration Minutes', 'Service Name',
+     'Member Count', 'Duration Type', 'Reopened', 'Estimated Hours', 'Crew'].forEach(function(h) {
+      te[h] = teHeaders.indexOf(h);
+    });
+
+    for (var j = 1; j < teData.length; j++) {
+      var teRow = teData[j];
+      var entryType = te['Entry Type'] !== -1 ? String(teRow[te['Entry Type']] || '') : '';
+      if (entryType !== 'service') continue;
+
+      var teDateRaw = te['Date'] !== -1 ? teRow[te['Date']] : '';
+      var teDateStr = '';
+      if (teDateRaw instanceof Date) {
+        teDateStr = teDateRaw.getFullYear() + '-' + String(teDateRaw.getMonth() + 1).padStart(2, '0') + '-' + String(teDateRaw.getDate()).padStart(2, '0');
+      } else {
+        teDateStr = String(teDateRaw || '');
+        if (teDateStr.indexOf('T') !== -1) teDateStr = teDateStr.split('T')[0];
+      }
+
+      if (startDate && teDateStr < startDate) continue;
+      if (endDate && teDateStr > endDate) continue;
+
+      var teCrew = te['Crew'] !== -1 ? String(teRow[te['Crew']] || '') : '';
+      if (crewFilter !== 'all' && teCrew !== crewFilter) continue;
+
+      timeEntries.push({
+        ticketId: te['Ticket ID'] !== -1 ? String(teRow[te['Ticket ID']] || '') : '',
+        serviceName: te['Service Name'] !== -1 ? String(teRow[te['Service Name']] || '') : '',
+        durationMinutes: te['Duration Minutes'] !== -1 ? (parseFloat(teRow[te['Duration Minutes']]) || 0) : 0,
+        memberCount: te['Member Count'] !== -1 ? (parseInt(teRow[te['Member Count']]) || 1) : 1,
+        durationType: te['Duration Type'] !== -1 ? String(teRow[te['Duration Type']] || 'scalable') : 'scalable',
+        reopened: te['Reopened'] !== -1 ? String(teRow[te['Reopened']] || '') === 'true' : false,
+        estimatedHours: te['Estimated Hours'] !== -1 ? (parseFloat(teRow[te['Estimated Hours']]) || 0) : 0
+      });
+    }
+  }
+
+  // ─── Aggregate time entries by ticketId + serviceName ───
+  var teAgg = {}; // key: ticketId|serviceName
+  for (var k = 0; k < timeEntries.length; k++) {
+    var entry = timeEntries[k];
+    var key = entry.ticketId + '|' + entry.serviceName;
+    if (!teAgg[key]) {
+      teAgg[key] = { totalMinutes: 0, totalManMinutes: 0, maxMemberCount: 0, reopened: false, durationType: entry.durationType, estimatedHours: entry.estimatedHours };
+    }
+    teAgg[key].totalMinutes += entry.durationMinutes;
+    var manMin = entry.durationType === 'fixed' ? entry.durationMinutes : entry.durationMinutes * entry.memberCount;
+    teAgg[key].totalManMinutes += manMin;
+    if (entry.memberCount > teAgg[key].maxMemberCount) teAgg[key].maxMemberCount = entry.memberCount;
+    if (entry.reopened) teAgg[key].reopened = true;
+    if (entry.estimatedHours > 0 && teAgg[key].estimatedHours === 0) teAgg[key].estimatedHours = entry.estimatedHours;
+  }
+
+  // ─── Build service-level aggregation ───
+  var serviceAgg = {}; // key: serviceName
+  var ticketDetails = {}; // key: serviceName -> array of ticket details
+
+  for (var t2 = 0; t2 < tickets.length; t2++) {
+    var ticket = tickets[t2];
+    for (var s = 0; s < ticket.services.length; s++) {
+      var svc = ticket.services[s];
+      var svcName = svc.name || svc.serviceName || '';
+      if (!svcName) continue;
+      var estHours = parseFloat(svc.estimatedHours) || 0;
+      var teKey = ticket.ticketId + '|' + svcName;
+      var actual = teAgg[teKey];
+
+      if (!actual) continue; // No time entries for this service on this ticket
+
+      var actualManHours = actual.totalManMinutes / 60;
+
+      if (!serviceAgg[svcName]) {
+        serviceAgg[svcName] = { ticketCount: 0, totalEstHours: 0, totalActualManHours: 0, reopenedCount: 0, itemCount: 0 };
+      }
+      serviceAgg[svcName].ticketCount++;
+      serviceAgg[svcName].totalEstHours += estHours;
+      serviceAgg[svcName].totalActualManHours += actualManHours;
+      if (actual.reopened) serviceAgg[svcName].reopenedCount++;
+
+      // Track item count from first ticket we see
+      var items = svc.items || [];
+      if (items.length > serviceAgg[svcName].itemCount) serviceAgg[svcName].itemCount = items.length;
+
+      if (!ticketDetails[svcName]) ticketDetails[svcName] = [];
+
+      // Build item-level implied rates
+      var ticketItems = [];
+      for (var it = 0; it < items.length; it++) {
+        var item = items[it];
+        var itemEntry = {
+          name: item.name || '',
+          estimatedHours: parseFloat(item.hours) || 0,
+          unit: item.unit || ''
+        };
+        if (item.quantities) {
+          itemEntry.quantities = item.quantities;
+          // Calculate implied rates using efficiency ratio
+          if (estHours > 0 && actualManHours > 0) {
+            var efficiencyRatio = estHours / actualManHours;
+            itemEntry.impliedRate = {};
+            ['easy', 'medium', 'hard'].forEach(function(diff) {
+              var qty = parseFloat((item.quantities || {})[diff]) || 0;
+              var itemHrs = parseFloat(item.hours) || 0;
+              if (qty > 0 && itemHrs > 0) {
+                var catalogRate = qty / itemHrs;
+                itemEntry.impliedRate[diff] = Math.round(catalogRate * efficiencyRatio);
+              }
+            });
+          }
+        }
+        ticketItems.push(itemEntry);
+      }
+
+      ticketDetails[svcName].push({
+        ticketId: ticket.ticketId,
+        propertyAddress: ticket.propertyAddress,
+        eventDate: ticket.eventDate,
+        crew: ticket.crew,
+        estimatedHours: estHours,
+        actualManHours: Math.round(actualManHours * 100) / 100,
+        memberCount: actual.maxMemberCount,
+        durationMinutes: Math.round(actual.totalMinutes),
+        reopened: actual.reopened,
+        items: ticketItems
+      });
+    }
+  }
+
+  // ─── Build service response array ───
+  var servicesResult = [];
+  Object.keys(serviceAgg).forEach(function(svcName) {
+    var agg = serviceAgg[svcName];
+    var efficiency = agg.totalEstHours > 0 ? agg.totalEstHours / agg.totalActualManHours : 0;
+    servicesResult.push({
+      serviceName: svcName,
+      ticketCount: agg.ticketCount,
+      totalEstimatedHours: Math.round(agg.totalEstHours * 100) / 100,
+      totalActualManHours: Math.round(agg.totalActualManHours * 100) / 100,
+      efficiency: Math.round(efficiency * 100) / 100,
+      avgEstPerVisit: agg.ticketCount > 0 ? Math.round((agg.totalEstHours / agg.ticketCount) * 100) / 100 : 0,
+      avgActualPerVisit: agg.ticketCount > 0 ? Math.round((agg.totalActualManHours / agg.ticketCount) * 100) / 100 : 0,
+      reopenedCount: agg.reopenedCount,
+      itemCount: agg.itemCount,
+      tickets: ticketDetails[svcName] || []
+    });
+  });
+
+  // ─── Build item-level aggregation ───
+  // Collect all item data across tickets for field rate calculation
+  var itemAgg = {}; // key: itemName
+
+  Object.keys(ticketDetails).forEach(function(svcName) {
+    var svcTickets = ticketDetails[svcName];
+    var isSingleItem = (serviceAgg[svcName].itemCount === 1);
+
+    for (var td = 0; td < svcTickets.length; td++) {
+      var tDetail = svcTickets[td];
+      for (var ii = 0; ii < tDetail.items.length; ii++) {
+        var itm = tDetail.items[ii];
+        if (!itm.name || !itm.quantities) continue;
+
+        if (!itemAgg[itm.name]) {
+          itemAgg[itm.name] = {
+            unit: itm.unit || '',
+            singleItemQty: { easy: 0, medium: 0, hard: 0 },
+            singleItemHours: 0,
+            singleItemCount: 0,
+            inferredRateSum: { easy: 0, medium: 0, hard: 0 },
+            inferredRateCount: { easy: 0, medium: 0, hard: 0 },
+            multiItemCount: 0
+          };
+        }
+
+        if (isSingleItem && tDetail.actualManHours > 0) {
+          // Measured rate: direct totalQty / actualManHours
+          itemAgg[itm.name].singleItemCount++;
+          itemAgg[itm.name].singleItemHours += tDetail.actualManHours;
+          ['easy', 'medium', 'hard'].forEach(function(d) {
+            itemAgg[itm.name].singleItemQty[d] += parseFloat((itm.quantities || {})[d]) || 0;
+          });
+        } else if (itm.impliedRate) {
+          // Inferred rate from multi-item services
+          itemAgg[itm.name].multiItemCount++;
+          ['easy', 'medium', 'hard'].forEach(function(d) {
+            if (itm.impliedRate[d]) {
+              itemAgg[itm.name].inferredRateSum[d] += itm.impliedRate[d];
+              itemAgg[itm.name].inferredRateCount[d]++;
+            }
+          });
+        }
+      }
+    }
+  });
+
+  // ─── Read Item Catalog for catalog rates ───
+  var catalogRatesMap = {};
+  var catalogSheet = ss.getSheetByName('Item Catalog');
+  if (catalogSheet) {
+    var catData = catalogSheet.getDataRange().getValues();
+    var catHeaders = catData[0];
+    var catItemCol = catHeaders.indexOf('Item');
+    var catUnitCol = catHeaders.indexOf('Unit');
+    var catEasyCol = catHeaders.indexOf('Easy');
+    var catMedCol = catHeaders.indexOf('Medium');
+    var catHardCol = catHeaders.indexOf('Hard');
+
+    for (var ci = 1; ci < catData.length; ci++) {
+      var catRow = catData[ci];
+      var catName = catItemCol !== -1 ? String(catRow[catItemCol] || '') : '';
+      if (catName) {
+        catalogRatesMap[catName] = {
+          easy: catEasyCol !== -1 ? (parseFloat(catRow[catEasyCol]) || 0) : 0,
+          medium: catMedCol !== -1 ? (parseFloat(catRow[catMedCol]) || 0) : 0,
+          hard: catHardCol !== -1 ? (parseFloat(catRow[catHardCol]) || 0) : 0
+        };
+      }
+    }
+  }
+
+  var itemsResult = [];
+  Object.keys(itemAgg).forEach(function(itemName) {
+    var ia = itemAgg[itemName];
+    var catRates = catalogRatesMap[itemName] || { easy: 0, medium: 0, hard: 0 };
+
+    var measuredRate = {};
+    ['easy', 'medium', 'hard'].forEach(function(d) {
+      if (ia.singleItemQty[d] > 0 && ia.singleItemHours > 0) {
+        measuredRate[d] = Math.round(ia.singleItemQty[d] / ia.singleItemHours);
+      }
+    });
+
+    var inferredRate = {};
+    ['easy', 'medium', 'hard'].forEach(function(d) {
+      if (ia.inferredRateCount[d] > 0) {
+        inferredRate[d] = Math.round(ia.inferredRateSum[d] / ia.inferredRateCount[d]);
+      }
+    });
+
+    itemsResult.push({
+      itemName: itemName,
+      unit: ia.unit,
+      catalogRates: catRates,
+      fieldData: {
+        singleItemServices: ia.singleItemCount,
+        measuredRate: measuredRate,
+        multiItemServices: ia.multiItemCount,
+        inferredRate: inferredRate
+      }
+    });
+  });
+
+  return {
+    success: true,
+    services: servicesResult,
+    items: itemsResult
+  };
 }

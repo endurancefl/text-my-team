@@ -4884,6 +4884,96 @@
       color: var(--gw-text-disabled);
       font-size: 13px;
     }
+
+    /* ─── Production Rates View ─── */
+    .prod-variance-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .prod-variance-badge.green { background: rgba(34,197,94,0.12); color: #16a34a; }
+    .prod-variance-badge.yellow { background: rgba(234,179,8,0.12); color: #ca8a04; }
+    .prod-variance-badge.red { background: rgba(239,68,68,0.12); color: #dc2626; }
+
+    .prod-confidence-tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .prod-confidence-tag.measured { background: rgba(34,197,94,0.12); color: #16a34a; }
+    .prod-confidence-tag.inferred { background: rgba(59,130,246,0.12); color: #2563eb; }
+
+    .prod-service-row { cursor: pointer; }
+    .prod-service-row:hover { background: var(--gw-bg-hover); }
+
+    .prod-detail-row { display: none; }
+    .prod-detail-row.open { display: table-row; }
+    .prod-detail-row td { padding: 0; }
+
+    .prod-detail-content {
+      padding: 12px 16px;
+      background: var(--gw-bg-secondary);
+      border-radius: var(--gw-radius-sm);
+      margin: 4px 8px 12px 8px;
+    }
+
+    .prod-detail-content h4 {
+      font-size: 13px;
+      font-weight: 600;
+      margin: 12px 0 6px 0;
+      color: var(--gw-text-secondary);
+    }
+    .prod-detail-content h4:first-child { margin-top: 0; }
+
+    .prod-item-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+    .prod-item-table th {
+      text-align: left;
+      padding: 4px 8px;
+      color: var(--gw-text-secondary);
+      font-weight: 600;
+      border-bottom: 1px solid var(--gw-border);
+    }
+    .prod-item-table td {
+      padding: 4px 8px;
+      border-bottom: 1px solid var(--gw-border-light, rgba(0,0,0,0.05));
+    }
+
+    .prod-reopened-badge {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 8px;
+      font-size: 10px;
+      font-weight: 600;
+      background: rgba(59,130,246,0.12);
+      color: #2563eb;
+      margin-left: 4px;
+    }
+
+    .prod-empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--gw-text-secondary);
+    }
+    .prod-empty-state svg {
+      width: 48px;
+      height: 48px;
+      stroke: var(--gw-text-disabled);
+      margin-bottom: 12px;
+    }
+
+    #prod-summary-cards .fin-summary-card {
+      background: var(--gw-bg-primary);
+      border: 1px solid var(--gw-border);
+    }
   </style>
 </head>
 <body>
@@ -4933,6 +5023,12 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
           </svg>
           <span>Item Catalog</span>
+        </div>
+        <div class="nav-item" data-view="production">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+          </svg>
+          <span>Production Rates</span>
         </div>
         <div class="nav-item" data-view="schedule" id="schedule-nav">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -5898,6 +5994,27 @@
         <!-- SERVICE CATALOG VIEW -->
         <div class="view" id="view-services">
           <div class="service-catalog-container" id="service-catalog-container"></div>
+        </div>
+
+        <!-- PRODUCTION RATES VIEW -->
+        <div class="view" id="view-production">
+          <div class="sched-toolbar">
+            <div class="sched-filters">
+              <input type="date" id="prod-start-date" class="form-input sched-filter-select">
+              <span style="color:var(--text-secondary);padding:0 4px;">to</span>
+              <input type="date" id="prod-end-date" class="form-input sched-filter-select">
+              <select id="prod-crew-filter" class="form-input sched-filter-select">
+                <option value="all">All Crews</option>
+              </select>
+              <button class="btn btn-primary" onclick="loadProductionAnalysis()">Analyze</button>
+            </div>
+            <div class="sched-view-toggle">
+              <button class="toggle-btn active" id="prod-toggle-services" onclick="setProdTab('services')">Services</button>
+              <button class="toggle-btn" id="prod-toggle-items" onclick="setProdTab('items')">Item Rates</button>
+            </div>
+          </div>
+          <div id="prod-summary-cards" class="fin-summary-cards" style="display:none;"></div>
+          <div id="production-content"></div>
         </div>
 
         <!-- SCHEDULE VIEW — Company Operational Hub -->
@@ -10588,6 +10705,7 @@ function showView(viewId) {
     'templates': 'Templates',
     'services': 'Service Catalog',
     'catalog': 'Item Catalog',
+    'production': 'Production Rates',
     'schedule': 'Schedule',
     'contracts': 'Contracts',
     'reports': 'Weekly Reports',
@@ -10639,6 +10757,11 @@ function showView(viewId) {
   // Load financials when financials view is shown
   if (viewId === 'financials') {
     loadFinancials();
+  }
+
+  // Load production analysis when production view is shown
+  if (viewId === 'production') {
+    initProductionView();
   }
 
   // Load contacts when contacts view is shown
@@ -11558,11 +11681,15 @@ function generateAllTickets(params) {
       const hoursPerVisit = calcItemHoursPerVisit(lineItem);
 
       if (dates.length > 0) {
+        const catalogItem = itemCatalog.find(c => c.item === lineItem.itemName);
         itemSchedules.push({
           serviceName: service.name,
           itemName: lineItem.itemName,
           hoursPerVisit: Math.round(hoursPerVisit * 10000) / 10000,
-          dates: dates
+          dates: dates,
+          quantities: lineItem.quantities || {},
+          unit: catalogItem ? catalogItem.unit : '',
+          complexityFactor: lineItem.complexityFactor || 1.0
         });
       }
     });
@@ -11596,10 +11723,16 @@ function generateAllTickets(params) {
       }
 
       if (is.itemName) {
-        serviceMap[is.serviceName].items.push({
+        const itemEntry = {
           name: is.itemName,
           hours: Math.round(is.hoursPerVisit * 100) / 100
-        });
+        };
+        if (is.quantities && (is.quantities.easy || is.quantities.medium || is.quantities.hard)) {
+          itemEntry.quantities = is.quantities;
+        }
+        if (is.unit) itemEntry.unit = is.unit;
+        if (is.complexityFactor && is.complexityFactor !== 1.0) itemEntry.complexityFactor = is.complexityFactor;
+        serviceMap[is.serviceName].items.push(itemEntry);
       }
       serviceMap[is.serviceName].estimatedHours += is.hoursPerVisit;
     });
@@ -16239,6 +16372,303 @@ function renderContractTable(contracts, tickets) {
   });
 
   html += '</tbody></table>';
+  return html;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PRODUCTION RATES VIEW
+// ═══════════════════════════════════════════════════════════════
+
+function escapeHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+let prodData = null;
+let prodTab = 'services';
+
+function initProductionView() {
+  // Set default date range: last 90 days
+  const end = new Date();
+  const start = new Date();
+  start.setDate(start.getDate() - 90);
+  const startEl = document.getElementById('prod-start-date');
+  const endEl = document.getElementById('prod-end-date');
+  if (!startEl.value) startEl.value = start.toISOString().split('T')[0];
+  if (!endEl.value) endEl.value = end.toISOString().split('T')[0];
+
+  // Populate crew filter
+  populateProdCrewFilter();
+
+  // Auto-load if no data yet
+  if (!prodData) loadProductionAnalysis();
+}
+
+async function populateProdCrewFilter() {
+  const select = document.getElementById('prod-crew-filter');
+  const currentVal = select.value;
+  select.innerHTML = '<option value="all">All Crews</option>';
+  try {
+    const resp = await fetch(GOOGLE_SHEETS_URL + '?action=getCrews');
+    const data = await resp.json();
+    if (data.success && data.crews) {
+      [...new Set(data.crews)].forEach(function(crew) {
+        const opt = document.createElement('option');
+        opt.value = crew;
+        opt.textContent = crew;
+        if (crew === currentVal) opt.selected = true;
+        select.appendChild(opt);
+      });
+    }
+  } catch (e) { /* silent */ }
+}
+
+async function loadProductionAnalysis() {
+  const startDate = document.getElementById('prod-start-date').value;
+  const endDate = document.getElementById('prod-end-date').value;
+  const crew = document.getElementById('prod-crew-filter').value;
+  const content = document.getElementById('production-content');
+  const summaryEl = document.getElementById('prod-summary-cards');
+
+  content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gw-text-secondary);">Loading analysis...</div>';
+  summaryEl.style.display = 'none';
+
+  try {
+    const url = GOOGLE_SHEETS_URL + '?action=getProductionAnalysis&startDate=' + encodeURIComponent(startDate) + '&endDate=' + encodeURIComponent(endDate) + '&crew=' + encodeURIComponent(crew);
+    const resp = await fetch(url);
+    prodData = await resp.json();
+
+    if (!prodData.success) {
+      content.innerHTML = '<div class="prod-empty-state">Error: ' + (prodData.error || 'Unknown error') + '</div>';
+      return;
+    }
+
+    renderProductionView();
+  } catch (err) {
+    content.innerHTML = '<div class="prod-empty-state">Failed to load: ' + err.message + '</div>';
+  }
+}
+
+function setProdTab(tab) {
+  prodTab = tab;
+  document.getElementById('prod-toggle-services').classList.toggle('active', tab === 'services');
+  document.getElementById('prod-toggle-items').classList.toggle('active', tab === 'items');
+  renderProductionView();
+}
+
+function renderProductionView() {
+  if (!prodData || !prodData.success) return;
+
+  const services = prodData.services || [];
+  const items = prodData.items || [];
+  const summaryEl = document.getElementById('prod-summary-cards');
+  const content = document.getElementById('production-content');
+
+  if (services.length === 0 && items.length === 0) {
+    summaryEl.style.display = 'none';
+    content.innerHTML = '<div class="prod-empty-state">' +
+      '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>' +
+      '<div style="font-size:15px;font-weight:600;margin-bottom:4px;">No completed service data</div>' +
+      '<div style="font-size:13px;">Adjust the date range or crew filter and try again.</div></div>';
+    return;
+  }
+
+  // ─── Summary Cards ───
+  const totalTickets = services.reduce((s, sv) => s + sv.ticketCount, 0);
+  const totalEst = services.reduce((s, sv) => s + sv.totalEstimatedHours, 0);
+  const totalActual = services.reduce((s, sv) => s + sv.totalActualManHours, 0);
+  const overallEff = totalActual > 0 ? Math.round((totalEst / totalActual) * 100) : 0;
+  const overBudgetCount = services.filter(sv => sv.efficiency < 1).length;
+  const reopenedTotal = services.reduce((s, sv) => s + sv.reopenedCount, 0);
+
+  const effColor = overallEff >= 100 ? '#16a34a' : overallEff >= 85 ? '#ca8a04' : '#dc2626';
+
+  summaryEl.style.display = 'flex';
+  summaryEl.innerHTML =
+    '<div class="fin-summary-card"><div class="fin-summary-value">' + totalTickets + '</div><div class="fin-summary-label">Service Visits Analyzed</div></div>' +
+    '<div class="fin-summary-card"><div class="fin-summary-value" style="color:' + effColor + '">' + overallEff + '%</div><div class="fin-summary-label">Overall Efficiency</div></div>' +
+    '<div class="fin-summary-card"><div class="fin-summary-value" style="color:' + (overBudgetCount > 0 ? '#ca8a04' : 'inherit') + '">' + overBudgetCount + '</div><div class="fin-summary-label">Services Over Budget</div></div>' +
+    '<div class="fin-summary-card"><div class="fin-summary-value" style="color:' + (reopenedTotal > 0 ? '#2563eb' : 'inherit') + '">' + reopenedTotal + '</div><div class="fin-summary-label">Reopened Services</div></div>';
+
+  if (prodTab === 'services') {
+    content.innerHTML = renderProdServicesTable(services);
+  } else {
+    content.innerHTML = renderProdItemsTable(items);
+  }
+}
+
+function prodVarianceBadge(efficiency) {
+  const pct = Math.round((1 - efficiency) * 100);
+  const sign = pct > 0 ? '+' : '';
+  const cls = pct <= 0 ? 'green' : pct <= 15 ? 'yellow' : 'red';
+  return '<span class="prod-variance-badge ' + cls + '">' + sign + pct + '%</span>';
+}
+
+function renderProdServicesTable(services) {
+  // Sort by worst efficiency first
+  const sorted = services.slice().sort((a, b) => a.efficiency - b.efficiency);
+
+  let html = '<div class="table-card"><div class="table-container">';
+  html += '<table class="catalog-table"><thead><tr>';
+  html += '<th>Service</th><th>Visits</th><th>Est Hrs (avg)</th><th>Actual Man-Hrs (avg)</th><th>Variance</th><th>Efficiency</th><th>Items</th><th></th>';
+  html += '</tr></thead><tbody>';
+
+  sorted.forEach(function(svc, idx) {
+    const effPct = Math.round(svc.efficiency * 100);
+    const itemLabel = svc.itemCount === 0 ? '-' :
+      svc.itemCount === 1 ? '1 item' : svc.itemCount + ' items';
+    const reopenBadge = svc.reopenedCount > 0 ? ' <span class="prod-reopened-badge">' + svc.reopenedCount + ' reopened</span>' : '';
+
+    html += '<tr class="prod-service-row" onclick="toggleProdDetail(' + idx + ')">';
+    html += '<td><strong>' + escapeHtml(svc.serviceName) + '</strong>' + reopenBadge + '</td>';
+    html += '<td>' + svc.ticketCount + '</td>';
+    html += '<td>' + svc.avgEstPerVisit.toFixed(2) + '</td>';
+    html += '<td>' + svc.avgActualPerVisit.toFixed(2) + '</td>';
+    html += '<td>' + prodVarianceBadge(svc.efficiency) + '</td>';
+    html += '<td>' + effPct + '%</td>';
+    html += '<td>' + itemLabel + '</td>';
+    html += '<td style="font-size:16px;color:var(--gw-text-secondary);">&#9654;</td>';
+    html += '</tr>';
+
+    // Detail row
+    html += '<tr class="prod-detail-row" id="prod-detail-' + idx + '"><td colspan="8">';
+    html += '<div class="prod-detail-content">';
+    html += renderProdTicketDetail(svc);
+    html += '</div></td></tr>';
+  });
+
+  html += '</tbody></table></div></div>';
+  return html;
+}
+
+function toggleProdDetail(idx) {
+  const row = document.getElementById('prod-detail-' + idx);
+  if (row) row.classList.toggle('open');
+}
+
+function renderProdTicketDetail(svc) {
+  let html = '<h4>Per-Ticket Breakdown</h4>';
+  html += '<table class="prod-item-table"><thead><tr>';
+  html += '<th>Date</th><th>Property</th><th>Crew</th><th>Est Hrs</th><th>Actual</th><th>Members</th><th>Variance</th>';
+  html += '</tr></thead><tbody>';
+
+  const tickets = (svc.tickets || []).slice().sort((a, b) => b.eventDate.localeCompare(a.eventDate));
+
+  tickets.forEach(function(t) {
+    const variance = t.estimatedHours > 0 ? (t.actualManHours - t.estimatedHours) / t.estimatedHours : 0;
+    const varPct = Math.round(variance * 100);
+    const cls = varPct <= 0 ? 'green' : varPct <= 15 ? 'yellow' : 'red';
+    const reopenTag = t.reopened ? ' <span class="prod-reopened-badge">reopened</span>' : '';
+
+    const dateParts = t.eventDate.split('-');
+    const dateDisplay = dateParts.length === 3 ? (dateParts[1].replace(/^0/, '') + '/' + dateParts[2].replace(/^0/, '')) : t.eventDate;
+
+    html += '<tr>';
+    html += '<td>' + dateDisplay + reopenTag + '</td>';
+    html += '<td>' + escapeHtml(t.propertyAddress || '-') + '</td>';
+    html += '<td>' + escapeHtml(t.crew || '-') + '</td>';
+    html += '<td>' + (t.estimatedHours || 0).toFixed(2) + '</td>';
+    html += '<td>' + (t.actualManHours || 0).toFixed(2) + '</td>';
+    html += '<td>' + (t.memberCount || '-') + '</td>';
+    html += '<td><span class="prod-variance-badge ' + cls + '">' + (varPct > 0 ? '+' : '') + varPct + '%</span></td>';
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+
+  // Item-level implied rates if any ticket has items with quantities
+  const ticketsWithItems = tickets.filter(t => t.items && t.items.some(i => i.quantities));
+  if (ticketsWithItems.length > 0) {
+    html += '<h4>Item-Level Implied Rates</h4>';
+    html += '<table class="prod-item-table"><thead><tr>';
+    html += '<th>Item</th><th>Unit</th><th>Catalog Rate (Easy)</th><th>Field Rate (Easy)</th><th>\u0394</th><th>Confidence</th>';
+    html += '</tr></thead><tbody>';
+
+    // Aggregate implied rates across tickets for this service
+    const itemRates = {};
+    ticketsWithItems.forEach(function(t) {
+      t.items.forEach(function(item) {
+        if (!item.quantities || !item.impliedRate) return;
+        if (!itemRates[item.name]) {
+          itemRates[item.name] = { unit: item.unit, impliedEasy: [], impliedMedium: [], impliedHard: [] };
+        }
+        if (item.impliedRate.easy) itemRates[item.name].impliedEasy.push(item.impliedRate.easy);
+        if (item.impliedRate.medium) itemRates[item.name].impliedMedium.push(item.impliedRate.medium);
+        if (item.impliedRate.hard) itemRates[item.name].impliedHard.push(item.impliedRate.hard);
+      });
+    });
+
+    Object.keys(itemRates).forEach(function(itemName) {
+      const ir = itemRates[itemName];
+      const catItem = (itemCatalog || []).find(c => c.item === itemName);
+      const catEasy = catItem ? (catItem.easy || 0) : 0;
+      const avgEasy = ir.impliedEasy.length > 0 ? Math.round(ir.impliedEasy.reduce((a, b) => a + b, 0) / ir.impliedEasy.length) : 0;
+      const delta = catEasy > 0 && avgEasy > 0 ? Math.round(((avgEasy - catEasy) / catEasy) * 100) : 0;
+      const deltaClass = delta >= 0 ? 'green' : (delta >= -15 ? 'yellow' : 'red');
+      const isSingleItem = svc.itemCount === 1;
+      const confLabel = isSingleItem ? 'Measured' : 'Inferred';
+      const confClass = isSingleItem ? 'measured' : 'inferred';
+
+      html += '<tr>';
+      html += '<td>' + escapeHtml(itemName) + '</td>';
+      html += '<td>' + escapeHtml(ir.unit || '-') + '</td>';
+      html += '<td>' + (catEasy > 0 ? catEasy.toLocaleString() + '/hr' : '-') + '</td>';
+      html += '<td>' + (avgEasy > 0 ? avgEasy.toLocaleString() + '/hr' : '-') + '</td>';
+      html += '<td><span class="prod-variance-badge ' + deltaClass + '">' + (delta > 0 ? '+' : '') + delta + '%</span></td>';
+      html += '<td><span class="prod-confidence-tag ' + confClass + '">' + confLabel + '</span></td>';
+      html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+  }
+
+  return html;
+}
+
+function renderProdItemsTable(items) {
+  if (items.length === 0) {
+    return '<div class="prod-empty-state"><div style="font-size:15px;font-weight:600;">No item-level rate data</div>' +
+      '<div style="font-size:13px;margin-top:4px;">Item rates require tickets with per-item quantity data (generated from estimates with item catalog entries).</div></div>';
+  }
+
+  let html = '<div class="table-card"><div class="table-container">';
+  html += '<table class="catalog-table"><thead><tr>';
+  html += '<th>Item</th><th>Unit</th><th>Easy (Catalog)</th><th>Easy (Field)</th><th>\u0394</th><th>Medium (Catalog)</th><th>Medium (Field)</th><th>\u0394</th><th>Data Points</th>';
+  html += '</tr></thead><tbody>';
+
+  items.forEach(function(item) {
+    const catEasy = item.catalogRates.easy || 0;
+    const catMed = item.catalogRates.medium || 0;
+    const fd = item.fieldData || {};
+
+    // Use measured rate if available, otherwise inferred
+    const fieldEasy = (fd.measuredRate && fd.measuredRate.easy) || (fd.inferredRate && fd.inferredRate.easy) || 0;
+    const fieldMed = (fd.measuredRate && fd.measuredRate.medium) || (fd.inferredRate && fd.inferredRate.medium) || 0;
+
+    const deltaEasy = catEasy > 0 && fieldEasy > 0 ? Math.round(((fieldEasy - catEasy) / catEasy) * 100) : null;
+    const deltaMed = catMed > 0 && fieldMed > 0 ? Math.round(((fieldMed - catMed) / catMed) * 100) : null;
+
+    const deltaEasyClass = deltaEasy === null ? '' : (deltaEasy >= 0 ? 'green' : deltaEasy >= -15 ? 'yellow' : 'red');
+    const deltaMedClass = deltaMed === null ? '' : (deltaMed >= 0 ? 'green' : deltaMed >= -15 ? 'yellow' : 'red');
+
+    const dataPoints = (fd.singleItemServices || 0) + (fd.multiItemServices || 0);
+    const confLabel = fd.singleItemServices > 0 ? 'measured' : 'inferred';
+
+    html += '<tr>';
+    html += '<td><strong>' + escapeHtml(item.itemName) + '</strong></td>';
+    html += '<td>' + escapeHtml(item.unit || '-') + '</td>';
+    html += '<td>' + (catEasy > 0 ? catEasy.toLocaleString() : '-') + '</td>';
+    html += '<td>' + (fieldEasy > 0 ? fieldEasy.toLocaleString() : '-') + '</td>';
+    html += '<td>' + (deltaEasy !== null ? '<span class="prod-variance-badge ' + deltaEasyClass + '">' + (deltaEasy > 0 ? '+' : '') + deltaEasy + '%</span>' : '-') + '</td>';
+    html += '<td>' + (catMed > 0 ? catMed.toLocaleString() : '-') + '</td>';
+    html += '<td>' + (fieldMed > 0 ? fieldMed.toLocaleString() : '-') + '</td>';
+    html += '<td>' + (deltaMed !== null ? '<span class="prod-variance-badge ' + deltaMedClass + '">' + (deltaMed > 0 ? '+' : '') + deltaMed + '%</span>' : '-') + '</td>';
+    html += '<td>' + dataPoints + ' <span class="prod-confidence-tag ' + confLabel + '">' + confLabel + '</span></td>';
+    html += '</tr>';
+  });
+
+  html += '</tbody></table></div></div>';
   return html;
 }
 </script>
