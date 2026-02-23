@@ -748,14 +748,14 @@ function createContract(data) {
 
   if (!sheet) {
     sheet = ss.insertSheet('Contracts');
-    sheet.getRange(1, 1, 1, 18).setValues([['Contract ID', 'Bid ID', 'Property Address', 'Assigned Crew', 'Preferred Day', 'Start Date', 'End Date', 'Contract Months', 'Monthly Payment', 'Status', 'Created Date', 'Payment Terms', 'Contract Value', 'CC Fee %', 'CC Gross-Up', 'Contact Name', 'Contact Email', 'Billing Address']]);
-    sheet.getRange(1, 1, 1, 18).setFontWeight('bold');
+    sheet.getRange(1, 1, 1, 20).setValues([['Contract ID', 'Bid ID', 'Property Address', 'Assigned Crew', 'Preferred Day', 'Start Date', 'End Date', 'Contract Months', 'Monthly Payment', 'Status', 'Created Date', 'Payment Terms', 'Contract Value', 'CC Fee %', 'CC Gross-Up', 'Contact Name', 'Contact Email', 'Billing Address', 'PDF URL', 'PDF File ID']]);
+    sheet.getRange(1, 1, 1, 20).setFontWeight('bold');
   }
 
   // Ensure new columns exist on existing sheets
   var existingData = sheet.getDataRange().getValues();
   var headers = existingData[0];
-  var newCols = ['Payment Terms', 'Contract Value', 'CC Fee %', 'CC Gross-Up', 'Contact Name', 'Contact Email', 'Billing Address'];
+  var newCols = ['Payment Terms', 'Contract Value', 'CC Fee %', 'CC Gross-Up', 'Contact Name', 'Contact Email', 'Billing Address', 'PDF URL', 'PDF File ID'];
   newCols.forEach(function(colName) {
     if (headers.indexOf(colName) === -1) {
       var nextCol = headers.length + 1;
@@ -786,7 +786,9 @@ function createContract(data) {
     ccGrossUp: headers.indexOf('CC Gross-Up'),
     contactName: headers.indexOf('Contact Name'),
     contactEmail: headers.indexOf('Contact Email'),
-    billingAddress: headers.indexOf('Billing Address')
+    billingAddress: headers.indexOf('Billing Address'),
+    pdfUrl: headers.indexOf('PDF URL'),
+    pdfFileId: headers.indexOf('PDF File ID')
   };
 
   var idCol = col.contractId !== -1 ? col.contractId : 0;
@@ -824,6 +826,8 @@ function createContract(data) {
     else if (c === col.contactName) row.push(data.contactName || '');
     else if (c === col.contactEmail) row.push(data.contactEmail || '');
     else if (c === col.billingAddress) row.push(data.billingAddress || '');
+    else if (c === col.pdfUrl) row.push(data.pdfUrl || '');
+    else if (c === col.pdfFileId) row.push(data.pdfFileId || '');
     else row.push('');
   }
 
@@ -836,6 +840,16 @@ function updateContract(data) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('Contracts');
   if (!sheet) return { success: false, error: 'Contracts sheet not found' };
+
+  // Ensure PDF columns exist
+  var tempHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  ['PDF URL', 'PDF File ID'].forEach(function(colName) {
+    if (tempHeaders.indexOf(colName) === -1) {
+      var nextCol = tempHeaders.length + 1;
+      sheet.getRange(1, nextCol).setValue(colName).setFontWeight('bold');
+      tempHeaders.push(colName);
+    }
+  });
 
   var rows = sheet.getDataRange().getValues();
   var headers = rows[0];
@@ -860,7 +874,9 @@ function updateContract(data) {
         'CC Gross-Up': data.ccGrossUp !== undefined ? (data.ccGrossUp ? 'Yes' : 'No') : undefined,
         'Contact Name': data.contactName,
         'Contact Email': data.contactEmail,
-        'Billing Address': data.billingAddress
+        'Billing Address': data.billingAddress,
+        'PDF URL': data.pdfUrl,
+        'PDF File ID': data.pdfFileId
       };
 
       for (var field in fieldsToUpdate) {
@@ -943,7 +959,9 @@ function getContracts() {
     ccGrossUp: headers.indexOf('CC Gross-Up'),
     contactName: headers.indexOf('Contact Name'),
     contactEmail: headers.indexOf('Contact Email'),
-    billingAddress: headers.indexOf('Billing Address')
+    billingAddress: headers.indexOf('Billing Address'),
+    pdfUrl: headers.indexOf('PDF URL'),
+    pdfFileId: headers.indexOf('PDF File ID')
   };
 
   var contracts = [];
@@ -970,7 +988,9 @@ function getContracts() {
         ccGrossUp: col.ccGrossUp !== -1 ? (row[col.ccGrossUp] === 'Yes') : false,
         contactName: col.contactName !== -1 ? (row[col.contactName] || '') : '',
         contactEmail: col.contactEmail !== -1 ? (row[col.contactEmail] || '') : '',
-        billingAddress: col.billingAddress !== -1 ? (row[col.billingAddress] || '') : ''
+        billingAddress: col.billingAddress !== -1 ? (row[col.billingAddress] || '') : '',
+        pdfUrl: col.pdfUrl !== -1 ? (row[col.pdfUrl] || '') : '',
+        pdfFileId: col.pdfFileId !== -1 ? (row[col.pdfFileId] || '') : ''
       });
     }
   }
