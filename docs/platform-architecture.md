@@ -284,9 +284,10 @@ text-my-team/
 
 #### Combined Apps Script Endpoints
 
-**GET endpoints (24):**
+**GET endpoints (25):**
 | Endpoint | Source | Description |
 |----------|--------|-------------|
+| `getInitData` | Estimating | **Bulk init** — returns all estimating data in a single request (itemCatalog, bidSettings, bids, templates, serviceCatalog, contacts, properties, propertyContacts, subContractors). Reduces 9+ network round-trips to 1. |
 | `getItemCatalog` | Estimating | Returns item catalog with production rates |
 | `getBidSettings` | Estimating | Returns settings key-value pairs |
 | `getBids` | Estimating | Returns all bids |

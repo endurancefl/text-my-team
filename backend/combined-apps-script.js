@@ -16,6 +16,21 @@ function doGet(e) {
 
   try {
     switch (action) {
+      // ─── Bulk Init (single request for all estimate builder data) ───
+      case 'getInitData':
+        return jsonResponse({
+          success: true,
+          itemCatalog: getItemCatalog(),
+          bidSettings: getBidSettings(),
+          bids: getBids(),
+          templates: getTemplates(),
+          serviceCatalog: getServiceCatalog(),
+          contacts: getContacts(),
+          properties: getEstimatingProperties(),
+          propertyContacts: getPropertyContacts(),
+          subContractors: getSubContractors()
+        });
+
       // ─── Estimate Builder ───
       case 'getItemCatalog':
         return jsonResponse(getItemCatalog());

@@ -4897,7 +4897,107 @@ function calculatePaymentSchedule(annualTotal, paymentMonths) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  API CALLS
+//  BULK INIT — single request loads everything
+// ═══════════════════════════════════════════════════════════════
+
+async function loadAllData() {
+  const t0 = performance.now();
+  try {
+    debugLog('Loading all data via getInitData...');
+    const response = await fetch(GOOGLE_SHEETS_URL + '?action=getInitData');
+    const data = await response.json();
+    debugLog('getInitData response received in', Math.round(performance.now() - t0), 'ms');
+
+    if (!data.success) throw new Error('getInitData failed');
+
+    // Item catalog
+    if (data.itemCatalog && data.itemCatalog.success && data.itemCatalog.items && data.itemCatalog.items.length > 0) {
+      itemCatalog = data.itemCatalog.items;
+      renderCatalog();
+      debugLog('Loaded', itemCatalog.length, 'catalog items');
+    }
+
+    // Bid settings
+    if (data.bidSettings && data.bidSettings.success && data.bidSettings.settings) {
+      bidSettings = { ...bidSettings, ...data.bidSettings.settings };
+      renderSettingsForm();
+      debugLog('Loaded bid settings');
+    }
+
+    // Bids
+    if (data.bids && data.bids.success) {
+      savedBids = data.bids.bids || [];
+      renderEstimatesList();
+    }
+
+    // Templates
+    if (data.templates && data.templates.success) {
+      savedTemplates = data.templates.templates || [];
+      renderTemplatesList();
+    }
+
+    // Service catalog
+    if (data.serviceCatalog && data.serviceCatalog.success) {
+      serviceCatalog = data.serviceCatalog.services || [];
+      if (serviceCatalog.length === 0) {
+        await createDefaultServiceCatalog();
+      }
+      renderServiceCatalog();
+    }
+
+    // Contacts
+    if (data.contacts && data.contacts.success) {
+      contacts = data.contacts.contacts || [];
+      if (currentView === 'contacts') {
+        renderContactsList();
+      }
+    }
+
+    // Properties
+    let backendProps = [];
+    if (data.properties && data.properties.success) {
+      backendProps = data.properties.properties || [];
+    }
+    if (data.propertyContacts && data.propertyContacts.success) {
+      propertyContacts = data.propertyContacts.links || [];
+    }
+    if (data.subContractors && data.subContractors.success) {
+      propertySubContractors = data.subContractors.subContractors || [];
+    }
+
+    if (backendProps.length > 0) {
+      properties = enrichPropertiesWithBidsContracts(backendProps);
+    } else {
+      properties = aggregateProperties();
+    }
+    if (!propertyContacts) propertyContacts = [];
+    if (!propertySubContractors) propertySubContractors = [];
+
+    if (currentView === 'properties') {
+      renderPropertiesList();
+    }
+    populateEstimatePropertyPicker();
+
+    // Render setup tables
+    checkForSavedEstimate();
+    renderMowerTable();
+    renderEdgeTable();
+
+    debugLog('All data loaded in', Math.round(performance.now() - t0), 'ms');
+  } catch (err) {
+    console.error('Bulk loadAllData failed, falling back to individual loads:', err);
+    // Fallback to individual requests
+    await Promise.all([loadItemCatalog(), loadBidSettings(), loadBids(), loadTemplates(), loadServiceCatalog(), loadContacts()]);
+    checkForSavedEstimate();
+    renderMowerTable();
+    renderEdgeTable();
+    await loadPropertiesFromBackend();
+    populateEstimatePropertyPicker();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  API CALLS (individual — used as fallback)
 // ═══════════════════════════════════════════════════════════════
 
 async function loadItemCatalog() {
@@ -12414,11 +12514,7 @@ document.addEventListener('DOMContentLoaded', function() {
       localStorage.setItem('estimatePhone', phone);
       document.getElementById('login-screen').style.display = 'none';
       document.getElementById('app-container').classList.add('active');
-      await Promise.all([loadItemCatalog(), loadBidSettings(), loadBids(), loadTemplates(), loadServiceCatalog(), loadContacts()]);
-      await loadPropertiesFromBackend();
-      populateEstimatePropertyPicker();
-      // Check for saved estimate after data is loaded
-      checkForSavedEstimate();
+      await loadAllData();
     }
   });
 
@@ -12428,16 +12524,7 @@ document.addEventListener('DOMContentLoaded', function() {
   localStorage.setItem('estimatePhone', savedPhone);
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app-container').classList.add('active');
-  Promise.all([loadItemCatalog(), loadBidSettings(), loadBids(), loadTemplates(), loadServiceCatalog(), loadContacts()]).then(async () => {
-    // Check for saved estimate after data is loaded
-    checkForSavedEstimate();
-    // Initialize Property Setup tables
-    renderMowerTable();
-    renderEdgeTable();
-    // Load properties from backend (after contacts/bids loaded for enrichment)
-    await loadPropertiesFromBackend();
-    populateEstimatePropertyPicker();
-  });
+  loadAllData();
 
   // Navigation
   document.querySelectorAll('.nav-item[data-view]').forEach(item => {
