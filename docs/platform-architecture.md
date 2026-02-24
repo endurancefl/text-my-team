@@ -1243,13 +1243,16 @@ After collecting time data:
 
 **Resume support:** If app is closed mid-day and reopened, `loadSchedule()` checks for open time entries (day_clock without clockOut, job without clockOut) and resumes the active timers from the saved timestamps.
 
-**Crew naming convention:** Crews are named by division: MNT Crew 1, MNT Crew 2, IRR Crew 1, CON Crew 1, ENH Crew 1. Contracts and tickets reference the crew name, not the individual leader.
+**Crew naming:** Crews are simply "Crew 1", "Crew 2", "Crew 3", etc. Contracts and tickets reference the crew name, not the individual leader. Crew names are division-agnostic by default — any crew can work any division's tickets.
 
-**Crews are not locked to a division.** Division names on crews are a default assignment, not a constraint. In practice:
-- **Day-level flexibility**: A 3-man crew might run as MNT Crew 1 on Monday through Thursday and function as IRR Crew 1 on Friday for irrigation repairs. The same people, different division's tickets.
-- **Mixed-division days**: Especially while the company is small, a single crew's daily route can include tickets across multiple divisions — morning mowing stops (MNT), afternoon irrigation repair (IRR work ticket), and a mulch install (ENH work ticket) squeezed in between. The schedule view and crew app handle this naturally since tickets already carry their own `division` field; the crew just works whatever's on their route for the day.
-- **Scaling trajectory**: As the company grows and hires dedicated irrigation techs or construction crews, divisions become more siloed. But the system never enforces it — a crew can always pick up cross-division work when the schedule allows.
-- **Reporting**: Production rate analysis, earned revenue, and time tracking all segment by the ticket's division, not the crew's default division. A crew working MNT tickets in the morning and an ENH work ticket in the afternoon generates separate production data for each division regardless of the crew's name.
+**Optional division specialization:** A crew can optionally be tagged with a `divisionFilter` (e.g., `['MNT']` or `['MNT', 'ENH']`). When set, the schedule builder only assigns that crew tickets from the specified division(s), and the crew app filters their daily route accordingly. When `divisionFilter` is null (the default), the crew sees all assigned tickets regardless of division. This supports the full spectrum:
+- **Small company (today)**: Crew 1, Crew 2, Crew 3 — all division-agnostic. A crew's Monday route might mix MNT mowing, an IRR repair, and an ENH mulch job. Everyone does everything.
+- **Growing company**: Crew 1 and Crew 2 stay general. Crew 3 gets tagged `['IRR']` because they're the irrigation techs. They only see irrigation tickets. The manager can still override and assign them an MNT ticket if needed.
+- **Large company (future multi-tenant customers)**: A customer might want dedicated division crews — "MNT Crew 1", "MNT Crew 2", "IRR Crew 1". They rename their crews and set `divisionFilter` per crew. The system enforces it in scheduling but the crew leader can still be overridden by a manager for edge cases.
+
+The crew name is always freeform text — if a company wants to call them "MNT Crew 1" they can, but the system doesn't derive division from the name. Division filtering is a separate data field.
+
+**Reporting**: Production rate analysis, earned revenue, and time tracking all segment by the ticket's division, not the crew. A crew working MNT tickets in the morning and an ENH work ticket in the afternoon generates separate production data for each division automatically.
 
 ### Requests Tab (Existing System — Relocated)
 - The current crew.html dashboard: open/completed request filtering, request cards, detail view, status updates, completion photos
