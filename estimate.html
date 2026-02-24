@@ -4702,11 +4702,17 @@
       margin-bottom: 12px;
     }
 
+    .contacts-grid {
+      gap: 6px;
+      border: none;
+    }
+
     /* Contact card in list */
     .contact-card {
       background: var(--gw-surface);
-      padding: 14px 20px;
-      border-bottom: 1px solid var(--gw-border);
+      padding: 16px 24px;
+      border: 1px solid var(--gw-border);
+      border-radius: var(--gw-radius-md);
       cursor: pointer;
       transition: background 0.1s;
       display: flex;
@@ -4715,7 +4721,7 @@
     }
 
     .contact-card:last-child {
-      border-bottom: none;
+      border-bottom: 1px solid var(--gw-border);
     }
 
     .contact-card:hover {
@@ -6278,7 +6284,7 @@
               </button>
             </div>
             <div class="contacts-count" id="contacts-count"></div>
-            <div class="estimates-grid" id="contacts-grid"></div>
+            <div class="estimates-grid contacts-grid" id="contacts-grid"></div>
           </div>
 
           <!-- Contact Profile (shown when clicking a contact) -->
@@ -9539,7 +9545,12 @@ async function loadContacts() {
     const data = await response.json();
     if (data.success) {
       contacts = data.contacts || [];
-      if (currentView === 'contacts') renderContactsList();
+      if (currentView === 'contacts') {
+        renderContactsList();
+        requestAnimationFrame(() => {
+          document.getElementById('main-body').scrollTop = 0;
+        });
+      }
     }
   } catch (err) {
     console.error('Error loading contacts:', err);
