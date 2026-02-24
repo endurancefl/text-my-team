@@ -12568,32 +12568,54 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('pm-driveway-sf').value = (result.features['Driveway'] || 0) + (result.features['Drive Lanes'] || 0) + (result.features['Pavement'] || 0) || '';
         document.getElementById('pm-sidewalk-sf').value = result.features['Sidewalk'] || '';
         document.getElementById('pm-tree-count').value = result.features['Tree'] || '';
-        // Auto-fill address fields if empty — parse "Street, City, ST ZIP" format
+        // Auto-fill address fields if empty — parse "Street, City, ST ZIP" or "Street, City, ST"
         if (!document.getElementById('property-address').value && result.address) {
           const parts = result.address.split(',').map(s => s.trim());
+          let street = '', city = '', state = '', zip = '';
           if (parts.length >= 3) {
-            document.getElementById('property-address').value = parts[0];
-            document.getElementById('property-city').value = parts[1];
-            const stateZip = parts[parts.length - 1].trim();
-            const szMatch = stateZip.match(/^([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+            street = parts[0];
+            city = parts[1];
+            const last = parts[parts.length - 1].trim();
+            const szMatch = last.match(/^([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+            const stateOnly = last.match(/^([A-Za-z]{2})$/);
             if (szMatch) {
-              document.getElementById('property-state').value = szMatch[1].toUpperCase();
-              document.getElementById('property-zip').value = szMatch[2];
+              state = szMatch[1].toUpperCase();
+              zip = szMatch[2];
+            } else if (stateOnly) {
+              state = stateOnly[1].toUpperCase();
             } else {
-              document.getElementById('property-state').value = stateZip;
+              state = last;
             }
           } else if (parts.length === 2) {
-            document.getElementById('property-address').value = parts[0];
-            const cityStateZip = parts[1].match(/^(.+?)\s+([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$/);
-            if (cityStateZip) {
-              document.getElementById('property-city').value = cityStateZip[1];
-              document.getElementById('property-state').value = cityStateZip[2].toUpperCase();
-              document.getElementById('property-zip').value = cityStateZip[3];
+            street = parts[0];
+            const csz = parts[1].match(/^(.+?)\s+([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+            const cs = parts[1].match(/^(.+?)\s+([A-Za-z]{2})$/);
+            if (csz) {
+              city = csz[1]; state = csz[2].toUpperCase(); zip = csz[3];
+            } else if (cs) {
+              city = cs[1]; state = cs[2].toUpperCase();
             } else {
-              document.getElementById('property-city').value = parts[1];
+              city = parts[1];
             }
           } else {
-            document.getElementById('property-address').value = result.address;
+            street = result.address;
+          }
+          document.getElementById('property-address').value = street;
+          if (city) document.getElementById('property-city').value = city;
+          if (state) document.getElementById('property-state').value = state;
+          if (zip) document.getElementById('property-zip').value = zip;
+          // Auto-lookup zip code if missing
+          if (!zip && street && city && state) {
+            fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(street + ', ' + city + ', ' + state))
+              .then(r => r.json())
+              .then(data => {
+                if (data && data[0] && data[0].display_name) {
+                  const zipMatch = data[0].display_name.match(/\b(\d{5})\b/);
+                  if (zipMatch && !document.getElementById('property-zip').value) {
+                    document.getElementById('property-zip').value = zipMatch[1];
+                  }
+                }
+              }).catch(() => {});
           }
         }
         // Set measurement source to attentive
@@ -13041,8 +13063,14 @@ document.addEventListener('DOMContentLoaded', function() {
     if (e.target === this) closeRecordPaymentModal();
   });
 
-  // Contact phone field formatting
+  // Phone field formatting
   document.getElementById('contact-phone').addEventListener('input', function() {
+    this.value = formatPhone(this.value);
+  });
+  document.getElementById('property-crew-phone').addEventListener('input', function() {
+    this.value = formatPhone(this.value);
+  });
+  document.getElementById('sub-phone').addEventListener('input', function() {
     this.value = formatPhone(this.value);
   });
 
