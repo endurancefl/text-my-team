@@ -544,7 +544,7 @@
     }
 
     #view-contracts {
-      height: 100%;
+      flex: 1;
       overflow-y: auto;
     }
 
@@ -557,7 +557,7 @@
     /* ═══════════════════════════════════════════════════════════════ */
 
     #view-schedule.active {
-      height: 100%;
+      flex: 1;
       overflow-y: auto;
       display: flex !important;
       flex-direction: column;
@@ -1533,6 +1533,9 @@
       padding: 24px;
       background: var(--gw-surface);
       -webkit-overflow-scrolling: touch;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
     }
 
     /* RIGHT SUMMARY PANEL - Google Sheets Explore Panel Style */
@@ -1630,6 +1633,7 @@
 
     .view.active {
       display: block !important;
+      flex: none;
     }
 
     /* ESTIMATES LIST VIEW - Google Drive style cards */
