@@ -1,0 +1,8 @@
+.DS_Store
+__pycache__/
+*.pyc
+cloud-function/test_output/
+cloud-function/test_local.py
+cloud-function/deploy/.aws-sam/
+cloud-function/deploy/samconfig.toml
+.claude/
