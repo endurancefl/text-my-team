@@ -2175,6 +2175,26 @@
           </div>
         </div>
 
+        <!-- Attentive Upload -->
+        <div style="margin-top: 20px;">
+          <label class="form-label">Attentive Report</label>
+          <div class="file-upload-wrapper">
+            <label class="file-upload-zone" id="property-file-upload-zone">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+              </svg>
+              <div class="file-upload-text" id="property-file-upload-text">Upload .xlsx</div>
+              <div class="file-upload-hint">Drag &amp; drop Attentive report or click to browse</div>
+              <input type="file" id="property-attentive-file" accept=".xlsx,.xls">
+            </label>
+            <button class="file-delete-btn" id="property-file-delete-btn" title="Clear Attentive data">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
         <!-- Measurements Section (collapsible) -->
         <div class="property-modal-section" style="margin-top: 20px;">
           <div class="property-modal-section-header" onclick="togglePropertySection('measurements')">
@@ -2182,7 +2202,7 @@
             <svg id="property-measurements-chevron" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="18" height="18" style="transition: transform 0.2s;"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
           </div>
           <div id="property-measurements-section" style="display: none; margin-top: 12px;">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 12px;">
               <div class="form-group">
                 <label class="form-label">Measurement Source</label>
                 <select class="form-select" id="property-measurement-source" onchange="toggleAttentiveUrl()">
@@ -2199,96 +2219,25 @@
                 <input type="url" class="form-input" id="property-attentive-url" placeholder="https://drive.google.com/...">
               </div>
             </div>
-            <!-- Area Measurements -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 12px;">
-              <div class="form-group">
-                <label class="form-label">Lot Size (SF)</label>
-                <input type="text" class="form-input property-num-input" id="pm-lot-size" placeholder="0">
+            <!-- Excel-style measurement grid -->
+            <div class="mower-table" style="width: 100%;">
+              <div class="mower-table-header" style="grid-template-columns: 1fr 100px;">
+                <span>Measurement</span>
+                <span style="text-align: right; border-right: none;">Value</span>
               </div>
-              <div class="form-group">
-                <label class="form-label">Lawn Area (SF)</label>
-                <input type="text" class="form-input property-num-input" id="pm-lawn-sf" placeholder="0">
-              </div>
-              <div class="form-group">
-                <label class="form-label">Lawn Perimeter (LF)</label>
-                <input type="text" class="form-input property-num-input" id="pm-lawn-perimeter" placeholder="0">
-              </div>
-            </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px;">
-              <div class="form-group">
-                <label class="form-label">Hard Edge (LF)</label>
-                <input type="text" class="form-input property-num-input" id="pm-hard-edge" placeholder="0">
-              </div>
-              <div class="form-group">
-                <label class="form-label">Soft Edge (LF)</label>
-                <input type="text" class="form-input property-num-input" id="pm-soft-edge" placeholder="0">
-              </div>
-            </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 12px;">
-              <div class="form-group">
-                <label class="form-label">Mulch Bed (SF)</label>
-                <input type="text" class="form-input property-num-input" id="pm-mulch-sf" placeholder="0">
-              </div>
-              <div class="form-group">
-                <label class="form-label">Mulch Perimeter (LF)</label>
-                <input type="text" class="form-input property-num-input" id="pm-mulch-perimeter" placeholder="0">
-              </div>
-              <div class="form-group">
-                <label class="form-label">Hedge (SF)</label>
-                <input type="text" class="form-input property-num-input" id="pm-hedge-sf" placeholder="0">
-              </div>
-            </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 12px;">
-              <div class="form-group">
-                <label class="form-label">Hedge (LF)</label>
-                <input type="text" class="form-input property-num-input" id="pm-hedge-lf" placeholder="0">
-              </div>
-              <div class="form-group">
-                <label class="form-label">Driveway/Pavement (SF)</label>
-                <input type="text" class="form-input property-num-input" id="pm-driveway-sf" placeholder="0">
-              </div>
-              <div class="form-group">
-                <label class="form-label">Sidewalk (SF)</label>
-                <input type="text" class="form-input property-num-input" id="pm-sidewalk-sf" placeholder="0">
-              </div>
-            </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px;">
-              <div class="form-group">
-                <label class="form-label">Tree Count</label>
-                <input type="text" class="form-input property-num-input" id="pm-tree-count" placeholder="0">
-              </div>
-              <div class="form-group">
-                <label class="form-label">Irrigation Zones</label>
-                <input type="text" class="form-input property-num-input" id="pm-irrigation-zones" placeholder="0">
-              </div>
-            </div>
-
-            <!-- Difficulty Splits (collapsible sub-section) -->
-            <div style="margin-top: 16px;">
-              <div class="property-modal-section-header" onclick="togglePropertySection('difficulty')" style="padding: 8px 0;">
-                <span style="font-size: 13px; font-weight: 500; color: var(--gw-text-secondary);">Difficulty Splits</span>
-                <svg id="property-difficulty-chevron" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16" style="transition: transform 0.2s;"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
-              </div>
-              <div id="property-difficulty-section" style="display: none; margin-top: 8px;">
-                <p style="font-size: 12px; color: var(--gw-text-disabled); margin: 0 0 8px 0;">Each row should sum to 100%.</p>
-                <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
-                  <thead>
-                    <tr style="border-bottom: 1px solid var(--gw-divider);">
-                      <th style="text-align: left; padding: 4px 8px; font-weight: 500;">Category</th>
-                      <th style="text-align: center; padding: 4px 8px; font-weight: 500;">Easy %</th>
-                      <th style="text-align: center; padding: 4px 8px; font-weight: 500;">Med %</th>
-                      <th style="text-align: center; padding: 4px 8px; font-weight: 500;">Hard %</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr><td style="padding: 4px 8px;">Lawn</td><td style="padding: 4px;"><input type="number" class="form-input diff-input" id="diff-lawn-easy" value="100" min="0" max="100" style="text-align:center; padding: 4px;"></td><td style="padding: 4px;"><input type="number" class="form-input diff-input" id="diff-lawn-med" value="0" min="0" max="100" style="text-align:center; padding: 4px;"></td><td style="padding: 4px;"><input type="number" class="form-input diff-input" id="diff-lawn-hard" value="0" min="0" max="100" style="text-align:center; padding: 4px;"></td></tr>
-                    <tr><td style="padding: 4px 8px;">Mulch</td><td style="padding: 4px;"><input type="number" class="form-input diff-input" id="diff-mulch-easy" value="100" min="0" max="100" style="text-align:center; padding: 4px;"></td><td style="padding: 4px;"><input type="number" class="form-input diff-input" id="diff-mulch-med" value="0" min="0" max="100" style="text-align:center; padding: 4px;"></td><td style="padding: 4px;"><input type="number" class="form-input diff-input" id="diff-mulch-hard" value="0" min="0" max="100" style="text-align:center; padding: 4px;"></td></tr>
-                    <tr><td style="padding: 4px 8px;">Hedge</td><td style="padding: 4px;"><input type="number" class="form-input diff-input" id="diff-hedge-easy" value="100" min="0" max="100" style="text-align:center; padding: 4px;"></td><td style="padding: 4px;"><input type="number" class="form-input diff-input" id="diff-hedge-med" value="0" min="0" max="100" style="text-align:center; padding: 4px;"></td><td style="padding: 4px;"><input type="number" class="form-input diff-input" id="diff-hedge-hard" value="0" min="0" max="100" style="text-align:center; padding: 4px;"></td></tr>
-                    <tr><td style="padding: 4px 8px;">Hard Edge</td><td style="padding: 4px;"><input type="number" class="form-input diff-input" id="diff-hardEdge-easy" value="100" min="0" max="100" style="text-align:center; padding: 4px;"></td><td style="padding: 4px;"><input type="number" class="form-input diff-input" id="diff-hardEdge-med" value="0" min="0" max="100" style="text-align:center; padding: 4px;"></td><td style="padding: 4px;"><input type="number" class="form-input diff-input" id="diff-hardEdge-hard" value="0" min="0" max="100" style="text-align:center; padding: 4px;"></td></tr>
-                    <tr><td style="padding: 4px 8px;">Soft Edge</td><td style="padding: 4px;"><input type="number" class="form-input diff-input" id="diff-softEdge-easy" value="100" min="0" max="100" style="text-align:center; padding: 4px;"></td><td style="padding: 4px;"><input type="number" class="form-input diff-input" id="diff-softEdge-med" value="0" min="0" max="100" style="text-align:center; padding: 4px;"></td><td style="padding: 4px;"><input type="number" class="form-input diff-input" id="diff-softEdge-hard" value="0" min="0" max="100" style="text-align:center; padding: 4px;"></td></tr>
-                  </tbody>
-                </table>
-              </div>
+              <div class="mower-row" style="grid-template-columns: 1fr 100px;"><span class="mower-name">Lot Size (SF)</span><input type="text" class="pm-grid-input" id="pm-lot-size" placeholder="0" inputmode="numeric"></div>
+              <div class="mower-row" style="grid-template-columns: 1fr 100px;"><span class="mower-name">Lawn Area (SF)</span><input type="text" class="pm-grid-input" id="pm-lawn-sf" placeholder="0" inputmode="numeric"></div>
+              <div class="mower-row" style="grid-template-columns: 1fr 100px;"><span class="mower-name">Lawn Perimeter (LF)</span><input type="text" class="pm-grid-input" id="pm-lawn-perimeter" placeholder="0" inputmode="numeric"></div>
+              <div class="mower-row" style="grid-template-columns: 1fr 100px;"><span class="mower-name">Hard Edge (LF)</span><input type="text" class="pm-grid-input" id="pm-hard-edge" placeholder="0" inputmode="numeric"></div>
+              <div class="mower-row" style="grid-template-columns: 1fr 100px;"><span class="mower-name">Soft Edge (LF)</span><input type="text" class="pm-grid-input" id="pm-soft-edge" placeholder="0" inputmode="numeric"></div>
+              <div class="mower-row" style="grid-template-columns: 1fr 100px;"><span class="mower-name">Mulch Bed (SF)</span><input type="text" class="pm-grid-input" id="pm-mulch-sf" placeholder="0" inputmode="numeric"></div>
+              <div class="mower-row" style="grid-template-columns: 1fr 100px;"><span class="mower-name">Mulch Perimeter (LF)</span><input type="text" class="pm-grid-input" id="pm-mulch-perimeter" placeholder="0" inputmode="numeric"></div>
+              <div class="mower-row" style="grid-template-columns: 1fr 100px;"><span class="mower-name">Hedge (SF)</span><input type="text" class="pm-grid-input" id="pm-hedge-sf" placeholder="0" inputmode="numeric"></div>
+              <div class="mower-row" style="grid-template-columns: 1fr 100px;"><span class="mower-name">Hedge (LF)</span><input type="text" class="pm-grid-input" id="pm-hedge-lf" placeholder="0" inputmode="numeric"></div>
+              <div class="mower-row" style="grid-template-columns: 1fr 100px;"><span class="mower-name">Driveway / Pavement (SF)</span><input type="text" class="pm-grid-input" id="pm-driveway-sf" placeholder="0" inputmode="numeric"></div>
+              <div class="mower-row" style="grid-template-columns: 1fr 100px;"><span class="mower-name">Sidewalk (SF)</span><input type="text" class="pm-grid-input" id="pm-sidewalk-sf" placeholder="0" inputmode="numeric"></div>
+              <div class="mower-row" style="grid-template-columns: 1fr 100px;"><span class="mower-name">Tree Count</span><input type="text" class="pm-grid-input" id="pm-tree-count" placeholder="0" inputmode="numeric"></div>
+              <div class="mower-row" style="grid-template-columns: 1fr 100px;"><span class="mower-name">Irrigation Zones</span><input type="text" class="pm-grid-input" id="pm-irrigation-zones" placeholder="0" inputmode="numeric"></div>
             </div>
           </div>
         </div>
@@ -5759,15 +5708,11 @@ function openPropertyModal(mode) {
     document.getElementById('pm-tree-count').value = p.treeCount || '';
     document.getElementById('pm-irrigation-zones').value = p.irrigationZones || '';
     document.getElementById('property-notes').value = p.notes || '';
-    // Difficulty splits
-    const diff = p.difficultyParsed || {};
-    ['lawn', 'mulch', 'hedge', 'hardEdge', 'softEdge'].forEach(cat => {
-      const d = diff[cat] || {};
-      document.getElementById('diff-' + cat + '-easy').value = d.easy != null ? d.easy : 100;
-      document.getElementById('diff-' + cat + '-med').value = d.med != null ? d.med : 0;
-      document.getElementById('diff-' + cat + '-hard').value = d.hard != null ? d.hard : 0;
-    });
     toggleAttentiveUrl();
+    // Reset file upload zone
+    document.getElementById('property-file-upload-zone').classList.remove('has-file');
+    document.getElementById('property-file-upload-text').textContent = 'Upload .xlsx';
+    document.getElementById('property-attentive-file').value = '';
   } else {
     title.textContent = 'New Property';
     saveBtn.textContent = 'Save Property';
@@ -5788,16 +5733,14 @@ function openPropertyModal(mode) {
       document.getElementById(id).value = '';
     });
     document.getElementById('property-notes').value = '';
-    ['lawn', 'mulch', 'hedge', 'hardEdge', 'softEdge'].forEach(cat => {
-      document.getElementById('diff-' + cat + '-easy').value = 100;
-      document.getElementById('diff-' + cat + '-med').value = 0;
-      document.getElementById('diff-' + cat + '-hard').value = 0;
-    });
     toggleAttentiveUrl();
+    // Reset file upload zone
+    document.getElementById('property-file-upload-zone').classList.remove('has-file');
+    document.getElementById('property-file-upload-text').textContent = 'Upload .xlsx';
+    document.getElementById('property-attentive-file').value = '';
   }
   // Collapse sections by default
   document.getElementById('property-measurements-section').style.display = 'none';
-  document.getElementById('property-difficulty-section').style.display = 'none';
   modal.classList.add('active');
 }
 
@@ -5823,15 +5766,6 @@ function toggleAttentiveUrl() {
 }
 
 function getPropertyDataFromModal() {
-  const difficultyJson = {};
-  ['lawn', 'mulch', 'hedge', 'hardEdge', 'softEdge'].forEach(cat => {
-    difficultyJson[cat] = {
-      easy: parseInt(document.getElementById('diff-' + cat + '-easy').value) || 0,
-      med: parseInt(document.getElementById('diff-' + cat + '-med').value) || 0,
-      hard: parseInt(document.getElementById('diff-' + cat + '-hard').value) || 0
-    };
-  });
-
   return {
     address: document.getElementById('property-address').value.trim(),
     city: document.getElementById('property-city').value.trim(),
@@ -5857,7 +5791,6 @@ function getPropertyDataFromModal() {
     sidewalkSF: parseFloat(document.getElementById('pm-sidewalk-sf').value) || 0,
     treeCount: parseInt(document.getElementById('pm-tree-count').value) || 0,
     irrigationZones: parseInt(document.getElementById('pm-irrigation-zones').value) || 0,
-    difficultyJson: difficultyJson,
     notes: document.getElementById('property-notes').value.trim()
   };
 }
@@ -6080,12 +6013,18 @@ function openPropertyProfile(propIdOrNormAddr) {
   }
 
   if (measurements.length > 0) {
-    measurementsGrid.innerHTML = measurements.map(m =>
-      `<div class="property-measurement-card">
-        <div class="property-measurement-value">${m.value}</div>
-        <div class="property-measurement-label">${m.label}</div>
-      </div>`
-    ).join('');
+    measurementsGrid.innerHTML = `<div class="mower-table" style="width: 100%;">
+      <div class="mower-table-header" style="grid-template-columns: 1fr 120px;">
+        <span>Measurement</span>
+        <span style="text-align: right; border-right: none;">Value</span>
+      </div>
+      ${measurements.map(m =>
+        `<div class="mower-row" style="grid-template-columns: 1fr 120px;">
+          <span class="mower-name">${m.label}</span>
+          <span style="text-align: right; padding: 0 8px; font-feature-settings: 'tnum'; color: var(--gw-blue); font-weight: 500;">${m.value}</span>
+        </div>`
+      ).join('')}
+    </div>`;
   } else {
     measurementsGrid.innerHTML = '<p style="color: var(--gw-text-disabled);">No measurements available.</p>';
   }
@@ -12559,6 +12498,87 @@ document.addEventListener('DOMContentLoaded', function() {
       clearAttentiveData();
     }
   });
+
+  // Property modal — Attentive file upload (drag & drop + click)
+  const propFileZone = document.getElementById('property-file-upload-zone');
+  const propFileInput = document.getElementById('property-attentive-file');
+  const propFileText = document.getElementById('property-file-upload-text');
+
+  if (propFileZone && propFileInput) {
+    propFileZone.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      this.classList.add('drag-over');
+    });
+    propFileZone.addEventListener('dragleave', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      this.classList.remove('drag-over');
+    });
+    propFileZone.addEventListener('drop', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      this.classList.remove('drag-over');
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        propFileInput.files = files;
+        propFileInput.dispatchEvent(new Event('change'));
+      }
+    });
+
+    propFileInput.addEventListener('change', async function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        const result = await parseAttentiveFile(file);
+        // Populate measurement grid inputs from parsed data
+        document.getElementById('pm-lot-size').value = result.lotSize || '';
+        document.getElementById('pm-lawn-sf').value = result.features['Lawn'] || '';
+        document.getElementById('pm-hard-edge').value = result.features['Hard Edge'] || '';
+        document.getElementById('pm-soft-edge').value = result.features['Soft Edge'] || '';
+        document.getElementById('pm-mulch-sf').value = result.features['Mulch Bed'] || '';
+        document.getElementById('pm-hedge-sf').value = result.features['Hedge'] || '';
+        document.getElementById('pm-driveway-sf').value = (result.features['Driveway'] || 0) + (result.features['Drive Lanes'] || 0) + (result.features['Pavement'] || 0) || '';
+        document.getElementById('pm-sidewalk-sf').value = result.features['Sidewalk'] || '';
+        document.getElementById('pm-tree-count').value = result.features['Tree'] || '';
+        // Auto-fill address if empty
+        if (!document.getElementById('property-address').value && result.address) {
+          document.getElementById('property-address').value = result.address;
+        }
+        // Set measurement source to attentive
+        document.getElementById('property-measurement-source').value = 'attentive';
+        toggleAttentiveUrl();
+        // Show measurements section
+        document.getElementById('property-measurements-section').style.display = 'block';
+        const chevron = document.getElementById('property-measurements-chevron');
+        if (chevron) chevron.style.transform = 'rotate(180deg)';
+        // Update upload zone UI
+        propFileZone.classList.add('has-file');
+        propFileText.textContent = file.name;
+        showToast('Attentive data imported to property.', 'success');
+      } catch (err) {
+        console.error('Error parsing property Attentive file:', err);
+        showToast('Error parsing file. Please check it\'s a valid Attentive report.', 'error');
+      }
+    });
+
+    document.getElementById('property-file-delete-btn').addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (confirm('Clear Attentive data from property measurements?')) {
+        ['pm-lot-size','pm-lawn-sf','pm-lawn-perimeter','pm-hard-edge','pm-soft-edge',
+         'pm-mulch-sf','pm-mulch-perimeter','pm-hedge-sf','pm-hedge-lf',
+         'pm-driveway-sf','pm-sidewalk-sf','pm-tree-count','pm-irrigation-zones'].forEach(id => {
+          document.getElementById(id).value = '';
+        });
+        propFileZone.classList.remove('has-file');
+        propFileText.textContent = 'Upload .xlsx';
+        propFileInput.value = '';
+        document.getElementById('property-measurement-source').value = '';
+        toggleAttentiveUrl();
+      }
+    });
+  }
 
   // Property inputs
   document.getElementById('prop-address').addEventListener('input', function() {

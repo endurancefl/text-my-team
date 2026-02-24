@@ -5016,8 +5016,27 @@ select option:checked {
 .property-modal-section-header.open svg {
   transform: rotate(180deg);
 }
-.property-num-input {
+/* Property measurement grid inputs — blue editable cells */
+.pm-grid-input {
+  width: 100%;
+  height: 28px;
+  border: none;
+  padding: 0 8px;
+  font-size: 12px;
+  text-align: right;
+  background: rgba(26, 115, 232, 0.04);
   font-feature-settings: 'tnum';
+  color: var(--gw-blue);
+  font-weight: 500;
+  box-sizing: border-box;
+}
+.pm-grid-input::placeholder {
+  color: rgba(26, 115, 232, 0.3);
+}
+.pm-grid-input:focus {
+  outline: none;
+  background: rgba(26, 115, 232, 0.1);
+  box-shadow: inset 0 0 0 2px var(--gw-blue);
 }
 
 /* Sub-Contractor Cards */
