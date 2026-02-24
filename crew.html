@@ -8044,8 +8044,27 @@
         var photo = srState.photos[done];
         var img = new Image();
         img.onload = function() {
-          // Cap resolution for Lambda payload (max 1600px on longest side)
-          var maxDim = 1600;
+          // Full-quality canvas for Drive upload (original resolution)
+          var fw = photo.imgWidth;
+          var fh = photo.imgHeight;
+          var fc = document.createElement('canvas');
+          fc.width = fw; fc.height = fh;
+          var fcx = fc.getContext('2d');
+          fcx.drawImage(img, 0, 0, fw, fh);
+          fcx.strokeStyle = 'red';
+          fcx.lineWidth = Math.max(3, Math.round(fw / 200));
+          photo.rects.forEach(function(r) {
+            fcx.strokeRect(r.x, r.y, r.w, r.h);
+          });
+          var base64 = fc.toDataURL('image/jpeg', 0.8);
+          srState.compositedPhotos.push({
+            base64: base64,
+            note: photo.note,
+            category: photo.category
+          });
+
+          // Smaller canvas for Lambda payload (max 1200px, supports 30+ photos under 10MB)
+          var maxDim = 1200;
           var w = photo.imgWidth;
           var h = photo.imgHeight;
           if (w > maxDim || h > maxDim) {
@@ -8054,11 +8073,9 @@
             h = Math.round(h * scale);
           }
           var c = document.createElement('canvas');
-          c.width = w;
-          c.height = h;
+          c.width = w; c.height = h;
           var cx = c.getContext('2d');
           cx.drawImage(img, 0, 0, w, h);
-          // Draw rects (scale to match resized canvas)
           var scaleX = w / photo.imgWidth;
           var scaleY = h / photo.imgHeight;
           cx.strokeStyle = 'red';
@@ -8066,19 +8083,12 @@
           photo.rects.forEach(function(r) {
             cx.strokeRect(r.x * scaleX, r.y * scaleY, r.w * scaleX, r.h * scaleY);
           });
-          // Store full quality base64 for uploading as separate file
-          var base64 = c.toDataURL('image/jpeg', 0.8);
-          srState.compositedPhotos.push({
-            base64: base64,
-            note: photo.note,
-            category: photo.category
-          });
           c.toBlob(function(blob) {
             composited.push({ blob: blob, note: photo.note, category: photo.category });
             done++;
             srProgressBar.style.width = Math.round(done / total * 40) + '%';
             compositeNext();
-          }, 'image/jpeg', 0.75);
+          }, 'image/jpeg', 0.65);
         };
         img.src = photo.originalBase64;
       }
