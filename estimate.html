@@ -12568,8 +12568,8 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('pm-driveway-sf').value = (result.features['Driveway'] || 0) + (result.features['Drive Lanes'] || 0) + (result.features['Pavement'] || 0) || '';
         document.getElementById('pm-sidewalk-sf').value = result.features['Sidewalk'] || '';
         document.getElementById('pm-tree-count').value = result.features['Tree'] || '';
-        // Auto-fill address fields if empty — parse "Street, City, ST ZIP" or "Street, City, ST"
-        if (!document.getElementById('property-address').value && result.address) {
+        // Auto-fill address fields — parse "Street, City, ST ZIP" or "Street, City, ST"
+        if (result.address) {
           const parts = result.address.split(',').map(s => s.trim());
           let street = '', city = '', state = '', zip = '';
           if (parts.length >= 3) {
@@ -12604,31 +12604,28 @@ document.addEventListener('DOMContentLoaded', function() {
           if (city) document.getElementById('property-city').value = city;
           if (state) document.getElementById('property-state').value = state;
           if (zip) document.getElementById('property-zip').value = zip;
-          // Always auto-lookup zip/city/state from geocoding
-          (async function() {
-            try {
-              const query = result.address;
-              const geoResp = await fetch('https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=1&q=' + encodeURIComponent(query), {
-                headers: { 'Accept': 'application/json' }
-              });
-              const geoData = await geoResp.json();
-              if (geoData && geoData[0]) {
-                const ad = geoData[0].address || {};
-                const stateAbbrevs = {Alabama:'AL',Alaska:'AK',Arizona:'AZ',Arkansas:'AR',California:'CA',Colorado:'CO',Connecticut:'CT',Delaware:'DE',Florida:'FL',Georgia:'GA',Hawaii:'HI',Idaho:'ID',Illinois:'IL',Indiana:'IN',Iowa:'IA',Kansas:'KS',Kentucky:'KY',Louisiana:'LA',Maine:'ME',Maryland:'MD',Massachusetts:'MA',Michigan:'MI',Minnesota:'MN',Mississippi:'MS',Missouri:'MO',Montana:'MT',Nebraska:'NE',Nevada:'NV','New Hampshire':'NH','New Jersey':'NJ','New Mexico':'NM','New York':'NY','North Carolina':'NC','North Dakota':'ND',Ohio:'OH',Oklahoma:'OK',Oregon:'OR',Pennsylvania:'PA','Rhode Island':'RI','South Carolina':'SC','South Dakota':'SD',Tennessee:'TN',Texas:'TX',Utah:'UT',Vermont:'VT',Virginia:'VA',Washington:'WA','West Virginia':'WV',Wisconsin:'WI',Wyoming:'WY'};
-                if (ad.postcode && !document.getElementById('property-zip').value) {
-                  document.getElementById('property-zip').value = ad.postcode;
-                }
-                if (!document.getElementById('property-city').value && (ad.city || ad.town || ad.village)) {
-                  document.getElementById('property-city').value = ad.city || ad.town || ad.village;
-                }
-                if (!document.getElementById('property-state').value && ad.state) {
-                  document.getElementById('property-state').value = stateAbbrevs[ad.state] || ad.state;
-                }
+        }
+        // Always geocode to fill in zip (and city/state if missing)
+        if (result.address && !document.getElementById('property-zip').value) {
+          try {
+            const geoResp = await fetch('https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=1&q=' + encodeURIComponent(result.address), {
+              headers: { 'Accept': 'application/json' }
+            });
+            const geoData = await geoResp.json();
+            if (geoData && geoData[0]) {
+              const ad = geoData[0].address || {};
+              const stateAbbrevs = {Alabama:'AL',Alaska:'AK',Arizona:'AZ',Arkansas:'AR',California:'CA',Colorado:'CO',Connecticut:'CT',Delaware:'DE',Florida:'FL',Georgia:'GA',Hawaii:'HI',Idaho:'ID',Illinois:'IL',Indiana:'IN',Iowa:'IA',Kansas:'KS',Kentucky:'KY',Louisiana:'LA',Maine:'ME',Maryland:'MD',Massachusetts:'MA',Michigan:'MI',Minnesota:'MN',Mississippi:'MS',Missouri:'MO',Montana:'MT',Nebraska:'NE',Nevada:'NV','New Hampshire':'NH','New Jersey':'NJ','New Mexico':'NM','New York':'NY','North Carolina':'NC','North Dakota':'ND',Ohio:'OH',Oklahoma:'OK',Oregon:'OR',Pennsylvania:'PA','Rhode Island':'RI','South Carolina':'SC','South Dakota':'SD',Tennessee:'TN',Texas:'TX',Utah:'UT',Vermont:'VT',Virginia:'VA',Washington:'WA','West Virginia':'WV',Wisconsin:'WI',Wyoming:'WY'};
+              if (ad.postcode) document.getElementById('property-zip').value = ad.postcode;
+              if (!document.getElementById('property-city').value && (ad.city || ad.town || ad.village)) {
+                document.getElementById('property-city').value = ad.city || ad.town || ad.village;
               }
-            } catch (err) {
-              console.error('Geocoding lookup failed:', err);
+              if (!document.getElementById('property-state').value && ad.state) {
+                document.getElementById('property-state').value = stateAbbrevs[ad.state] || ad.state;
+              }
             }
-          })();
+          } catch (err) {
+            console.error('Geocoding lookup failed:', err);
+          }
         }
         // Set measurement source to attentive
         document.getElementById('property-measurement-source').value = 'attentive';
