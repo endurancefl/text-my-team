@@ -5835,12 +5835,19 @@ async function openPropertyModal(mode) {
     document.getElementById('property-state').value = '';
     document.getElementById('property-zip').value = '';
     document.getElementById('property-type-select').value = 'Residential';
-    // Auto-generate a unique 4-digit PIN (no duplicates with existing properties)
-    const usedPins = new Set(properties.map(p => String(p.pin || '').trim()));
-    let autoPin;
+    // Auto-generate a unique 4-digit PIN that differs from every existing PIN
+    // by at least 2 digits (so a single typo can't match another property)
+    const usedPins = properties.map(p => String(p.pin || '').trim()).filter(p => p.length === 4);
+    function pinDistance(a, b) {
+      let diff = 0;
+      for (let i = 0; i < 4; i++) { if (a[i] !== b[i]) diff++; }
+      return diff;
+    }
+    let autoPin, attempts = 0;
     do {
       autoPin = String(Math.floor(1000 + Math.random() * 9000));
-    } while (usedPins.has(autoPin));
+      attempts++;
+    } while (attempts < 500 && usedPins.some(p => pinDistance(autoPin, p) < 2));
     document.getElementById('property-pin').value = autoPin;
     document.getElementById('property-gate-code').value = '';
     document.getElementById('property-crew').value = '';
