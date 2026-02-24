@@ -2120,12 +2120,12 @@
 
   <!-- Property Add/Edit Modal -->
   <div class="modal-overlay" id="property-modal">
-    <div class="modal" style="max-width: 640px;">
-      <div class="modal-header">
+    <div class="modal" style="max-width: 640px; display: flex; flex-direction: column; max-height: 85vh;">
+      <div class="modal-header" style="flex-shrink: 0;">
         <h3 id="property-modal-title">New Property</h3>
         <button class="modal-close" onclick="closePropertyModal()">&times;</button>
       </div>
-      <div class="modal-body" style="padding: 20px 24px; max-height: 70vh; overflow-y: auto;">
+      <div class="modal-body" style="padding: 20px 24px; overflow-y: auto; flex: 1; min-height: 0;">
         <!-- Address Section -->
         <div class="form-group">
           <label class="form-label">Street Address *</label>
@@ -2244,7 +2244,7 @@
           <textarea class="form-input" id="property-notes" rows="3" style="height: auto; padding: 8px 12px; resize: vertical;" placeholder="Access instructions, special notes..."></textarea>
         </div>
       </div>
-      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; padding: 16px 24px; border-top: 1px solid var(--gw-divider);">
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; padding: 16px 24px; border-top: 1px solid var(--gw-divider); flex-shrink: 0;">
         <button class="btn btn-secondary" onclick="closePropertyModal()">Cancel</button>
         <button class="btn btn-primary" id="property-save-btn" onclick="savePropertyFromModal()">Save Property</button>
       </div>
@@ -5715,7 +5715,9 @@ function openPropertyModal(mode) {
     document.getElementById('property-state').value = '';
     document.getElementById('property-zip').value = '';
     document.getElementById('property-type-select').value = 'Residential';
-    document.getElementById('property-pin').value = '';
+    // Auto-generate a 4-digit PIN for new properties
+    const autoPin = String(Math.floor(1000 + Math.random() * 9000));
+    document.getElementById('property-pin').value = autoPin;
     document.getElementById('property-gate-code').value = '';
     document.getElementById('property-crew').value = '';
     document.getElementById('property-crew-phone').value = '';
