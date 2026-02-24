@@ -4,8 +4,8 @@ Description: PDF generation for Site Reports, Before & After Reports, and Contra
 
 Globals:
   Function:
-    Timeout: 60
-    MemorySize: 1024
+    Timeout: 300
+    MemorySize: 2048
 
 Resources:
   PdfGeneratorFunction:

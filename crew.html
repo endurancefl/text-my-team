@@ -7916,16 +7916,27 @@
         var photo = srState.photos[done];
         var img = new Image();
         img.onload = function() {
+          // Cap resolution for Lambda payload (max 1600px on longest side)
+          var maxDim = 1600;
+          var w = photo.imgWidth;
+          var h = photo.imgHeight;
+          if (w > maxDim || h > maxDim) {
+            var scale = maxDim / Math.max(w, h);
+            w = Math.round(w * scale);
+            h = Math.round(h * scale);
+          }
           var c = document.createElement('canvas');
-          c.width = photo.imgWidth;
-          c.height = photo.imgHeight;
+          c.width = w;
+          c.height = h;
           var cx = c.getContext('2d');
-          cx.drawImage(img, 0, 0, photo.imgWidth, photo.imgHeight);
-          // Draw rects
+          cx.drawImage(img, 0, 0, w, h);
+          // Draw rects (scale to match resized canvas)
+          var scaleX = w / photo.imgWidth;
+          var scaleY = h / photo.imgHeight;
           cx.strokeStyle = 'red';
-          cx.lineWidth = Math.max(3, Math.round(photo.imgWidth / 200));
+          cx.lineWidth = Math.max(3, Math.round(w / 200));
           photo.rects.forEach(function(r) {
-            cx.strokeRect(r.x, r.y, r.w, r.h);
+            cx.strokeRect(r.x * scaleX, r.y * scaleY, r.w * scaleX, r.h * scaleY);
           });
           // Store full quality base64 for uploading as separate file
           var base64 = c.toDataURL('image/jpeg', 0.8);
@@ -7939,7 +7950,7 @@
             done++;
             srProgressBar.style.width = Math.round(done / total * 40) + '%';
             compositeNext();
-          }, 'image/jpeg', 0.85);
+          }, 'image/jpeg', 0.75);
         };
         img.src = photo.originalBase64;
       }
