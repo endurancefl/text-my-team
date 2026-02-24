@@ -56,7 +56,7 @@ The platform supports four divisions, each representing a distinct revenue strea
 - Returning user personalization (remembers name, PIN, language preference)
 - PWA manifest with apple-mobile-web-app-capable
 
-**crew.html + crew.css — Crew Dashboard (~9,089 lines HTML/JS + ~4,369 lines CSS)**
+**crew.html + crew.css — Crew Dashboard (~9,339 lines HTML/JS + ~4,419 lines CSS)**
 - iOS 18-precision mobile app for crew leaders
 - **Full English/Spanish bilingual support** via `data-i18n` system — same `localStorage` key `preferredLang` shared with index.html so language choice persists across apps. Toggle pill-button on both login screen and dashboard header. `translations` object with ~160 keys (en/es), `t(key)` lookup function with English fallback, `updateLanguage()` traverses `[data-i18n]` and `[data-i18n-placeholder]` elements + rebuilds JS-generated UI via `renderStopCards()` and `renderRequests()`. All static HTML text tagged with `data-i18n` attributes. All JS-generated strings use `t()` calls with `{name}` template replacement for dynamic values. Date locales switch between `en-US` and `es-US`. Site Report and Before-After wizard internals deferred (large subsystems with ~50+ strings each).
 - Phone number authentication against Crew Members sheet (Role = "Leader")
@@ -103,12 +103,12 @@ The platform supports four divisions, each representing a distinct revenue strea
 - Spanish translation support in request messages
 - **Report Issue** — crew-submitted internal tickets with property search, photo capture
 - **Quick Photos** — batch photo upload to Google Drive organized by property
-- **Site Report Wizard** — multi-step flow: property selection → mode choice → photo capture with categories/notes → thumbnail strip → **service offer attachment** (recommend services with photos and catalog pricing) → PDF generation via AWS Lambda (ReportLab) → auto-upload to Google Drive → customer receives report with embedded approval buttons for offered services
+- **Site Report Wizard** — multi-step flow: property selection → mode choice → photo capture with categories/notes → thumbnail strip → **service offer attachment** (recommend services with photos and catalog pricing) → PDF generation via AWS Lambda (ReportLab) → auto-upload to Google Drive → customer receives report with embedded approval buttons for offered services. **localStorage draft persistence** — in-progress reports auto-save to localStorage on every state change (property, photos, annotations, notes, categories, step). On wizard open, if a draft with photos exists, user is prompted to resume or start fresh. Drafts expire after 24 hours and clear on successful generation or explicit discard. **Photo optimization for Lambda** — photos sent to Lambda are resized to 1200px max dimension at 0.65 JPEG quality (~100-200KB each, supports 30+ photos under API Gateway's 10MB limit). Full-resolution photos (original size, 0.8 quality) are uploaded separately to Google Drive for archival.
 - **Before & After Reports** — pulls photos from previous site reports, pairs with new "after" photos, generates comparison PDF. **Photo orientation matching (Layers 1 & 2 built)** — real-time orientation hint banner in detail modal with green/red color indicator via `window.resize` + `orientationchange` events, shows landscape/portrait guidance based on before photo's `naturalWidth`/`naturalHeight`; mismatch warning dialog via `iosConfirm()` when after photo orientation doesn't match before photo. Layer 3 (ReportLab) unnecessary — existing fill-and-crop scaling handles mixed orientations
 - iOS design system: SF Pro typography, exact system colors, dark mode, frosted glass tab bar with `backdrop-filter`, iOS spring animations, 44px touch targets, `prefers-reduced-motion` support
 - Bottom tab bar: Schedule (home) | Requests | Report Issue | Reports
 
-**estimate.html — Bidding & Estimating Tool (~18,400 lines)**
+**estimate.html — Bidding & Estimating Tool (~18,750 lines)**
 - **Division: Maintenance (MNT) fully built** — Irrigation, Construction, and Enhancement divisions planned, will reuse the same engine with division-specific catalogs and takeoffs
 - **Division & Job Type Selection**: When creating a new estimate, the user selects two things upfront:
   1. **Division** — Maintenance (MNT), Irrigation (IRR), Construction (CON), or Enhancement (ENH). This determines which item catalog, service catalog, and takeoff measurements are available. Stored as `division` on the estimate/bid.
@@ -160,7 +160,7 @@ The platform supports four divisions, each representing a distinct revenue strea
 
   **Data model**: Work ticket schedule type stored as `scheduleType` on the bid (`'single'`, `'multi_day'`, `'milestone'`). Multi-day tickets store `plannedDays` (integer). Milestone tickets store an ordered array of `milestones` — each with `name`, `sortOrder`, `estimatedHours`, `scheduledDate`, and associated `lineItems`. All generated tickets reference the parent work ticket via `workTicketId` and carry `sequenceIndex` (day number or milestone order) and `sequenceTotal`.
 
-- Three-panel Google Workspace layout (sidebar, main content, summary panel)
+- Three-panel Google Workspace layout (sidebar, main content, summary panel). **CSS layout chain**: `.app-container` (flex row, 100vh) → `.sidebar` (fixed width) + `.main-content` (flex: 1, **CSS Grid** with `grid-template-rows: var(--header-height) 1fr`) + `.summary-panel` (280px). Grid row 1 = `.main-header` (56px, flex-shrink: 0, z-index: 1), Grid row 2 = `.main-body` (1fr, overflow-y: auto, padding: 24px — the scroll container). Views inside `.main-body` are plain `display: block/none` toggled by `.view.active`. CSS Grid's definite `1fr` row sizing avoids Safari/WebKit flex miscalculation issues with 15+ hidden view siblings.
 - **Bid Builder**: Spreadsheet-style table with columns: Item, OCC, QTY, Unit, P/H, AH, TH, P/P, TP, GM%
 - **Real-time calculation engine**: labor hours from quantities ÷ production rates, material costs from coverage rates, travel time percentage, separate markups for labor/materials/subcontractors
 - **Three-tier billing structure**: Fixed Payment Services (monthly amortized), Services Billed Separately (upon completion), Recommended/Optional (customer opt-in with accepted/pending toggle)
@@ -437,7 +437,7 @@ Both apps live in the same monorepo, share the component library (`packages/ui`)
 - **WeasyPrint engine** (`pdf_generator.py`): Jinja2 HTML/CSS templates rendered to PDF via WeasyPrint. Photos embedded as base64 data URIs. Templates live in `cloud-function/templates/`. CSS edits are previewable in a browser via `test_local.py --html`.
 - **ReportLab engine** (`main.py`): Original coordinate-based PDF generation (~2,193 lines). Kept as fallback during migration. Will be deleted after all 4 PDF types are validated in production.
 - `lambda_function.py` — Lambda handler: parses multipart boundary from API Gateway event, extracts metadata JSON + photo blobs, selects rendering engine, routes by `metadata.type`: `invoice` → `generate_invoice_pdf()` (WeasyPrint only), `contract` → `generate_contract_pdf()`, `before_after` → `generate_before_after_report()`, `standard` → `generate_standard_report()`
-- Lambda config: Python 3.11, **1024MB memory** (WeasyPrint needs more than ReportLab), 60s timeout
+- Lambda config: Python 3.11, **2048MB memory** (WeasyPrint needs more than ReportLab), **300s timeout** (increased from 60s/1024MB to handle 25+ photo site reports)
 - **Deployment**: **Docker container image** (not zip). `Dockerfile` in `cloud-function/` uses `public.ecr.aws/lambda/python:3.11` base with system deps (pango, cairo, gdk-pixbuf2, libffi, fontconfig, freetype, harfbuzz). SAM template uses `PackageType: Image`. ECR repo created on first `sam deploy --guided`. Deploy via `cloud-function/deploy/deploy.sh`.
 - **Template structure**:
   ```
