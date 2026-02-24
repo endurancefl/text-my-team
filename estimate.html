@@ -4703,8 +4703,9 @@
     }
 
     .contacts-grid {
-      gap: 6px;
-      border: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
     }
 
     /* Contact card in list */
@@ -4718,10 +4719,6 @@
       display: flex;
       align-items: center;
       gap: 16px;
-    }
-
-    .contact-card:last-child {
-      border-bottom: 1px solid var(--gw-border);
     }
 
     .contact-card:hover {
@@ -6284,7 +6281,7 @@
               </button>
             </div>
             <div class="contacts-count" id="contacts-count"></div>
-            <div class="estimates-grid contacts-grid" id="contacts-grid"></div>
+            <div class="contacts-grid" id="contacts-grid"></div>
           </div>
 
           <!-- Contact Profile (shown when clicking a contact) -->
@@ -9547,9 +9544,9 @@ async function loadContacts() {
       contacts = data.contacts || [];
       if (currentView === 'contacts') {
         renderContactsList();
-        requestAnimationFrame(() => {
+        setTimeout(() => {
           document.getElementById('main-body').scrollTop = 0;
-        });
+        }, 0);
       }
     }
   } catch (err) {
@@ -9751,9 +9748,9 @@ async function openContactProfile(contactId) {
 
   document.getElementById('contacts-list-view').style.display = 'none';
   document.getElementById('contact-profile-view').style.display = '';
-  requestAnimationFrame(() => {
+  setTimeout(() => {
     document.getElementById('main-body').scrollTop = 0;
-  });
+  }, 0);
 
   document.getElementById('contact-profile-avatar').textContent = getContactInitials(contact);
   document.getElementById('contact-profile-name').textContent = getContactDisplayName(contact);
@@ -9826,9 +9823,9 @@ function showContactsList() {
   document.getElementById('header-title').textContent = 'Contacts';
   document.getElementById('header-subtitle').textContent = contacts.length + ' contacts';
   renderContactsList();
-  requestAnimationFrame(() => {
+  setTimeout(() => {
     document.getElementById('main-body').scrollTop = 0;
-  });
+  }, 0);
 }
 
 async function updateContactStage(newStage) {
@@ -10964,8 +10961,12 @@ function showView(viewId) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById(`view-${viewId}`).classList.add('active');
 
-  // Scroll to top when switching views
-  document.getElementById('main-body').scrollTop = 0;
+  // Scroll to top when switching views — use setTimeout to ensure
+  // the browser has completed layout after view toggle
+  setTimeout(() => {
+    const mb = document.getElementById('main-body');
+    mb.scrollTop = 0;
+  }, 0);
 
   // Update header
   const titles = {
@@ -11037,10 +11038,6 @@ function showView(viewId) {
   // Render contacts list when contacts view is shown
   if (viewId === 'contacts') {
     renderContactsList();
-    // Scroll after render so content starts at the top
-    requestAnimationFrame(() => {
-      document.getElementById('main-body').scrollTop = 0;
-    });
   }
 
   // Populate contact picker when builder view is shown
@@ -16708,7 +16705,9 @@ async function loadWeeklyReports() {
   }
 
   renderWeeklyReports();
-  document.getElementById('main-body').scrollTop = 0;
+  setTimeout(() => {
+    document.getElementById('main-body').scrollTop = 0;
+  }, 0);
 }
 
 function renderWeeklyReports() {
