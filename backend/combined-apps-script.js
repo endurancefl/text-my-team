@@ -4248,38 +4248,41 @@ function ensurePropertiesSheet() {
     sheet.getRange(1, 1, 1, PROPERTIES_HEADERS.length).setFontWeight('bold');
     return sheet;
   }
-  // Ensure all headers exist (migration for existing simple Properties sheet)
+
   var existingHeaders = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
-  var added = false;
+
+  // FIRST: Rename old column headers to new names (before adding new columns)
+  var renameMap = {
+    'Address': 'address',
+    'Crew Leader': 'crew',
+    'Crew': 'crew',
+    'Crew Phone': 'crewPhone',
+    'Phone': 'crewPhone',
+    'Pin': 'pin',
+    'PIN': 'pin',
+    'Email': 'notes'  // Map old Email column to notes (closest match)
+  };
+  for (var i = 0; i < existingHeaders.length; i++) {
+    var oldName = String(existingHeaders[i]);
+    if (renameMap[oldName]) {
+      var newName = renameMap[oldName];
+      // Only rename if the new name doesn't already exist elsewhere
+      if (existingHeaders.indexOf(newName) === -1) {
+        sheet.getRange(1, i + 1).setValue(newName);
+        existingHeaders[i] = newName;
+      }
+    }
+  }
+
+  // THEN: Add any missing headers from PROPERTIES_HEADERS
   PROPERTIES_HEADERS.forEach(function(h) {
     if (existingHeaders.indexOf(h) === -1) {
       var nextCol = existingHeaders.length + 1;
       sheet.getRange(1, nextCol).setValue(h).setFontWeight('bold');
       existingHeaders.push(h);
-      added = true;
     }
   });
-  // Migrate old simple Properties sheet: rename 'Address' to 'address' if needed
-  var addrIdx = existingHeaders.indexOf('Address');
-  if (addrIdx !== -1 && existingHeaders.indexOf('address') === -1) {
-    sheet.getRange(1, addrIdx + 1).setValue('address');
-  }
-  var crewIdx = existingHeaders.indexOf('Crew');
-  if (crewIdx !== -1 && existingHeaders.indexOf('crew') === -1) {
-    sheet.getRange(1, crewIdx + 1).setValue('crew');
-  }
-  var phoneIdx = existingHeaders.indexOf('Phone');
-  if (phoneIdx !== -1 && existingHeaders.indexOf('crewPhone') === -1) {
-    sheet.getRange(1, phoneIdx + 1).setValue('crewPhone');
-  }
-  var pinIdx = existingHeaders.indexOf('Pin');
-  if (pinIdx !== -1 && existingHeaders.indexOf('pin') === -1) {
-    sheet.getRange(1, pinIdx + 1).setValue('pin');
-  }
-  var pinIdx2 = existingHeaders.indexOf('PIN');
-  if (pinIdx2 !== -1 && existingHeaders.indexOf('pin') === -1) {
-    sheet.getRange(1, pinIdx2 + 1).setValue('pin');
-  }
+
   return sheet;
 }
 
@@ -4287,16 +4290,37 @@ function getEstimatingProperties() {
   var sheet = ensurePropertiesSheet();
   var data = sheet.getDataRange().getValues();
   if (data.length <= 1) return { success: true, properties: [] };
-  var headers = data[0];
+  var headers = data[0].map(function(h) { return String(h).trim(); });
+
+  // Helper to find a column by multiple possible names
+  function col(names) {
+    for (var n = 0; n < names.length; n++) {
+      var idx = headers.indexOf(names[n]);
+      if (idx !== -1) return idx;
+    }
+    return -1;
+  }
+
+  var addrCol = col(['address', 'Address', 'Property Address']);
   var properties = [];
   for (var i = 1; i < data.length; i++) {
     var row = data[i];
-    // Skip empty rows
-    if (!row[headers.indexOf('propertyId')] && !row[headers.indexOf('address')]) continue;
+    // Skip empty rows — need at least an address
+    var addr = addrCol !== -1 ? String(row[addrCol] || '').trim() : '';
+    if (!addr) continue;
+    // Build object from headers
     var obj = {};
     for (var j = 0; j < headers.length; j++) {
-      obj[headers[j]] = row[j];
+      if (headers[j]) obj[headers[j]] = row[j];
     }
+    // Normalize: ensure lowercase field names exist even if old headers used
+    if (!obj.address && obj.Address) obj.address = obj.Address;
+    if (!obj.crew && obj.Crew) obj.crew = obj.Crew;
+    if (!obj.crew && obj['Crew Leader']) obj.crew = obj['Crew Leader'];
+    if (!obj.crewPhone && obj['Crew Phone']) obj.crewPhone = obj['Crew Phone'];
+    if (!obj.crewPhone && obj.Phone) obj.crewPhone = obj.Phone;
+    if (!obj.pin && obj.Pin) obj.pin = obj.Pin;
+    if (!obj.pin && obj.PIN) obj.pin = obj.PIN;
     // Parse difficultyJson if present
     if (obj.difficultyJson && typeof obj.difficultyJson === 'string') {
       try { obj.difficultyParsed = JSON.parse(obj.difficultyJson); } catch (e) { obj.difficultyParsed = {}; }
