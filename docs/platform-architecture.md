@@ -123,15 +123,21 @@ The platform supports four divisions, each representing a distinct revenue strea
   - Seasonal Color: flowers ÷ flowers per flat → Spring/Fall items
   - Leaf Cleanup: canopy coverage × SF per bag → cleanup + hauling items
 - **Item Catalog**: 20+ items with production rates by difficulty (SF/Hour, LF/Hour), material pricing (purchase unit, cost per unit, coverage per unit, default depth)
-- **Service Catalog**: Pre-configured service templates with default visits, billing tiers, proposal names, descriptions, map colors, line item assignments, duration type (scalable or fixed)
+- **Service Catalog**: Pre-configured service templates with default visits, billing tiers, proposal names, descriptions (rich text via Quill.js editor), map colors, line item assignments, duration type (scalable or fixed)
 - **Template System**: Save/load estimate structures (services, tiers, visits, travel %, contract duration), excludes property-specific data
-- **Contract Settings**: Start/end dates, duration, payment months, price increase %, payment terms (Net 30, etc.), CC processing fee %, CC gross-up toggle
+- **Contract Settings**: Start/end dates, duration, payment months, price increase %, payment terms (Net 30, etc.), CC processing fee %, CC gross-up toggle, "Edit Terms & Conditions" button (opens Quill.js rich text editor modal)
 - **CC Gross-Up**: When enabled, monthly payment is adjusted: `grossedUpMonthly = baseMonthly / (1 - ccFeePercent/100)`. Applied in summary panel, payment schedule, and finalize calculations. Data model fields: `ccFeePercent` (number), `ccGrossUp` (boolean).
 - **Payment Schedule Generator**: Monthly payment distribution with penny rounding algorithm
-- **Contract PDF Generation**: Generates professional contract PDFs via AWS Lambda/ReportLab pipeline. Two templates based on `propertyType`:
-  - **Residential (3 pages)**: Quote page (services table, totals, recipient info), Description of Services (numbered list with sub-items from service catalog defaults), Terms & Conditions (12 clauses with template variables) + signature section
-  - **Commercial (5-6 pages)**: Cover page (logo, property info, optional service map image), Three-tier services tables (Fixed/Billed Separately/Recommended with category groupings), Payment schedule (12-month breakdown with penny rounding), Description of services (per-service paragraphs), Terms & Conditions, Signature page
-  - T&C clauses 11-12 (Price Increase, Tropical Event Policy) highlighted in red
+- **Rich Text Editors (Quill.js v2)**: Three Quill.js rich text editors replace plain textareas for formatted content that flows into contract PDFs:
+  - **Service Catalog Description**: Quill editor in the service catalog edit modal — stores HTML as `defaultDescription`
+  - **Service Details Description**: Quill editor in the per-estimate service details modal — stores HTML in `service.description`, pre-populated from catalog `defaultDescription` when service is added
+  - **Terms & Conditions**: Quill editor in a dedicated modal (opened from Contract Settings card) — stores HTML in `currentEstimate.contract.termsAndConditionsHtml` (null = server defaults). Pre-populated with 12 default clauses containing placeholder tokens `{duration}`, `{startDate}`, `{endDate}`, `{paymentTerms}`, `{priceIncrease}` that resolve at PDF generation time. "Reset to Defaults" button restores original text.
+  - **Toolbar**: Headers (H1-H3), bold/italic/underline, text color (dark, red, gray), ordered/bullet lists, indent/outdent, clear formatting
+  - **CDN**: Quill v2 via jsdelivr (~43KB gzipped), MIT license, no build step
+- **Contract PDF Generation**: Generates professional contract PDFs via AWS Lambda/WeasyPrint pipeline. Two templates based on `propertyType`:
+  - **Residential (3 pages)**: Quote page (services table, totals, recipient info), Description of Services (rich text HTML per-service from Quill editors, falls back to hardcoded descriptions if no per-service rich text), Terms & Conditions (custom rich text HTML with resolved tokens, falls back to 12 structured clauses) + signature section
+  - **Commercial (5-6 pages)**: Cover page (logo, property info, optional service map image), Three-tier services tables (Fixed/Billed Separately/Recommended with category groupings), Payment schedule (12-month breakdown with penny rounding), Description of services (rich text HTML per-service, falls back to tier-grouped paragraphs), Terms & Conditions (custom rich text or structured fallback), Signature page
+  - T&C clauses 11-12 (Price Increase, Tropical Event Policy) highlighted in red (in default structured fallback)
   - "Generate Contract PDF" button appears in header after estimate is finalized (when no PDF URL exists)
   - PDF auto-downloads and uploads to Google Drive (property folder → Contracts subfolder)
   - After upload, the Google Drive PDF URL and file ID are saved to the contract record via `updateContract`
@@ -145,12 +151,12 @@ The platform supports four divisions, each representing a distinct revenue strea
 - **Production Rates View**: Compares catalog production rates against actual field data from completed tickets. Nav item between Item Catalog and Schedule. Date range + crew filter. Two tabs: **Services tab** shows service-level comparison table sorted by worst efficiency — per-service visit count, avg est vs actual man-hours, variance badges (green/yellow/red), expandable rows with per-ticket breakdown and item-level implied rates. **Item Rates tab** shows item catalog with field rate columns — measured rates (from single-item services, direct qty/hours), inferred rates (from multi-item services, proportional via efficiency ratio), delta vs catalog rates, data point counts. Summary cards: tickets analyzed, overall efficiency, services over budget, reopened count. Ticket Services JSON enriched with per-item `quantities` (easy/medium/hard), `unit`, and `complexityFactor` during ticket generation for rate calculation. Functions: `initProductionView()`, `loadProductionAnalysis()`, `setProdTab()`, `renderProductionView()`, `renderProdServicesTable()`, `renderProdItemsTable()`, `renderProdTicketDetail()`, `toggleProdDetail()`, `populateProdCrewFilter()`. CSS: `.prod-variance-badge`, `.prod-confidence-tag`, `.prod-detail-row`, `.prod-detail-content`, `.prod-item-table`, `.prod-reopened-badge`, `.prod-empty-state`.
 - **Schedule View (Route Management)**: Three display modes — day view with property stop cards and drag-drop reordering (`schedDrop()` + `saveRouteOrder()`), week calendar grid with drag-to-reschedule between dates, month calendar with ticket dots. Crew filter dropdown. Stop detail panel with earned value, margin, services. Functions: `loadScheduleView()`, `renderSchedDay()`, `renderSchedWeek()`, `renderSchedMonth()`, `showSchedTicketDetail()`, `rescheduleFromDetail()`, `skipFromDetail()`.
 - **Financials Dashboard (Earned Revenue)**: Summary cards (contract value, collected, earned, deferred revenue, completion %). Monthly bar chart comparing earned vs collected with pagination. Contract table with per-contract breakdown. Deferred revenue = collected - earned (orange if positive/deferred, green if ahead of schedule). Functions: `loadFinancials()`, `renderFinancials()`, `calcCollectedToDate()`, `calcMonthlyData()`, `renderMonthlyChart()`, `renderContractTable()`.
-- **Ticket Scheduling Engine**: Three date distribution strategies dispatched by visit count in `getDatesForVisitCount()`: `generateSeasonalMowingDates()` (weekly Apr–Oct, biweekly Nov–Mar — visits === seasonalAnchor), `generateWeeklyDates()` (every week, 50-54 visits), `generateSimpleScheduleDates()` (even distribution, all others). Item-level visit override via `lineItem.itemVisits`. Tickets bundled by date with earned value proportionally distributed and penny reconciliation. `previewTickets()` shows breakdown before committing.
+- **Ticket Scheduling Engine**: Three date distribution strategies dispatched by visit count in `getDatesForVisitCount()`: `generateSeasonalMowingDates()` (weekly Apr–Oct, biweekly Nov–Mar; fills dormant gaps for higher targets (e.g. 52), trims dormant dates for lower targets — visits === seasonalAnchor), `generateWeeklyDates()` (every week, 50-54 visits), `generateSimpleScheduleDates()` (even distribution, all others). Item-level visit override via `lineItem.itemVisits`. Tickets bundled by date with earned value proportionally distributed and penny reconciliation. `previewTickets()` shows breakdown before committing.
 - Material Design styling with Google Sans/Roboto fonts
 
 ### Backend & Infrastructure
 - **Backend** — Single consolidated Google Apps Script (Code.gs) serving both Estimating and Crew endpoints from one "Estimating" spreadsheet
-- **PDF Generation** — AWS Lambda + API Gateway (Python/ReportLab)
+- **PDF Generation** — AWS Lambda + API Gateway (Python/WeasyPrint container image, ReportLab fallback). Rich text HTML from Quill.js editors rendered natively by WeasyPrint via `.rich-text-content` CSS class. Template variable resolution via `_resolve_template_vars()` for T&C placeholders.
 - **Hosting** — GitHub Pages (endurancefl.github.io)
 - **Auth** — Crew leaders: phone number against Crew Members sheet (Role = "Leader"). Customers: 4-digit PIN against Properties sheet.
 - **Data storage** — Google Sheets as database, Google Drive for files (estimates JSON, photos, site reports), localStorage for auto-save
@@ -335,23 +341,41 @@ Both apps live in the same monorepo, share the component library (`packages/ui`)
 - Pick based on your cloud provider choice
 
 ### PDF Generation
-**Current: AWS Lambda + API Gateway (Python/ReportLab) — `cloud-function/main.py` + `cloud-function/lambda_function.py`**
-- Endpoint: `https://ibjyxrp542.execute-api.us-east-1.amazonaws.com/prod/generate_site_report` (replace YOUR_API_ID after deployment)
-- **Architecture**: API Gateway HTTP API receives multipart/form-data → Lambda parses event → `main.py` generates PDF → base64-encoded response
-- `main.py` is a platform-agnostic PDF library — no Flask or framework dependencies. Entry points (`lambda_function.py`) handle HTTP parsing
-- `lambda_function.py` — Lambda handler: parses multipart boundary from API Gateway event, extracts metadata JSON + photo blobs, routes by `metadata.type`: `standard` → `generate_standard_report()`, `before_after` → `generate_before_after_report()`, `contract` → `generate_contract_pdf()`
-- Lambda config: Python 3.11, 512MB memory, 60s timeout
-- **Deployment**: AWS SAM template in `cloud-function/deploy/template.yaml`, one-command deploy via `cloud-function/deploy/deploy.sh` (`sam build && sam deploy`)
+**Current: AWS Lambda + API Gateway (Python/WeasyPrint + ReportLab dual engine) — Container image deployment**
+- Endpoint: `https://ibjyxrp542.execute-api.us-east-1.amazonaws.com/prod/generate_site_report`
+- **Architecture**: API Gateway HTTP API receives multipart/form-data → Lambda parses event → `pdf_generator.py` (WeasyPrint, default) or `main.py` (ReportLab, fallback) generates PDF → base64-encoded response
+- **Rendering engines**: Two engines coexist during migration. The `renderer` field in metadata JSON selects the engine (`"weasyprint"` default, `"reportlab"` fallback). `DEFAULT_RENDERER` in `lambda_function.py` controls the global default.
+- **WeasyPrint engine** (`pdf_generator.py`): Jinja2 HTML/CSS templates rendered to PDF via WeasyPrint. Photos embedded as base64 data URIs. Templates live in `cloud-function/templates/`. CSS edits are previewable in a browser via `test_local.py --html`.
+- **ReportLab engine** (`main.py`): Original coordinate-based PDF generation (~2,193 lines). Kept as fallback during migration. Will be deleted after all 4 PDF types are validated in production.
+- `lambda_function.py` — Lambda handler: parses multipart boundary from API Gateway event, extracts metadata JSON + photo blobs, selects rendering engine, routes by `metadata.type`: `standard` → `generate_standard_report()`, `before_after` → `generate_before_after_report()`, `contract` → `generate_contract_pdf()`
+- Lambda config: Python 3.11, **1024MB memory** (WeasyPrint needs more than ReportLab), 60s timeout
+- **Deployment**: **Docker container image** (not zip). `Dockerfile` in `cloud-function/` uses `public.ecr.aws/lambda/python:3.11` base with system deps (pango, cairo, gdk-pixbuf2, libffi, fontconfig, freetype, harfbuzz). SAM template uses `PackageType: Image`. ECR repo created on first `sam deploy --guided`. Deploy via `cloud-function/deploy/deploy.sh`.
+- **Template structure**:
+  ```
+  cloud-function/templates/
+    base.html                   # Shared @page rules, CSS vars, footer
+    site_report.html            # Photo grid report
+    before_after.html           # Comparison report
+    contract_residential.html   # 3-page residential contract
+    contract_commercial.html    # 5-6 page commercial contract
+    styles/
+      common.css                # Shared print CSS (header, info box, category bars)
+      site_report.css           # 2-column CSS grid, photo frames, note boxes
+      before_after.css          # BEFORE/AFTER paired layout
+      contract.css              # Tables, signatures, terms, payment schedule
+  ```
+- **Color palette** (CSS variables in `base.html`): `--green: #3A5F4B`, `--dark: #1A2E24`, `--gray-header: #666666`, `--light-gray: #CCCCCC`, `--contract-light-gray: #F5F5F5`, `--contract-red: #C62828`, `--before-red: #DC2626`, `--after-green: #16A34A`
 - Handles Site Report, Before & After, and Contract PDF types (distinguished by `metadata.type` field)
-- **Site Report layout**: 2-column, 3-row grid per page (page 1 has 2 rows for header). Photos grouped by category with category headers, notes below each photo, page numbering, logo on page 1
-- **Before & After layout**: Side-by-side comparison — BEFORE (red banner) left, AFTER (green banner) right. 2 pairs on page 1 (header), 3 pairs per page after. New page per category
-- **Contract PDF layout**: Two templates based on `propertyType`. Residential: 3-page (quote, service descriptions, T&C + signatures). Commercial: 5-6 page (cover, three-tier services tables, payment schedule, service descriptions, T&C, signatures). Both include 12 standard terms clauses with template variables. Optional `service_map` photo for commercial cover page. Functions: `generate_contract_pdf()`, `_generate_residential_contract()`, `_generate_commercial_contract()`, `_get_terms_clauses()`
+- **Site Report layout**: 2-column CSS grid. Photos grouped by category with category headers, notes below each photo, page numbering via `@page` counters, logo on page 1. `object-fit: cover` replaces ReportLab's manual crop algorithm.
+- **Before & After layout**: Side-by-side comparison — BEFORE (red banner) left, AFTER (green banner) right. CSS grid pairs with `page-break-inside: avoid`. New page per category.
+- **Contract PDF layout**: Two templates based on `propertyType`. Residential: 3-page (quote, service descriptions, T&C + signatures). Commercial: 5-6 page (cover, three-tier services tables, payment schedule, service descriptions, T&C, signatures). Both include 12 standard terms clauses with template variables. Clause 12 (Named Tropical Event Policy) uses numbered sub-items instead of plain text. `_get_terms_clauses()` returns `(title, text)` tuples where text is a string or a list of sub-item strings. Both engines and all templates handle both formats. Optional `service_map` photo for commercial cover page. Functions: `generate_contract_pdf()`, `_generate_residential_contract()`, `_generate_commercial_contract()`
 - Request format: `multipart/form-data` with JSON `metadata` field + photo blobs (`photos`, `before_photos`, `after_photos`)
 - Photos composited client-side (annotations burned onto canvas) before upload. Site Report: max 1600px, 85% JPEG quality. Before & After: max 1000px, 75% quality
 - PDF returned as binary blob (base64 via API Gateway) → auto-downloaded to device → uploaded to Google Drive via Apps Script (`siteReportPdf: true`)
 - Individual photos and report JSON also uploaded to Drive for future reference (Before & After pulls prior photos from these)
 - CORS configured at API Gateway level + Lambda response headers for GitHub Pages origins
 - Demo mode: `crew.html` intercepts `execute-api` URLs (and legacy `cloudfunctions.net`) to return mock PDF blobs
+- **Local dev workflow**: `python test_local.py standard --html` opens HTML in browser for rapid CSS iteration. `python test_local.py standard` generates WeasyPrint PDF. `--reportlab` flag uses old engine for comparison.
 
 **Built: Before & After photo orientation matching (Layers 1 & 2):**
 
@@ -361,8 +385,7 @@ Both apps live in the same monorepo, share the component library (`packages/ui`)
 
 3. **Layer 3 — ReportLab layout normalization** (not needed): The PDF renderer already handles mixed orientations with fill-and-crop scaling inside fixed bounding boxes. Client-side guidance is sufficient.
 
-- Production options (future): Puppeteer/Playwright (HTML → PDF), or move into main API as a route
-- The right choice depends on template complexity and whether you want static layouts or dynamic/AI-generated content
+- WeasyPrint HTML/CSS templates now replace the need for Puppeteer/Playwright — CSS print layout gives full control over page breaks, headers, footers, and photo grids while remaining previewable in any browser
 
 ### Hosting (Frontend)
 **Cloud-native static hosting (S3 + CloudFront / Azure Static Web Apps / Firebase Hosting / Vercel)**
@@ -935,7 +958,7 @@ When an estimate is accepted, the "Accept Estimate → Create Contract" action:
 
 | Schedule Type | Rule | Example |
 |---------------|------|---------|
-| `seasonal_mowing` | Weekly Apr 1–Oct 31, biweekly Nov 1–Mar 31 | Mowing, Blowing, Detail Mowing, Trash Pickup |
+| `seasonal_mowing` | Weekly Apr–Oct, biweekly Nov–Mar; fills dormant gaps for higher targets (52), trims dormant for lower | Mowing, Blowing, Detail Mowing, Trash Pickup |
 | `weekly` | Every week, all year (~52 visits) | Blade Edge, Blowing (when set to 52 visits) |
 | `simple` | Evenly distributed across contract, snapped to preferred day | Hedge Trimming (12/yr), Irrigation (12/yr), Mulch (1/yr) |
 
@@ -1266,7 +1289,7 @@ Build in this order. Each phase builds on the previous one and delivers usable v
 
 #### Contract & Ticket Generation (Management Platform)
 - [ ] "Accept Estimate" action on bid summary → creates contract
-- [ ] Mowing seasonal schedule: weekly Apr 1–Oct 31, biweekly Nov 1–Mar 31
+- [ ] Mowing seasonal schedule: weekly year-round, trims winter dates first for lower targets
 - [ ] Simple schedule distribution for all other services
 - [ ] Ticket bundling: co-scheduled services grouped into single property stops
 - [ ] Schedule preview before generation (show ticket counts by service)
@@ -2095,7 +2118,7 @@ Before the full React/PostgreSQL migration, the ticket generation and schedule f
 5. ✅ Ticket status update (`updateTicketStatus`) and reschedule (`rescheduleTicket`) endpoints
 6. ✅ "Finalize Estimate" UI flow — locks estimate, opens modal for crew/day/dates, generates contract + tickets
 7. ✅ **Estimate Revision workflow** — Finalized → Revision → Update Contract → re-Finalized. Updates existing contract, deletes/regenerates future tickets, preserves completed tickets, increments `revisionCount`
-8. ✅ `generateSeasonalMowingDates()` — weekly Apr–Oct, biweekly Nov–Mar seasonal logic
+8. ✅ `generateSeasonalMowingDates()` — weekly Apr–Oct, biweekly Nov–Mar; fills dormant gaps for higher targets (e.g. 52), trims dormant dates for lower targets seasonal logic
 9. ✅ `generateWeeklyDates()` — every week all year, trims to target visit count (50-54 visits)
 10. ✅ `generateSimpleScheduleDates()` — evenly distributed dates for all other visit counts
 11. ✅ **Item-level scheduling**: each line item can override the service visit count via `lineItem.itemVisits`
@@ -2423,7 +2446,7 @@ You don't have to stop using the current app while you build the new one. Here's
    - ✅ Crew-hours display (man-hours ÷ crew size) + budgeted indirect time from travelHours
    - ✅ **Contract finalization UI in estimate.html** — "Finalize Estimate" flow that generates tickets from bid services
    - ✅ **Estimate Revision & Re-Finalize workflow** — three-status lifecycle (Draft/Revision/Finalized), contract update instead of duplicate, future ticket regeneration, revision count tracking
-   - ✅ **Ticket generation logic** — three date distribution strategies: `generateSeasonalMowingDates()` (weekly Apr–Oct, biweekly Nov–Mar), `generateWeeklyDates()` (every week, 50-54 visits), `generateSimpleScheduleDates()` (even distribution). Item-level `itemVisits` override, ticket bundling by date, earned value with penny reconciliation, `previewTickets()` breakdown
+   - ✅ **Ticket generation logic** — three date distribution strategies: `generateSeasonalMowingDates()` (weekly Apr–Oct, biweekly Nov–Mar; fills dormant gaps for higher targets (e.g. 52), trims dormant dates for lower targets), `generateWeeklyDates()` (every week, 50-54 visits), `generateSimpleScheduleDates()` (even distribution). Item-level `itemVisits` override, ticket bundling by date, earned value with penny reconciliation, `previewTickets()` breakdown
    - ✅ **GPS capture** at clock in/out — `captureGPS()` with high accuracy at 11 capture points (travel, day, ticket start/complete). Coordinates as `latIn/lngIn/latOut/lngOut`
    - ✅ **Route management view** — day/week/month views with drag-drop reordering, crew filter, bulk skip day for weather/holidays, "Needs Reschedule" queue with badge count and per-ticket reschedule controls
    - 🔶 **Earned revenue dashboard** — monthly earned vs collected chart, contract table, deferred revenue, completion % all built; **remaining: monthly P&L approximation**

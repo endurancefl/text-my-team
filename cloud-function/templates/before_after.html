@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Before &amp; After Report{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ css_url('common.css') }}">
+<link rel="stylesheet" href="{{ css_url('before_after.css') }}">
+{% endblock %}
+
+{% block content %}
+{# ── Page 1 Header ── #}
+<div class="report-header">
+  <div class="logo">
+    {% if logo_uri %}
+    <img src="{{ logo_uri }}" alt="Logo">
+    {% endif %}
+  </div>
+  <div class="info-box">
+    <div class="info-row">
+      <div class="info-label">Date:</div>
+      <div class="info-value">{{ date }}</div>
+    </div>
+    <div class="info-row">
+      <div class="info-label">Inspected By:</div>
+      <div class="info-value">{{ inspector }}</div>
+    </div>
+    <div class="info-row">
+      <div class="info-label">Property:</div>
+      <div class="info-value">{{ address }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="report-title">Before &amp; After Report</div>
+<hr class="title-rule">
+
+{# ── Photo Pairs by Category ── #}
+{% for cat_name, pairs in categories.items() %}
+<div class="category-section">
+  <div class="category-header">{{ cat_name }}</div>
+  {% for pair in pairs %}
+  <div class="pair-row">
+    <div class="pair-grid">
+      <div class="pair-column">
+        <div class="pair-label before">BEFORE</div>
+        <div class="pair-photo">
+          {% if pair.before_uri %}
+          <img src="{{ pair.before_uri }}" alt="Before {{ pair.num }}">
+          {% endif %}
+        </div>
+        <div class="pair-note">{{ pair.num }}. {% if pair.before_note %}Note: {{ pair.before_note }}{% endif %}</div>
+      </div>
+      <div class="pair-column">
+        <div class="pair-label after">AFTER</div>
+        <div class="pair-photo">
+          {% if pair.after_uri %}
+          <img src="{{ pair.after_uri }}" alt="After {{ pair.num }}">
+          {% endif %}
+        </div>
+        <div class="pair-note">{{ pair.num }}. {% if pair.after_note %}Note: {{ pair.after_note }}{% endif %}</div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,65 @@
+/* Common styles shared across all report types */
+
+.report-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0;
+}
+
+.logo img {
+  width: 180px;
+  height: auto;
+}
+
+.info-box {
+  width: 160px;
+  border: 0.5px solid var(--light-gray);
+  font-size: 8pt;
+}
+
+.info-box .info-row {
+  display: flex;
+  flex-direction: column;
+}
+
+.info-box .info-label {
+  background: var(--gray-header);
+  color: var(--white);
+  font-weight: bold;
+  font-size: 8pt;
+  padding: 3px 6px;
+}
+
+.info-box .info-value {
+  color: var(--dark);
+  font-size: 9pt;
+  padding: 3px 6px;
+}
+
+.report-title {
+  font-size: 20pt;
+  font-weight: bold;
+  color: var(--dark);
+  margin-top: 6px;
+}
+
+.title-rule {
+  border: none;
+  border-top: 1px solid black;
+  margin: 8px 0 14px 0;
+}
+
+.category-header {
+  background: var(--gray-header);
+  color: var(--white);
+  font-weight: bold;
+  font-size: 10pt;
+  padding: 6px 8px;
+  margin-bottom: 14px;
+}
+
+.footer-text {
+  font-size: 8pt;
+  color: var(--gray-header);
+}

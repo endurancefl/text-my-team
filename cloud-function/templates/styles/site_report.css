@@ -1,0 +1,53 @@
+/* Site Report — 2-column photo grid layout */
+
+.photo-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.photo-cell {
+  page-break-inside: avoid;
+}
+
+.photo-frame {
+  border: 0.5px solid black;
+  width: 100%;
+  aspect-ratio: 258 / 195;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f0f0f0;
+}
+
+.photo-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.note-box {
+  border: 0.5px solid black;
+  border-top: none;
+  min-height: 30px;
+  padding: 2px 4px;
+  font-size: 8pt;
+  color: var(--dark);
+  line-height: 1.25;
+  overflow: hidden;
+}
+
+/* Page 1 header takes space — only 2 rows fit */
+.page-first .photo-grid {
+  /* handled by page breaks */
+}
+
+/* Category starts on new page */
+.category-section {
+  page-break-before: always;
+}
+
+.category-section:first-child {
+  page-break-before: avoid;
+}

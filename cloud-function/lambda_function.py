@@ -1,22 +1,43 @@
 """AWS Lambda handler for PDF generation.
 
 Receives multipart/form-data via API Gateway, parses the request,
-calls main.py PDF generation functions, and returns base64-encoded PDF.
+generates PDFs, and returns base64-encoded PDF.
+
+Supports dual rendering engines during migration:
+  - "reportlab" (default fallback) — original main.py engine
+  - "weasyprint" — new HTML/CSS template engine (pdf_generator.py)
+
+Set "renderer": "weasyprint" in the metadata JSON to use the new engine.
 """
 import base64
 import io
 import json
 import re
 
+# ReportLab engine (original)
 from main import (
     ALLOWED_ORIGINS,
     allowed_origin_from_header,
     cors_headers,
     parse_photo_buffers,
-    generate_standard_report,
-    generate_before_after_report,
-    generate_contract_pdf,
+    generate_standard_report as rl_generate_standard_report,
+    generate_before_after_report as rl_generate_before_after_report,
+    generate_contract_pdf as rl_generate_contract_pdf,
 )
+
+# WeasyPrint engine (new)
+try:
+    from pdf_generator import (
+        generate_standard_report as wp_generate_standard_report,
+        generate_before_after_report as wp_generate_before_after_report,
+        generate_contract_pdf as wp_generate_contract_pdf,
+    )
+    WEASYPRINT_AVAILABLE = True
+except ImportError:
+    WEASYPRINT_AVAILABLE = False
+
+# Default renderer — flip to "weasyprint" once all types are validated
+DEFAULT_RENDERER = "weasyprint"
 
 
 def lambda_handler(event, context):
@@ -64,6 +85,12 @@ def lambda_handler(event, context):
         metadata = json.loads(metadata_raw)
         report_type = metadata.get("type", "standard")
 
+        # Select rendering engine
+        renderer = metadata.get("renderer", DEFAULT_RENDERER)
+        if renderer == "weasyprint" and not WEASYPRINT_AVAILABLE:
+            renderer = "reportlab"
+        use_wp = renderer == "weasyprint"
+
         if report_type == "contract":
             # Parse optional service map photo (commercial only)
             service_map_files = parts.get("files", {}).get("service_map", [])
@@ -73,7 +100,8 @@ def lambda_handler(event, context):
                 if buffers:
                     service_map_buffer = buffers[0]
 
-            pdf_bytes, filename = generate_contract_pdf(metadata, service_map_buffer)
+            gen = wp_generate_contract_pdf if use_wp else rl_generate_contract_pdf
+            pdf_bytes, filename = gen(metadata, service_map_buffer)
 
         elif report_type == "before_after":
             # Parse before and after photo files
@@ -83,15 +111,15 @@ def lambda_handler(event, context):
             before_buffers = parse_photo_buffers(before_files)
             after_buffers = parse_photo_buffers(after_files)
 
-            pdf_bytes, filename = generate_before_after_report(
-                metadata, before_buffers, after_buffers
-            )
+            gen = wp_generate_before_after_report if use_wp else rl_generate_before_after_report
+            pdf_bytes, filename = gen(metadata, before_buffers, after_buffers)
         else:
             # Parse photo files
             photo_files = parts.get("files", {}).get("photos", [])
             photo_buffers = parse_photo_buffers(photo_files)
 
-            pdf_bytes, filename = generate_standard_report(metadata, photo_buffers)
+            gen = wp_generate_standard_report if use_wp else rl_generate_standard_report
+            pdf_bytes, filename = gen(metadata, photo_buffers)
 
         # Return base64-encoded PDF
         response_headers = cors_headers(allowed)

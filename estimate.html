@@ -9,6 +9,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
   <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.js"></script>
   <style>
     /* ═══════════════════════════════════════════════════════════════
        GOOGLE WORKSPACE STYLE - ESTIMATING INTERFACE
@@ -3741,6 +3743,25 @@
       border-color: var(--accent);
     }
 
+    /* Quill editor overrides for modals */
+    .ql-toolbar.ql-snow {
+      border-radius: var(--radius) var(--radius) 0 0;
+      border-color: var(--border);
+      background: #fafafa;
+    }
+    .ql-container.ql-snow {
+      border-radius: 0 0 var(--radius) var(--radius);
+      border-color: var(--border);
+      font-family: inherit;
+      font-size: 14px;
+    }
+    .ql-editor {
+      min-height: 80px;
+    }
+    #terms-editor .ql-editor {
+      min-height: 300px;
+    }
+
     /* ═══════════════════════════════════════════════════════════════
        ENHANCED SUMMARY PANEL
        ═══════════════════════════════════════════════════════════════ */
@@ -5198,6 +5219,37 @@
                     <label class="form-label" for="contract-cc-grossup" style="margin: 0; cursor: pointer;">Gross-up monthly payment for CC fee</label>
                   </div>
                 </div>
+                <div style="padding: 0 16px 16px; border-top: 1px solid #eee; margin-top: 8px; padding-top: 12px;">
+                  <button class="btn btn-secondary" onclick="openTermsModal()" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="18" height="18">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                    </svg>
+                    Edit Terms &amp; Conditions
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Terms & Conditions Modal -->
+            <div class="modal-overlay" id="terms-modal">
+              <div class="modal" style="max-width: 800px; width: 95%;">
+                <div class="modal-header">
+                  <h3>Terms &amp; Conditions</h3>
+                  <button class="modal-close" onclick="closeTermsModal()">&times;</button>
+                </div>
+                <div class="modal-body" style="padding: 16px;">
+                  <p style="font-size: 13px; color: #666; margin-bottom: 12px;">
+                    Use placeholders <code>{duration}</code>, <code>{startDate}</code>, <code>{endDate}</code>, <code>{paymentTerms}</code>, <code>{priceIncrease}</code> — they resolve automatically in the PDF.
+                  </p>
+                  <div id="terms-editor" style="height: 400px;"></div>
+                </div>
+                <div class="modal-footer" style="display: flex; gap: 8px; justify-content: space-between;">
+                  <button class="btn btn-text" onclick="resetTermsToDefaults()">Reset to Defaults</button>
+                  <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-secondary" onclick="closeTermsModal()">Cancel</button>
+                    <button class="btn btn-primary" onclick="saveTermsContent()">Save</button>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -6516,7 +6568,7 @@
           </div>
           <div class="form-group service-details-full">
             <label class="form-label">Description (for proposal)</label>
-            <textarea class="service-textarea" id="service-description" placeholder="Describe the service for the customer proposal..."></textarea>
+            <div id="service-description-editor" style="height: 120px;"></div>
           </div>
           <div class="service-details-row">
             <div class="form-group">
@@ -6745,7 +6797,7 @@
         </div>
         <div class="form-group" style="margin-bottom: 16px;">
           <label class="form-label">Description</label>
-          <textarea class="form-input" id="svc-catalog-description" style="height: 70px; resize: vertical; padding: 10px;" placeholder="Description for proposals..."></textarea>
+          <div id="svc-catalog-description-editor" style="height: 120px;"></div>
         </div>
         <div class="form-group">
           <label class="form-label">Items from Item Catalog</label>
@@ -6971,7 +7023,8 @@ let currentEstimate = {
     priceIncrease: 0,
     paymentTerms: 'Net 30',
     ccFeePercent: 0,
-    ccGrossUp: false
+    ccGrossUp: false,
+    termsAndConditionsHtml: null
   },
   // NEW: Takeoffs data - the single source of truth for measurements
   takeoffs: {
@@ -10190,6 +10243,99 @@ function toggleServiceCatalogSection(sectionName) {
   renderServiceCatalog();
 }
 
+// ── Quill Editor Config ──
+const QUILL_TOOLBAR_OPTIONS = [
+  [{ 'header': [1, 2, 3, false] }],
+  ['bold', 'italic', 'underline'],
+  [{ 'color': ['#333333', '#cc0000', '#888888'] }],
+  [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+  [{ 'indent': '-1' }, { 'indent': '+1' }],
+  ['clean']
+];
+
+let catalogDescQuill = null;
+let serviceDescQuill = null;
+let termsQuill = null;
+
+function initCatalogDescriptionQuill(htmlContent) {
+  const container = document.getElementById('svc-catalog-description-editor');
+  container.innerHTML = '';
+  catalogDescQuill = new Quill(container, {
+    theme: 'snow',
+    modules: { toolbar: QUILL_TOOLBAR_OPTIONS },
+    placeholder: 'Description for proposals...'
+  });
+  if (htmlContent) {
+    catalogDescQuill.clipboard.dangerouslyPasteHTML(htmlContent);
+  }
+}
+
+function initServiceDescriptionQuill(htmlContent) {
+  const container = document.getElementById('service-description-editor');
+  container.innerHTML = '';
+  serviceDescQuill = new Quill(container, {
+    theme: 'snow',
+    modules: { toolbar: QUILL_TOOLBAR_OPTIONS },
+    placeholder: 'Describe the service for the customer proposal...'
+  });
+  if (htmlContent) {
+    serviceDescQuill.clipboard.dangerouslyPasteHTML(htmlContent);
+  }
+}
+
+function getDefaultTermsHtml() {
+  return `<ol>
+<li><strong>Term:</strong> The term of this Landscape Management Agreement will be {duration} months. Start Date: {startDate} and End Date: {endDate}.</li>
+<li><strong>Regular Monthly Maintenance Billing:</strong> The customer will be invoiced once per month for the Weekly Property Maintenance.</li>
+<li><strong>Enhancement Work Billing:</strong> Additional work not outlined in this Landscape Management Agreement will be subject to customer approval and invoiced separately.</li>
+<li><strong>Invoice Terms:</strong> Payment terms will be {paymentTerms} on all invoices.</li>
+<li><strong>Sales Tax:</strong> All state and local sales tax will be applied to invoices where required by law.</li>
+<li><strong>Background Check:</strong> Endurance Services will conduct background checks on all team members prior to working on the client\u2019s property.</li>
+<li><strong>Uniform:</strong> Endurance Services team members will wear the company uniform: work boots, pants, and Endurance Services branded shirts and hats.</li>
+<li><strong>Insurance:</strong> Endurance Services will maintain Workers Compensation and General Liability Insurance.</li>
+<li><strong>Termination:</strong> Either party may terminate this contract for cause, by providing thirty (30) days\u2019 prior written notice stating the reason for termination.</li>
+<li><strong>Contract Renewal:</strong> This contract will automatically renew unless either party provides written notice of non-renewal at least sixty (60) days prior to the expiration date.</li>
+<li style="color: #cc0000;"><strong>Price Increase:</strong> Upon contract renewal, a cost-of-living adjustment will be applied to the new contract. The adjustment will be equal to the greater of {priceIncrease} percent ({priceIncrease}%) or the percentage increase in the \u201cCPI-U, US CITY AVERAGE, ALL ITEMS\u201d as measured by the U.S. Bureau of Labor Statistics (https://www.bls.gov/cpi/) for the most recent twelve-month period.</li>
+<li style="color: #cc0000;"><strong>Named Tropical Event Policy:</strong><ol>
+<li>A Named Tropical Event is defined as a tropical storm or hurricane given a name by the National Hurricane Center (www.nhc.noaa.gov).</li>
+<li>Once work can be performed safely, property cleanup resulting from a Named Tropical Event will be billed on a Time and Materials basis at $65 per hour in addition to the monthly contract price.</li>
+</ol></li>
+</ol>`;
+}
+
+function openTermsModal() {
+  const modal = document.getElementById('terms-modal');
+  modal.classList.add('active');
+  const container = document.getElementById('terms-editor');
+  container.innerHTML = '';
+  termsQuill = new Quill(container, {
+    theme: 'snow',
+    modules: { toolbar: QUILL_TOOLBAR_OPTIONS },
+    placeholder: 'Terms & Conditions...'
+  });
+  const html = currentEstimate.contract.termsAndConditionsHtml || getDefaultTermsHtml();
+  termsQuill.clipboard.dangerouslyPasteHTML(html);
+}
+
+function closeTermsModal() {
+  document.getElementById('terms-modal').classList.remove('active');
+}
+
+function saveTermsContent() {
+  if (termsQuill) {
+    currentEstimate.contract.termsAndConditionsHtml = termsQuill.root.innerHTML.trim();
+    markEstimateDirty();
+  }
+  closeTermsModal();
+  showToast('Terms & Conditions saved.', 'success');
+}
+
+function resetTermsToDefaults() {
+  if (termsQuill) {
+    termsQuill.clipboard.dangerouslyPasteHTML(getDefaultTermsHtml());
+  }
+}
+
 function openServiceCatalogEditModal(serviceId = null) {
   const modal = document.getElementById('service-catalog-modal');
   const title = document.getElementById('service-catalog-modal-title');
@@ -10207,9 +10353,15 @@ function openServiceCatalogEditModal(serviceId = null) {
     document.getElementById('svc-catalog-tier').value = service.defaultBillingTier;
     document.getElementById('svc-catalog-color').value = service.defaultMapColor || 'green';
     document.getElementById('svc-catalog-proposal-name').value = service.defaultProposalName || service.serviceName;
-    document.getElementById('svc-catalog-description').value = service.defaultDescription || '';
 
     serviceCatalogEditItems = typeof service.items === 'string' ? JSON.parse(service.items || '[]') : [...(service.items || [])];
+
+    // Init Quill after modal renders
+    renderServiceCatalogEditItems();
+    populateItemCatalogDropdown();
+    modal.classList.add('active');
+    initCatalogDescriptionQuill(service.defaultDescription || '');
+    return;
   } else {
     title.textContent = 'Add Service to Catalog';
     document.getElementById('svc-catalog-id').value = '';
@@ -10219,13 +10371,13 @@ function openServiceCatalogEditModal(serviceId = null) {
     document.getElementById('svc-catalog-tier').value = 'fixed';
     document.getElementById('svc-catalog-color').value = 'green';
     document.getElementById('svc-catalog-proposal-name').value = '';
-    document.getElementById('svc-catalog-description').value = '';
     serviceCatalogEditItems = [];
   }
 
   renderServiceCatalogEditItems();
   populateItemCatalogDropdown();
   modal.classList.add('active');
+  initCatalogDescriptionQuill('');
 }
 
 function closeServiceCatalogModal() {
@@ -10439,7 +10591,7 @@ async function saveServiceCatalogEntry() {
   const defaultBillingTier = document.getElementById('svc-catalog-tier').value;
   const defaultMapColor = document.getElementById('svc-catalog-color').value;
   const defaultProposalName = document.getElementById('svc-catalog-proposal-name').value.trim() || serviceName;
-  const defaultDescription = document.getElementById('svc-catalog-description').value.trim();
+  const defaultDescription = catalogDescQuill ? catalogDescQuill.root.innerHTML.trim() : '';
 
   if (!serviceName) {
     showToast('Please enter a service name.', 'error');
@@ -11604,7 +11756,8 @@ function generateSeasonalMowingDates(startDate, endDate, preferredDay, targetVis
   // Convert 0=Mon..6=Sun to JS getDay() where 0=Sun
   const jsDay = preferredDay === 6 ? 0 : preferredDay + 1;
 
-  // Step 1: Generate raw seasonal dates
+  // Step 1: Generate seasonal base — weekly in growing season, biweekly in dormant
+  // Apr(3)–Oct(9) = weekly, Nov(10)–Mar(2) = biweekly
   const dates = [];
   let current = new Date(start);
   while (current.getDay() !== jsDay) {
@@ -11614,14 +11767,13 @@ function generateSeasonalMowingDates(startDate, endDate, preferredDay, targetVis
   while (current <= end) {
     dates.push(current.toISOString().split('T')[0]);
     const month = current.getMonth(); // 0=Jan..11=Dec
-    // Apr(3)–Oct(9) = weekly, Nov(10)–Mar(2) = biweekly
-    const isWeekly = month >= 3 && month <= 9;
-    current.setDate(current.getDate() + (isWeekly ? 7 : 14));
+    const isGrowing = month >= 3 && month <= 9;
+    current.setDate(current.getDate() + (isGrowing ? 7 : 14));
   }
 
-  // Step 2: Adjust to hit exact target
+  // Step 2: Adjust to hit exact target visit count
   if (targetVisits && targetVisits > 0) {
-    // Need to add dates — find largest gaps and insert midpoints
+    // Too few dates — fill in the biweekly dormant gaps to make them weekly
     while (dates.length < targetVisits && dates.length >= 2) {
       let maxGap = 0;
       let maxIdx = 0;
@@ -11632,44 +11784,41 @@ function generateSeasonalMowingDates(startDate, endDate, preferredDay, targetVis
           maxIdx = i;
         }
       }
-      if (maxGap <= 7) break; // Can't split a weekly gap further
+      if (maxGap < 10) break; // No biweekly gaps left to fill
 
-      // Insert at the midpoint of the largest gap, snapped to preferred day
+      // Add a visit in the middle of the largest gap, on the preferred day
       const prev = new Date(dates[maxIdx - 1] + 'T00:00:00');
       const mid = new Date(prev);
-      mid.setDate(mid.getDate() + Math.floor(maxGap / 2));
-      // Snap to preferred day
-      while (mid.getDay() !== jsDay) {
-        mid.setDate(mid.getDate() + 1);
-      }
+      mid.setDate(mid.getDate() + 7); // One week after previous (fills biweekly → weekly)
       const midStr = mid.toISOString().split('T')[0];
-      if (!dates.includes(midStr) && mid <= end) {
+      if (!dates.includes(midStr) && mid <= end && mid < new Date(dates[maxIdx])) {
         dates.push(midStr);
         dates.sort();
       } else {
-        break; // Can't find a valid insertion point
+        break;
       }
     }
 
-    // Need to remove dates — find smallest gaps and remove one side
+    // Too many dates — thin from dormant season first
     while (dates.length > targetVisits && dates.length >= 2) {
-      let minGap = Infinity;
-      let minIdx = 0;
-      for (let i = 1; i < dates.length; i++) {
-        const gap = (new Date(dates[i]) - new Date(dates[i - 1])) / (1000 * 60 * 60 * 24);
-        if (gap < minGap) {
-          minGap = gap;
-          minIdx = i;
+      let bestIdx = -1;
+      let bestScore = -1;
+      for (let i = 1; i < dates.length - 1; i++) {
+        const m = new Date(dates[i] + 'T00:00:00').getMonth();
+        const isDormant = m >= 10 || m <= 2; // Nov–Mar
+        const prevGap = (new Date(dates[i]) - new Date(dates[i - 1])) / (1000 * 60 * 60 * 24);
+        const nextGap = (new Date(dates[i + 1]) - new Date(dates[i])) / (1000 * 60 * 60 * 24);
+        // Prefer dormant dates with close neighbors (dense clusters)
+        const score = (isDormant ? 1000 : 0) + (100 - Math.min(prevGap, nextGap));
+        if (score > bestScore) {
+          bestScore = score;
+          bestIdx = i;
         }
       }
-      // Remove the date that's closest to its neighbor (not the first or last)
-      // Prefer removing from the middle of the densest cluster
-      if (minIdx > 0 && minIdx < dates.length - 1) {
-        dates.splice(minIdx, 1);
-      } else if (minIdx === dates.length - 1) {
-        dates.splice(minIdx, 1);
+      if (bestIdx > 0) {
+        dates.splice(bestIdx, 1);
       } else {
-        dates.splice(minIdx, 1);
+        dates.splice(dates.length - 2, 1);
       }
     }
   }
@@ -12391,7 +12540,8 @@ async function generateContractPdf() {
       recommendedTotal: Math.round(tierTotals.recommended.services.filter(s => s.accepted).reduce((sum, s) => sum + s.total, 0) * 100) / 100,
       contractValue: Math.round(effectiveAnnual * 100) / 100,
       monthlyPayment: Math.round(monthlyPayment * 100) / 100,
-      paymentSchedule: schedule
+      paymentSchedule: schedule,
+      termsAndConditionsHtml: currentEstimate.contract.termsAndConditionsHtml || null
     };
 
     // Build FormData
@@ -14066,7 +14216,8 @@ async function loadEstimateFromTemplate(templateId) {
       duration: duration,
       paymentMonths: 12,
       priceIncrease: data.priceIncrease || 0,
-      paymentTerms: 'Net 30'
+      paymentTerms: 'Net 30',
+      termsAndConditionsHtml: null
     }
   };
 
@@ -14205,7 +14356,8 @@ async function editTemplate(templateId) {
       duration: data.contractDuration || 12,
       paymentMonths: 12,
       priceIncrease: data.priceIncrease || 0,
-      paymentTerms: 'Net 30'
+      paymentTerms: 'Net 30',
+      termsAndConditionsHtml: null
     }
   };
 
@@ -14572,7 +14724,6 @@ function openServiceDetailsModal(sIdx) {
   document.getElementById('service-detail-index').value = sIdx;
   document.getElementById('service-internal-name').value = service.name;
   document.getElementById('service-proposal-name').value = service.proposalName || service.name;
-  document.getElementById('service-description').value = service.description || '';
   document.getElementById('service-billing-tier').value = service.billingTier || 'fixed';
 
   // Set color picker
@@ -14594,6 +14745,7 @@ function openServiceDetailsModal(sIdx) {
   }
 
   modal.classList.add('active');
+  initServiceDescriptionQuill(service.description || '');
 }
 
 function closeServiceDetailsModal() {
@@ -14606,7 +14758,7 @@ function saveServiceDetails() {
   if (!service) return;
 
   service.proposalName = document.getElementById('service-proposal-name').value.trim() || service.name;
-  service.description = document.getElementById('service-description').value.trim();
+  service.description = serviceDescQuill ? serviceDescQuill.root.innerHTML.trim() : '';
   service.billingTier = document.getElementById('service-billing-tier').value;
   service.mapColor = selectedServiceColor;
 
@@ -14706,7 +14858,8 @@ function resetEstimate() {
       duration: 12,
       paymentMonths: 12,
       priceIncrease: 0,
-      paymentTerms: 'Net 30'
+      paymentTerms: 'Net 30',
+      termsAndConditionsHtml: null
     },
     // Takeoffs data - initialized by initializeTakeoffs() on first use
     takeoffs: null

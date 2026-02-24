@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}{{ contract_id }} — Residential Contract{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ css_url('common.css') }}">
+<link rel="stylesheet" href="{{ css_url('contract.css') }}">
+{% endblock %}
+
+{% block content %}
+{# ═══════════ PAGE 1: Quote Page ═══════════ #}
+<div class="contract-header">
+  <div class="company-name">{{ company_name }}</div>
+  <div class="contract-info-box">
+    <div class="info-box-header">
+      <span class="info-box-header-label">Quote #{{ contract_id }}</span>
+    </div>
+    <div class="info-box-row">
+      <span class="info-box-label">Sent on</span>
+      <span class="info-box-underline"></span>
+    </div>
+    <div class="info-box-row total-row">
+      <span class="info-box-label-bold">Total</span>
+      <span class="info-box-total">${{ "{:,.2f}".format(contract_value) }}</span>
+    </div>
+  </div>
+</div>
+
+<hr class="header-rule">
+
+<div class="section-label">RECIPIENT:</div>
+<div class="recipient-name">{{ customer_name }}</div>
+{% if billing_address %}
+{% for part in billing_address.split(',') %}
+<div class="recipient-line">{{ part.strip() }}</div>
+{% endfor %}
+{% endif %}
+
+<div class="section-label" style="margin-top: 12px;">SERVICE LOCATION:</div>
+{% if property_address %}
+{% for part in property_address.split(',') %}
+<div class="recipient-line">{{ part.strip() }}</div>
+{% endfor %}
+{% endif %}
+
+{# Services Table #}
+<table class="services-table">
+  <thead>
+    <tr>
+      <th style="width: 22%">Product/Service</th>
+      <th style="width: 38%">Description</th>
+      <th style="width: 8%" class="right">Qty.</th>
+      <th style="width: 16%" class="right">Unit Price</th>
+      <th style="width: 16%" class="right">Total</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for svc in services %}
+    <tr>
+      <td>{{ svc.name }}</td>
+      <td></td>
+      <td class="right">{{ svc.frequency }}</td>
+      <td class="right">${{ "{:,.2f}".format(svc.costPerOccurrence) }}</td>
+      <td class="right">${{ "{:,.2f}".format(svc.annualTotal) }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<hr class="table-bottom-rule">
+
+<div class="total-line">
+  <span class="total-label">Total</span>
+  <span class="total-amount">${{ "{:,.2f}".format(annual_total) }}</span>
+</div>
+
+<div class="valid-note">This quote is valid for the next 30 days, after which values may be subject to change.</div>
+
+{# ═══════════ PAGE 2: Description of Services ═══════════ #}
+<div class="page-break"></div>
+
+<div class="svc-desc-title">{{ primary_service_name }}</div>
+<div class="svc-desc-subtitle">Description of Services</div>
+
+{% if has_rich_desc %}
+<div class="rich-text-content">
+  {{ description_html | safe }}
+</div>
+{% else %}
+<ol class="desc-list">
+{% for heading, sub_items in service_descriptions %}
+  <li>
+    <strong>{{ heading }}</strong>
+    <ol class="desc-sub-list" type="a">
+      {% for item in sub_items %}
+      <li{% if 'irrigation' in heading|lower and '$100' in item|lower %} class="highlight-red"{% endif %}>{{ item }}</li>
+      {% endfor %}
+    </ol>
+  </li>
+{% endfor %}
+</ol>
+{% endif %}
+
+{# ═══════════ PAGE 3: Terms & Conditions + Signatures ═══════════ #}
+<div class="page-break"></div>
+
+<div class="terms-title">Terms and Conditions</div>
+<div class="terms-effective"><strong>Effective Date:</strong> {{ effective_date }}</div>
+
+{% if custom_terms_html %}
+<div class="rich-text-content">
+  {{ custom_terms_html | safe }}
+</div>
+{% else %}
+<ol class="clause-list">
+{% for clause in clauses %}
+  <li class="clause{% if loop.index > 10 %} red{% endif %}">
+    {% if clause.sub_items %}
+    <strong>{{ clause.title }}:</strong>
+    <ol class="clause-sub-list">
+      {% for sub in clause.sub_items %}
+      <li>{{ sub }}</li>
+      {% endfor %}
+    </ol>
+    {% else %}
+    <strong>{{ clause.title }}:</strong> {{ clause.text }}
+    {% endif %}
+  </li>
+{% endfor %}
+</ol>
+{% endif %}
+
+{# Signature Section #}
+<div class="signature-section">
+  <div class="signature-title">Signature Section</div>
+  <hr class="signature-divider">
+  <div class="signature-grid">
+    <div class="signature-col">
+      <div class="sig-line"></div>
+      <div class="sig-name">Jack McMahon</div>
+      <div class="sig-company">{{ company_name }}</div>
+      <div class="sig-date">Date: {{ generated_date }}</div>
+    </div>
+    <div class="signature-col">
+      <div class="sig-line"></div>
+      <div class="sig-name">{{ customer_name or "________________" }}</div>
+      <div class="sig-company">{{ property_address }}</div>
+      <div class="sig-date">Date: {{ generated_date }}</div>
+    </div>
+  </div>
+</div>
+{% endblock %}

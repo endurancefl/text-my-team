@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+
+{% block title %}{{ contract_id }} — Commercial Contract{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ css_url('common.css') }}">
+<link rel="stylesheet" href="{{ css_url('contract.css') }}">
+{% endblock %}
+
+{% block content %}
+{# ═══════════ PAGE 1: Cover Page ═══════════ #}
+<div class="contract-header">
+  <div class="logo">
+    {% if logo_uri %}
+    <img src="{{ logo_uri }}" alt="Logo">
+    {% endif %}
+  </div>
+  <div class="contract-info-box commercial">
+    {% for label, val in info_items %}
+    {% if label or val %}
+    <div class="contract-info-row">
+      {% if label %}<span class="contract-info-label">{{ label }}</span>{% endif %}
+      <span class="contract-info-value">{{ val }}</span>
+    </div>
+    {% endif %}
+    {% endfor %}
+  </div>
+</div>
+
+<div class="commercial-title">{{ title_text }}</div>
+<div class="commercial-subtitle">{{ subtitle_text }}</div>
+<hr class="green-rule">
+
+{% if service_map_uri %}
+<img src="{{ service_map_uri }}" alt="Service Map" class="service-map">
+{% endif %}
+
+{# ═══════════ PAGE 2: Services Tables ═══════════ #}
+<div class="page-break"></div>
+
+{# Fixed Payment Services #}
+{% if fixed_services %}
+<div class="gray-header-bar">Fixed Payment Services</div>
+<table class="commercial-services-table">
+  <thead>
+    <tr>
+      <th style="width: 40%">Service</th>
+      <th style="width: 18%">Frequency</th>
+      <th style="width: 20%" class="right">Cost/Occ.</th>
+      <th style="width: 22%" class="right">Annual Cost</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% set current_cat = namespace(value='') %}
+    {% for svc in fixed_services %}
+    {% if svc.category and svc.category != current_cat.value %}
+    {% set current_cat.value = svc.category %}
+    <tr class="category-row"><td colspan="4">{{ svc.category }}</td></tr>
+    {% endif %}
+    <tr>
+      <td>{{ svc.name[:40] }}</td>
+      <td>{{ svc.frequency }}</td>
+      <td class="right">${{ "%.2f"|format(svc.costPerOccurrence) }}</td>
+      <td class="right">${{ "%.2f"|format(svc.annualTotal) }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+  <tfoot>
+    <tr>
+      <td colspan="3"></td>
+      <td class="right">${{ "%.2f"|format(fixed_total) }}</td>
+    </tr>
+  </tfoot>
+</table>
+{% endif %}
+
+{# Services Billed Separately #}
+{% if billed_services %}
+<div class="gray-header-bar">Services Billed Separately Once Completed</div>
+<table class="commercial-services-table">
+  <thead>
+    <tr>
+      <th style="width: 40%">Service</th>
+      <th style="width: 18%">Frequency</th>
+      <th style="width: 20%" class="right">Cost/Occ.</th>
+      <th style="width: 22%" class="right">Annual Cost</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% set current_cat = namespace(value='') %}
+    {% for svc in billed_services %}
+    {% if svc.category and svc.category != current_cat.value %}
+    {% set current_cat.value = svc.category %}
+    <tr class="category-row"><td colspan="4">{{ svc.category }}</td></tr>
+    {% endif %}
+    <tr>
+      <td>{{ svc.name[:40] }}</td>
+      <td>{{ svc.frequency }}</td>
+      <td class="right">${{ "%.2f"|format(svc.costPerOccurrence) }}</td>
+      <td class="right">${{ "%.2f"|format(svc.annualTotal) }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+  <tfoot>
+    <tr>
+      <td colspan="3"></td>
+      <td class="right">${{ "%.2f"|format(billed_total) }}</td>
+    </tr>
+  </tfoot>
+</table>
+{% endif %}
+
+{# Recommended Services #}
+{% if recommended_services %}
+<div class="gray-header-bar">Recommended Services</div>
+<div class="recommended-note">Initial next to optional service(s) you would like added to your contract</div>
+<table class="commercial-services-table">
+  <thead>
+    <tr>
+      <th style="width: 6%">Initial</th>
+      <th style="width: 34%">Service</th>
+      <th style="width: 18%">Frequency</th>
+      <th style="width: 20%" class="right">Cost/Occ.</th>
+      <th style="width: 22%" class="right">Annual Cost</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% set current_cat = namespace(value='') %}
+    {% for svc in recommended_services %}
+    {% if svc.category and svc.category != current_cat.value %}
+    {% set current_cat.value = svc.category %}
+    <tr class="category-row"><td colspan="5">{{ svc.category }}</td></tr>
+    {% endif %}
+    <tr>
+      <td><span class="initial-box"></span></td>
+      <td>{{ svc.name[:40] }}</td>
+      <td>{{ svc.frequency }}</td>
+      <td class="right">${{ "%.2f"|format(svc.costPerOccurrence) }}</td>
+      <td class="right">${{ "%.2f"|format(svc.annualTotal) }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+  <tfoot>
+    <tr>
+      <td colspan="4"></td>
+      <td class="right">${{ "%.2f"|format(recommended_total) }}</td>
+    </tr>
+  </tfoot>
+</table>
+{% endif %}
+
+{# ═══════════ PAGE 3: Payment Schedule ═══════════ #}
+<div class="page-break"></div>
+
+<div class="gray-header-bar">Payment Schedule (Fixed Payment Services Only)</div>
+<table class="payment-table">
+  <thead>
+    <tr>
+      <th style="width: 40%">Schedule</th>
+      <th style="width: 30%" class="right">Price</th>
+      <th style="width: 30%" class="right">Total Price</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% set running = namespace(total=0) %}
+    {% for pay in payment_schedule %}
+    {% set running.total = running.total + pay.amount %}
+    <tr>
+      <td>{{ pay.month }}</td>
+      <td class="right">${{ "%.2f"|format(pay.amount) }}</td>
+      <td class="right">${{ "%.2f"|format(running.total) }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+  <tfoot>
+    <tr>
+      <td>Total</td>
+      <td></td>
+      <td class="right">${{ "%.2f"|format(running.total) }}</td>
+    </tr>
+  </tfoot>
+</table>
+
+{# ═══════════ PAGE 4: Description of Services ═══════════ #}
+<div class="page-break"></div>
+
+<div class="gray-header-bar">Description of Services</div>
+
+{% if has_rich_desc %}
+<div class="rich-text-content">
+  {{ description_html | safe }}
+</div>
+{% else %}
+{% for tier_label, tier_svcs in tier_groups %}
+{% if tier_svcs %}
+<div class="tier-section">
+  <div class="tier-label">{{ tier_label }}</div>
+  <hr class="tier-divider">
+  {% for svc in tier_svcs %}
+  <div class="svc-name-underline">{{ svc.name }}</div>
+  <div class="svc-description">{{ svc.description or "Service included as specified in the agreement." }}</div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endfor %}
+{% endif %}
+
+{# ═══════════ PAGE 5: Terms & Conditions ═══════════ #}
+<div class="page-break"></div>
+
+<div class="gray-header-bar">Terms and Conditions</div>
+<div class="terms-effective" style="margin-top: 6px;">Effective Date: {{ effective_date }}</div>
+<hr class="terms-divider">
+
+{% if custom_terms_html %}
+<div class="rich-text-content">
+  {{ custom_terms_html | safe }}
+</div>
+{% else %}
+{% for clause in clauses %}
+<div class="clause{% if loop.index > 10 %} red{% endif %}">
+  <div class="clause-title">{{ loop.index }}. {{ clause.title }}</div>
+  {% if clause.sub_items %}
+  <ol class="clause-sub-list">
+    {% for sub in clause.sub_items %}
+    <li>{{ sub }}</li>
+    {% endfor %}
+  </ol>
+  {% else %}
+  <div class="clause-text">{{ clause.text }}</div>
+  {% endif %}
+</div>
+{% endfor %}
+{% endif %}
+
+{# ═══════════ PAGE 6: Signature Page ═══════════ #}
+<div class="commercial-signature-section">
+  <div class="signature-title">Signature Section</div>
+  <hr class="signature-divider">
+  <div class="signature-grid">
+    <div class="signature-col">
+      <div class="sig-by-label">By</div>
+      <div class="sig-line"></div>
+      <div class="sig-name">Jack McMahon</div>
+      <div class="sig-company">{{ company_name }}</div>
+      <div class="sig-date">Date: {{ generated_date }}</div>
+    </div>
+    <div class="signature-col">
+      <div class="sig-by-label">By</div>
+      <div class="sig-line"></div>
+      <div class="sig-name">{{ customer_name or "________________" }}</div>
+      <div class="sig-company">{{ customer_company }}</div>
+      <div class="sig-date">Date: {{ generated_date }}</div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1090,34 +1090,33 @@ CONTRACT_BORDER = HexColor("#CCCCCC")
 RESIDENTIAL_SERVICE_DESCRIPTIONS = {
     "Weekly Grounds Maintenance": [
         ("Weekly Maintenance", [
-            "Scheduled service will occur on the same day each week, weather permitting. In the event of inclement weather, service will be rescheduled to the next available day within the same work week."
+            "Endurance Services will perform weekly maintenance visits to your property. If weather prevents a scheduled visit, the service will be rescheduled as soon as possible."
         ]),
         ("Trash and Debris Removal", [
-            "Light trash and debris pickup will be performed during each visit, including removal of litter, fallen branches (under 3 inches in diameter), and other small debris from maintained areas."
+            "Light trash and debris will be collected and removed during each visit, limited to items that can be easily picked up by hand or with small handheld tools."
         ]),
         ("Mowing", [
-            "Turf areas will be mowed at the appropriate height for the grass type, typically maintaining a height of 3.5–4 inches for St. Augustine and 1–2 inches for Bermuda and Zoysia.",
-            "Mowing patterns will be rotated regularly to prevent ruts and promote even growth."
+            "Grass areas will be mowed on a regular schedule, with frequency adjusted seasonally based on weather, ground conditions, and grass type.",
+            "Mowing techniques including rotating patterns will be used to maintain a smooth, even surface and prevent damage to the lawn. All clippings and debris will be removed."
         ]),
         ("Edging", [
-            "All hard edges along sidewalks, driveways, curbs, and planting beds will be mechanically edged to maintain clean, defined lines."
+            "Mechanical edging will be performed along walkways, driveways, and landscape beds during each mowing visit. All debris will be removed."
         ]),
         ("String Trimming", [
-            "Areas inaccessible to mowers, including around fences, trees, signs, light poles, and other obstacles, will be string-trimmed to match the height of surrounding turf."
+            "String trimming will be performed during each mowing visit around fences, trees, and areas the mower cannot reach. All debris will be removed."
         ]),
         ("Blowing", [
-            "All walkways, driveways, patios, porches, and other hard surfaces will be cleared of grass clippings and debris after each service."
+            "All walkways, driveways, patios, and landscape areas will be blown clean during each visit. Leaves will be bagged and hauled away on an as needed basis."
         ]),
         ("Weeding", [
-            "Routine weed control will be performed in landscape beds, tree rings, and hardscape joints during each visit. This includes hand-pulling and spot treatment of visible weeds."
+            "Routine weed control will be performed in landscape beds on an as needed basis."
         ]),
         ("Pruning and Hedge Trimming", [
-            "Shrubs, hedges, and ornamental plants under 10 feet in height will be trimmed and shaped as needed to maintain a clean, manicured appearance.",
-            "Trees and palms over 10 feet require a separate estimate for trimming services."
+            "Shrubs, hedges, and trees 10 feet or under will be pruned and shaped on a regular basis to maintain a neat appearance.",
+            "Pruning of trees and hedges over 10 feet will require a separate estimate and customer approval."
         ]),
         ("Irrigation", [
-            "A total of 12 irrigation inspections will be performed per year (approximately once per month). Each inspection includes a full system check, head adjustments, and minor repairs.",
-            "Repairs under $100 in parts/labor are authorized and will be completed during the inspection visit. Repairs exceeding $100 require written approval before work begins."
+            "Endurance Services will inspect your irrigation system 12 times per year and perform routine repairs on a Time and Materials basis. Client authorizes Endurance Services to complete repairs under $100. Repairs over $100 will require client approval."
         ]),
     ],
 }
@@ -1132,18 +1131,21 @@ def _get_terms_clauses(metadata):
     increase = metadata.get("priceIncrease", 0)
 
     return [
-        ("Term", f"This agreement shall be for a period of {duration} months, commencing on {start} and ending on {end}, unless terminated earlier in accordance with the terms herein."),
-        ("Regular Monthly Maintenance Billing", "Client will be invoiced monthly for all fixed-payment maintenance services outlined in this agreement. Payment is due in accordance with the invoice terms specified below."),
-        ("Enhancement Work Billing", "Any additional work requested by the Client beyond the scope of this agreement (enhancements, additions, or one-time projects) will be quoted separately and billed upon completion."),
-        ("Invoice Terms", f"{terms} on all invoices. Late payments may be subject to a finance charge of 1.5% per month on the outstanding balance."),
-        ("Sales Tax", "Applicable sales tax will be added to all invoices as required by Florida state and local regulations."),
-        ("Background Check", "All Endurance Services team members undergo thorough background checks prior to employment. We are committed to providing trustworthy and reliable personnel on your property."),
-        ("Uniform", "All crew members will wear company-branded uniforms and identification while on your property. This ensures easy identification and maintains a professional appearance."),
-        ("Insurance", "Endurance Services maintains comprehensive Workers' Compensation and General Liability insurance coverage. Certificates of insurance are available upon request."),
-        ("Termination", "Either party may terminate this agreement with 30 days' written notice. Upon termination, the Client is responsible for payment of all services rendered through the termination date."),
-        ("Contract Renewal", "This agreement will automatically renew for successive terms of equal duration unless either party provides written notice of non-renewal at least 60 days prior to the end of the current term."),
-        ("Price Increase", f"Upon renewal, pricing may be adjusted by the greater of {increase}% or the annual change in the Consumer Price Index for All Urban Consumers (CPI-U). The Client will be notified of any price adjustment at least 60 days before the renewal date."),
-        ("Named Tropical Event Policy", "In the event of a named tropical storm or hurricane, Endurance Services will provide emergency cleanup and restoration services on a time-and-materials basis at a rate of $65.00 per man-hour, plus materials and equipment costs. Pre-authorization is not required for emergency response within 72 hours of the event."),
+        ("Term", f"The term of this Landscape Management Agreement will be {duration} months. Start Date: {start} and End Date: {end}."),
+        ("Regular Monthly Maintenance Billing", "The customer will be invoiced once per month for the Weekly Property Maintenance."),
+        ("Enhancement Work Billing", "Additional work not outlined in this Landscape Management Agreement will be subject to customer approval and invoiced separately."),
+        ("Invoice Terms", f"Payment terms will be {terms} on all invoices."),
+        ("Sales Tax", "All state and local sales tax will be applied to invoices where required by law."),
+        ("Background Check", "Endurance Services will conduct background checks on all team members prior to working on the client\u2019s property."),
+        ("Uniform", "Endurance Services team members will wear the company uniform: work boots, pants, and Endurance Services branded shirts and hats."),
+        ("Insurance", "Endurance Services will maintain Workers Compensation and General Liability Insurance."),
+        ("Termination", "Either party may terminate this contract for cause, by providing thirty (30) days\u2019 prior written notice stating the reason for termination."),
+        ("Contract Renewal", "This contract will automatically renew unless either party provides written notice of non-renewal at least sixty (60) days prior to the expiration date."),
+        ("Price Increase", f"Upon contract renewal, a cost-of-living adjustment will be applied to the new contract. The adjustment will be equal to the greater of {increase} percent ({increase}%) or the percentage increase in the \u201cCPI-U, US CITY AVERAGE, ALL ITEMS\u201d as measured by the U.S. Bureau of Labor Statistics (https://www.bls.gov/cpi/) for the most recent twelve-month period."),
+        ("Named Tropical Event Policy", [
+            "A Named Tropical Event is defined as a tropical storm or hurricane given a name by the National Hurricane Center (www.nhc.noaa.gov).",
+            "Once work can be performed safely, property cleanup resulting from a Named Tropical Event will be billed on a Time and Materials basis at $65 per hour in addition to the monthly contract price.",
+        ]),
     ]
 
 
@@ -1473,38 +1475,51 @@ def _generate_residential_contract(metadata):
         # Highlight specific clauses (price increase and tropical event)
         is_red = idx >= 10  # clauses 11 and 12
 
+        # Highlight specific clauses (price increase and tropical event)
+        is_red = idx >= 10  # clauses 11 and 12
+
         c.setFont("Helvetica", 8)
         if is_red:
             c.setFillColor(CONTRACT_RED)
         else:
             c.setFillColor(CONTRACT_DARK)
 
-        # Word-wrap clause text
-        max_chars = 90
-        remaining = text
+        # Text can be a string or a list of sub-items (clause 12)
+        text_items = text if isinstance(text, list) else [text]
         indent = LEFT + 16
-        while remaining:
-            if len(remaining) <= max_chars:
-                c.drawString(indent, y, remaining)
-                y -= 11
-                remaining = ""
-            else:
-                break_at = remaining.rfind(' ', 0, max_chars)
-                if break_at <= 0:
-                    break_at = max_chars
-                c.drawString(indent, y, remaining[:break_at])
-                y -= 11
-                remaining = remaining[break_at:].lstrip()
 
-                if y < BOTTOM + 50:
-                    draw_footer()
-                    c.showPage()
-                    page_num[0] += 1
-                    page_count += 1
-                    y = TOP
-                    if is_red:
-                        c.setFont("Helvetica", 8)
-                        c.setFillColor(CONTRACT_RED)
+        for sub_idx, sub_text in enumerate(text_items):
+            # For list items, prefix with sub-number
+            if isinstance(text, list):
+                line_text = f"{sub_idx + 1}. {sub_text}"
+            else:
+                line_text = sub_text
+
+            # Word-wrap clause text
+            max_chars = 90
+            remaining = line_text
+            while remaining:
+                if len(remaining) <= max_chars:
+                    c.drawString(indent, y, remaining)
+                    y -= 11
+                    remaining = ""
+                else:
+                    break_at = remaining.rfind(' ', 0, max_chars)
+                    if break_at <= 0:
+                        break_at = max_chars
+                    c.drawString(indent, y, remaining[:break_at])
+                    y -= 11
+                    remaining = remaining[break_at:].lstrip()
+
+                    if y < BOTTOM + 50:
+                        draw_footer()
+                        c.showPage()
+                        page_num[0] += 1
+                        page_count += 1
+                        y = TOP
+                        if is_red:
+                            c.setFont("Helvetica", 8)
+                            c.setFillColor(CONTRACT_RED)
 
         y -= 4  # Gap between clauses
 
@@ -1992,26 +2007,35 @@ def _generate_commercial_contract(metadata, service_map_buffer=None):
         else:
             c.setFillColor(CONTRACT_DARK)
 
-        max_chars = 95
-        remaining = text
-        while remaining:
-            if y < BOTTOM + 30:
-                y = new_page()
-                if is_red:
-                    c.setFont("Helvetica", 7.5)
-                    c.setFillColor(CONTRACT_RED)
+        # Text can be a string or a list of sub-items (clause 12)
+        text_items = text if isinstance(text, list) else [text]
 
-            if len(remaining) <= max_chars:
-                c.drawString(LEFT + 16, y, remaining)
-                y -= 10
-                remaining = ""
+        for sub_idx, sub_text in enumerate(text_items):
+            if isinstance(text, list):
+                line_text = f"{sub_idx + 1}. {sub_text}"
             else:
-                break_at = remaining.rfind(' ', 0, max_chars)
-                if break_at <= 0:
-                    break_at = max_chars
-                c.drawString(LEFT + 16, y, remaining[:break_at])
-                y -= 10
-                remaining = remaining[break_at:].lstrip()
+                line_text = sub_text
+
+            max_chars = 95
+            remaining = line_text
+            while remaining:
+                if y < BOTTOM + 30:
+                    y = new_page()
+                    if is_red:
+                        c.setFont("Helvetica", 7.5)
+                        c.setFillColor(CONTRACT_RED)
+
+                if len(remaining) <= max_chars:
+                    c.drawString(LEFT + 16, y, remaining)
+                    y -= 10
+                    remaining = ""
+                else:
+                    break_at = remaining.rfind(' ', 0, max_chars)
+                    if break_at <= 0:
+                        break_at = max_chars
+                    c.drawString(LEFT + 16, y, remaining[:break_at])
+                    y -= 10
+                    remaining = remaining[break_at:].lstrip()
 
         y -= 3
 

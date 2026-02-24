@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Site Recommendation Report{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ css_url('common.css') }}">
+<link rel="stylesheet" href="{{ css_url('site_report.css') }}">
+{% endblock %}
+
+{% block content %}
+{# ── Page 1 Header ── #}
+<div class="report-header">
+  <div class="logo">
+    {% if logo_uri %}
+    <img src="{{ logo_uri }}" alt="Logo">
+    {% endif %}
+  </div>
+  <div class="info-box">
+    <div class="info-row">
+      <div class="info-label">Date:</div>
+      <div class="info-value">{{ date }}</div>
+    </div>
+    <div class="info-row">
+      <div class="info-label">Inspected By:</div>
+      <div class="info-value">{{ inspector }}</div>
+    </div>
+    <div class="info-row">
+      <div class="info-label">Property:</div>
+      <div class="info-value">{{ address }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="report-title">Site Recommendation Report</div>
+<hr class="title-rule">
+
+{# ── Photo Grid by Category ── #}
+{% for cat_name, photos in categories.items() %}
+<div class="category-section">
+  <div class="category-header">{{ cat_name }}</div>
+  <div class="photo-grid">
+    {% for photo in photos %}
+    <div class="photo-cell">
+      <div class="photo-frame">
+        {% if photo.data_uri %}
+        <img src="{{ photo.data_uri }}" alt="Photo {{ photo.num }}">
+        {% endif %}
+      </div>
+      <div class="note-box">{{ photo.num }}. {% if photo.note %}Note: {{ photo.note }}{% endif %}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endfor %}
+{% endblock %}
