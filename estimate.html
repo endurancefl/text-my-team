@@ -12568,9 +12568,33 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('pm-driveway-sf').value = (result.features['Driveway'] || 0) + (result.features['Drive Lanes'] || 0) + (result.features['Pavement'] || 0) || '';
         document.getElementById('pm-sidewalk-sf').value = result.features['Sidewalk'] || '';
         document.getElementById('pm-tree-count').value = result.features['Tree'] || '';
-        // Auto-fill address if empty
+        // Auto-fill address fields if empty — parse "Street, City, ST ZIP" format
         if (!document.getElementById('property-address').value && result.address) {
-          document.getElementById('property-address').value = result.address;
+          const parts = result.address.split(',').map(s => s.trim());
+          if (parts.length >= 3) {
+            document.getElementById('property-address').value = parts[0];
+            document.getElementById('property-city').value = parts[1];
+            const stateZip = parts[parts.length - 1].trim();
+            const szMatch = stateZip.match(/^([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+            if (szMatch) {
+              document.getElementById('property-state').value = szMatch[1].toUpperCase();
+              document.getElementById('property-zip').value = szMatch[2];
+            } else {
+              document.getElementById('property-state').value = stateZip;
+            }
+          } else if (parts.length === 2) {
+            document.getElementById('property-address').value = parts[0];
+            const cityStateZip = parts[1].match(/^(.+?)\s+([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+            if (cityStateZip) {
+              document.getElementById('property-city').value = cityStateZip[1];
+              document.getElementById('property-state').value = cityStateZip[2].toUpperCase();
+              document.getElementById('property-zip').value = cityStateZip[3];
+            } else {
+              document.getElementById('property-city').value = parts[1];
+            }
+          } else {
+            document.getElementById('property-address').value = result.address;
+          }
         }
         // Set measurement source to attentive
         document.getElementById('property-measurement-source').value = 'attentive';
