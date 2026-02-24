@@ -6525,9 +6525,10 @@ function onEstimatePropertySelect(propertyId) {
     document.getElementById('prop-lot-size').value = Number(prop.lotSizeSF).toLocaleString('en-US');
   }
 
-  // Auto-fill measurements into takeoffs
+  // Auto-fill measurements into takeoffs from property record
+  initializeTakeoffs();
+
   if (prop.lawnRawSF) {
-    currentEstimate.takeoffs.lawn.rawSF = Number(prop.lawnRawSF);
     setLawnSF(Number(prop.lawnRawSF));
   }
   if (prop.hardEdgeLF) {
@@ -6537,15 +6538,18 @@ function onEstimatePropertySelect(propertyId) {
     currentEstimate.takeoffs.edge.rawSoftLF = Number(prop.softEdgeLF);
   }
 
-  // Auto-fill difficulty splits from property
-  if (prop.difficultyParsed && prop.difficultyParsed.lawn) {
-    const d = prop.difficultyParsed.lawn;
-    currentEstimate.takeoffs.lawn.diffEasy = d.easy || 100;
-    currentEstimate.takeoffs.lawn.diffMedium = d.med || 0;
-    currentEstimate.takeoffs.lawn.diffHard = d.hard || 0;
-  }
+  // Store Attentive-style features for service calculations
+  if (!currentEstimate.features) currentEstimate.features = {};
+  if (prop.lawnRawSF) currentEstimate.features['Lawn'] = Number(prop.lawnRawSF);
+  if (prop.hardEdgeLF) currentEstimate.features['Hard Edge'] = Number(prop.hardEdgeLF);
+  if (prop.softEdgeLF) currentEstimate.features['Soft Edge'] = Number(prop.softEdgeLF);
+  if (prop.mulchBedSF) currentEstimate.features['Mulch Bed'] = Number(prop.mulchBedSF);
+  if (prop.hedgeSF) currentEstimate.features['Hedge'] = Number(prop.hedgeSF);
+  if (prop.drivewayPavementSF) currentEstimate.features['Driveway'] = Number(prop.drivewayPavementSF);
+  if (prop.sidewalkSF) currentEstimate.features['Sidewalk'] = Number(prop.sidewalkSF);
+  if (prop.treeCount) currentEstimate.features['Tree'] = Number(prop.treeCount);
 
-  // Update edge and recalculate
+  // Update edge and recalculate everything
   recalcTotalEdge();
   recalcHardscape();
   renderPropertySetupTables();
