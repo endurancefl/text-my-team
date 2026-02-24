@@ -9739,7 +9739,9 @@ async function openContactProfile(contactId) {
 
   document.getElementById('contacts-list-view').style.display = 'none';
   document.getElementById('contact-profile-view').style.display = '';
-  document.getElementById('main-body').scrollTop = 0;
+  requestAnimationFrame(() => {
+    document.getElementById('main-body').scrollTop = 0;
+  });
 
   document.getElementById('contact-profile-avatar').textContent = getContactInitials(contact);
   document.getElementById('contact-profile-name').textContent = getContactDisplayName(contact);
@@ -9812,7 +9814,9 @@ function showContactsList() {
   document.getElementById('header-title').textContent = 'Contacts';
   document.getElementById('header-subtitle').textContent = contacts.length + ' contacts';
   renderContactsList();
-  document.getElementById('main-body').scrollTop = 0;
+  requestAnimationFrame(() => {
+    document.getElementById('main-body').scrollTop = 0;
+  });
 }
 
 async function updateContactStage(newStage) {
@@ -11021,11 +11025,10 @@ function showView(viewId) {
   // Render contacts list when contacts view is shown
   if (viewId === 'contacts') {
     renderContactsList();
-  }
-
-  // Load contacts when contacts view is shown
-  if (viewId === 'contacts') {
-    renderContactsList();
+    // Scroll after render so content starts at the top
+    requestAnimationFrame(() => {
+      document.getElementById('main-body').scrollTop = 0;
+    });
   }
 
   // Populate contact picker when builder view is shown
