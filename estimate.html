@@ -12568,23 +12568,22 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('pm-driveway-sf').value = (result.features['Driveway'] || 0) + (result.features['Drive Lanes'] || 0) + (result.features['Pavement'] || 0) || '';
         document.getElementById('pm-sidewalk-sf').value = result.features['Sidewalk'] || '';
         document.getElementById('pm-tree-count').value = result.features['Tree'] || '';
-        // Auto-fill address fields — parse "Street, City, ST ZIP" or "Street, City, ST"
+        // Auto-fill address fields — parse "Street, City, ST ZIP" or "Street, City, ST, USA"
         if (result.address) {
-          const parts = result.address.split(',').map(s => s.trim());
+          // Strip trailing ", USA" / ", US" before parsing
+          const cleanedAddr = result.address.replace(/,?\s*(USA|US|United States)$/i, '').trim();
+          const parts = cleanedAddr.split(',').map(s => s.trim());
           let street = '', city = '', state = '', zip = '';
           if (parts.length >= 3) {
             street = parts[0];
             city = parts[1];
-            const last = parts[parts.length - 1].trim();
-            const szMatch = last.match(/^([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$/);
-            const stateOnly = last.match(/^([A-Za-z]{2})$/);
-            if (szMatch) {
-              state = szMatch[1].toUpperCase();
-              zip = szMatch[2];
-            } else if (stateOnly) {
-              state = stateOnly[1].toUpperCase();
-            } else {
-              state = last;
+            // Find state in remaining parts — look for 2-letter code
+            for (let i = 2; i < parts.length; i++) {
+              const p = parts[i].trim();
+              const szMatch = p.match(/^([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+              const stateOnly = p.match(/^([A-Za-z]{2})$/);
+              if (szMatch) { state = szMatch[1].toUpperCase(); zip = szMatch[2]; break; }
+              else if (stateOnly) { state = stateOnly[1].toUpperCase(); break; }
             }
           } else if (parts.length === 2) {
             street = parts[0];
