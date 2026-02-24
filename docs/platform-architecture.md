@@ -42,6 +42,46 @@ The platform supports four divisions, each representing a distinct revenue strea
 
 ## Current State (What Exists Today)
 
+### Repository Folder Structure
+
+```
+text-my-team/
+├── index.html                     # Customer service request portal (~3,100 lines)
+├── crew.html                      # Crew leader app (~9,339 lines HTML/JS)
+├── estimate.html                  # Bidding & estimating tool (~13,494 lines HTML/JS)
+├── payment-success.html           # Stripe payment success redirect
+├── payment-cancel.html            # Stripe payment cancel redirect
+├── css/
+│   ├── crew.css                   # All CSS for crew.html (~4,419 lines)
+│   └── estimate.css               # All CSS for estimate.html (~5,255 lines)
+├── assets/
+│   ├── manifest.json              # PWA manifest for index.html
+│   ├── manifest-crew.json         # PWA manifest for crew.html
+│   └── images/
+│       ├── icon.png               # PWA icon
+│       ├── logo-stacked-fullcolor.png
+│       ├── iceberg-icon.png
+│       └── 26__Endurace_Icon_Green_LightBackground.png
+├── backend/
+│   └── combined-apps-script.js    # Google Apps Script backend (~35,200 lines)
+├── cloud-function/                # AWS Lambda PDF generation
+│   ├── pdf_generator.py           # PDF library (WeasyPrint + ReportLab)
+│   ├── lambda_function.py         # AWS Lambda handler
+│   ├── Dockerfile                 # WeasyPrint container image
+│   ├── requirements.txt
+│   ├── templates/                 # Jinja2 HTML/CSS templates for PDFs
+│   │   ├── base.html
+│   │   ├── invoice.html
+│   │   └── styles/
+│   ├── assets/logo.png
+│   └── deploy/
+│       ├── template.yaml          # SAM template (Lambda + API Gateway)
+│       └── deploy.sh
+├── docs/
+│   └── platform-architecture.md   # This document
+└── .gitignore
+```
+
 ### Working Prototypes on GitHub Pages
 
 **index.html — Customer Service Request Portal (~3,100 lines)**
