@@ -68,6 +68,14 @@ function doGet(e) {
       case 'getContacts':
         return jsonResponse(getContacts());
 
+      // ─── Properties (Estimating) ───
+      case 'getEstimatingProperties':
+        return jsonResponse(getEstimatingProperties());
+      case 'getPropertyContacts':
+        return jsonResponse(getPropertyContacts());
+      case 'getSubContractors':
+        return jsonResponse(getSubContractors(e.parameter.propertyId));
+
       // ─── Invoicing ───
       case 'getInvoices':
         return jsonResponse(getInvoices(e));
@@ -157,6 +165,16 @@ function doPost(e) {
     if (data.saveContact) return jsonResponse(saveContact(data));
     if (data.updateContact) return jsonResponse(updateContact(data));
     if (data.deleteContact) return jsonResponse(deleteContact(data));
+
+    // ─── Properties POST handlers ───
+    if (data.saveProperty) return jsonResponse(saveProperty(data));
+    if (data.updateProperty) return jsonResponse(updateProperty(data));
+    if (data.deleteProperty) return jsonResponse(deleteProperty(data));
+    if (data.linkContactToProperty) return jsonResponse(linkContactToProperty(data));
+    if (data.unlinkContactFromProperty) return jsonResponse(unlinkContactFromProperty(data));
+    if (data.saveSubContractor) return jsonResponse(saveSubContractor(data));
+    if (data.updateSubContractor) return jsonResponse(updateSubContractor(data));
+    if (data.deleteSubContractor) return jsonResponse(deleteSubContractor(data));
 
     // ─── Invoicing POST handlers ───
     if (data.generateInvoiceBatch) return jsonResponse(generateInvoiceBatch(data));
@@ -1627,6 +1645,8 @@ function getRequests(phone) {
 // ═══════════════════════════════════════════════════════════════
 
 function getProperties() {
+  // Backward-compatible endpoint for crew.html — reads from the expanded Properties sheet
+  // but returns only the subset of fields crew.html expects
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('Properties');
   if (!sheet) return { success: true, properties: [] };
@@ -1634,10 +1654,10 @@ function getProperties() {
   var data = sheet.getDataRange().getValues();
   var headers = data[0];
 
-  var addrCol = findCol(headers, ['Address', 'address', 'Property Address']);
-  var crewCol = findCol(headers, ['Crew', 'crew', 'Crew Leader', 'Assigned Crew']);
-  var phoneCol = findCol(headers, ['Phone', 'phone', 'Crew Phone', 'Crew Leader Phone']);
-  var pinCol = findCol(headers, ['Pin', 'pin', 'PIN']);
+  var addrCol = findCol(headers, ['address', 'Address', 'Property Address']);
+  var crewCol = findCol(headers, ['crew', 'Crew', 'Crew Leader', 'Assigned Crew']);
+  var phoneCol = findCol(headers, ['crewPhone', 'Phone', 'phone', 'Crew Phone', 'Crew Leader Phone']);
+  var pinCol = findCol(headers, ['pin', 'Pin', 'PIN']);
 
   var properties = [];
   for (var i = 1; i < data.length; i++) {
@@ -4198,4 +4218,369 @@ function buildInvoiceHtml(inv, lineItems) {
     '<div style="margin:8px 0;font-size:20px;font-weight:600;border-top:2px solid #333;padding-top:8px;">' +
     '<span style="color:#666;margin-right:24px;">Total Due:</span> $' + total.toFixed(2) + '</div></div>' +
     '</body></html>';
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PROPERTIES (First-Class Entities)
+// ═══════════════════════════════════════════════════════════════
+
+var PROPERTIES_HEADERS = [
+  'propertyId', 'address', 'city', 'state', 'zip', 'propertyType',
+  'pin', 'crew', 'crewPhone',
+  'measurementSource', 'attentiveReportUrl',
+  'lotSizeSF', 'lawnRawSF', 'lawnPerimeterLF',
+  'hardEdgeLF', 'softEdgeLF',
+  'mulchBedSF', 'mulchBedPerimeterLF',
+  'hedgeSF', 'hedgeLF',
+  'drivewayPavementSF', 'sidewalkSF',
+  'treeCount', 'irrigationZones',
+  'difficultyJson',
+  'gateCode', 'notes',
+  'createdAt', 'updatedAt'
+];
+
+function ensurePropertiesSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Properties');
+  if (!sheet) {
+    sheet = ss.insertSheet('Properties');
+    sheet.getRange(1, 1, 1, PROPERTIES_HEADERS.length).setValues([PROPERTIES_HEADERS]);
+    sheet.getRange(1, 1, 1, PROPERTIES_HEADERS.length).setFontWeight('bold');
+    return sheet;
+  }
+  // Ensure all headers exist (migration for existing simple Properties sheet)
+  var existingHeaders = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
+  var added = false;
+  PROPERTIES_HEADERS.forEach(function(h) {
+    if (existingHeaders.indexOf(h) === -1) {
+      var nextCol = existingHeaders.length + 1;
+      sheet.getRange(1, nextCol).setValue(h).setFontWeight('bold');
+      existingHeaders.push(h);
+      added = true;
+    }
+  });
+  // Migrate old simple Properties sheet: rename 'Address' to 'address' if needed
+  var addrIdx = existingHeaders.indexOf('Address');
+  if (addrIdx !== -1 && existingHeaders.indexOf('address') === -1) {
+    sheet.getRange(1, addrIdx + 1).setValue('address');
+  }
+  var crewIdx = existingHeaders.indexOf('Crew');
+  if (crewIdx !== -1 && existingHeaders.indexOf('crew') === -1) {
+    sheet.getRange(1, crewIdx + 1).setValue('crew');
+  }
+  var phoneIdx = existingHeaders.indexOf('Phone');
+  if (phoneIdx !== -1 && existingHeaders.indexOf('crewPhone') === -1) {
+    sheet.getRange(1, phoneIdx + 1).setValue('crewPhone');
+  }
+  var pinIdx = existingHeaders.indexOf('Pin');
+  if (pinIdx !== -1 && existingHeaders.indexOf('pin') === -1) {
+    sheet.getRange(1, pinIdx + 1).setValue('pin');
+  }
+  var pinIdx2 = existingHeaders.indexOf('PIN');
+  if (pinIdx2 !== -1 && existingHeaders.indexOf('pin') === -1) {
+    sheet.getRange(1, pinIdx2 + 1).setValue('pin');
+  }
+  return sheet;
+}
+
+function getEstimatingProperties() {
+  var sheet = ensurePropertiesSheet();
+  var data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return { success: true, properties: [] };
+  var headers = data[0];
+  var properties = [];
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    // Skip empty rows
+    if (!row[headers.indexOf('propertyId')] && !row[headers.indexOf('address')]) continue;
+    var obj = {};
+    for (var j = 0; j < headers.length; j++) {
+      obj[headers[j]] = row[j];
+    }
+    // Parse difficultyJson if present
+    if (obj.difficultyJson && typeof obj.difficultyJson === 'string') {
+      try { obj.difficultyParsed = JSON.parse(obj.difficultyJson); } catch (e) { obj.difficultyParsed = {}; }
+    }
+    properties.push(obj);
+  }
+  return { success: true, properties: properties };
+}
+
+function saveProperty(data) {
+  var sheet = ensurePropertiesSheet();
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+
+  // Generate propertyId: PROP-0001 format
+  var allData = sheet.getDataRange().getValues();
+  var maxNum = 0;
+  var idCol = headers.indexOf('propertyId');
+  for (var i = 1; i < allData.length; i++) {
+    var existingId = String(allData[i][idCol] || '');
+    if (existingId.indexOf('PROP-') === 0) {
+      var num = parseInt(existingId.replace('PROP-', ''), 10);
+      if (num > maxNum) maxNum = num;
+    }
+  }
+  var propertyId = 'PROP-' + String(maxNum + 1).padStart(4, '0');
+  var now = new Date().toISOString();
+
+  var rowData = headers.map(function(h) {
+    if (h === 'propertyId') return propertyId;
+    if (h === 'createdAt') return now;
+    if (h === 'updatedAt') return now;
+    if (h === 'difficultyJson' && data.difficultyJson && typeof data.difficultyJson === 'object') {
+      return JSON.stringify(data.difficultyJson);
+    }
+    return data[h] !== undefined ? data[h] : '';
+  });
+
+  sheet.appendRow(rowData);
+  return { success: true, propertyId: propertyId };
+}
+
+function updateProperty(data) {
+  var sheet = ensurePropertiesSheet();
+  var allData = sheet.getDataRange().getValues();
+  var headers = allData[0];
+  var idCol = headers.indexOf('propertyId');
+
+  for (var i = 1; i < allData.length; i++) {
+    if (String(allData[i][idCol]) === String(data.propertyId)) {
+      var now = new Date().toISOString();
+      var rowData = headers.map(function(h) {
+        if (h === 'propertyId') return data.propertyId;
+        if (h === 'createdAt') return allData[i][headers.indexOf('createdAt')]; // preserve
+        if (h === 'updatedAt') return now;
+        if (h === 'difficultyJson' && data.difficultyJson && typeof data.difficultyJson === 'object') {
+          return JSON.stringify(data.difficultyJson);
+        }
+        return data[h] !== undefined ? data[h] : allData[i][headers.indexOf(h)];
+      });
+      sheet.getRange(i + 1, 1, 1, headers.length).setValues([rowData]);
+      return { success: true };
+    }
+  }
+  return { success: false, error: 'Property not found' };
+}
+
+function deleteProperty(data) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Properties');
+  if (!sheet) return { success: false, error: 'Properties sheet not found' };
+
+  var allData = sheet.getDataRange().getValues();
+  var headers = allData[0];
+  var idCol = headers.indexOf('propertyId');
+
+  for (var i = 1; i < allData.length; i++) {
+    if (String(allData[i][idCol]) === String(data.propertyId)) {
+      sheet.deleteRow(i + 1);
+      // Also delete junction links
+      deletePropertyContactLinks(data.propertyId);
+      // Also delete sub-contractors
+      deletePropertySubContractors(data.propertyId);
+      return { success: true };
+    }
+  }
+  return { success: false, error: 'Property not found' };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PROPERTY CONTACTS (Junction Table)
+// ═══════════════════════════════════════════════════════════════
+
+var PROPERTY_CONTACTS_HEADERS = ['linkId', 'propertyId', 'contactId', 'role', 'createdAt'];
+
+function ensurePropertyContactsSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('PropertyContacts');
+  if (!sheet) {
+    sheet = ss.insertSheet('PropertyContacts');
+    sheet.getRange(1, 1, 1, PROPERTY_CONTACTS_HEADERS.length).setValues([PROPERTY_CONTACTS_HEADERS]);
+    sheet.getRange(1, 1, 1, PROPERTY_CONTACTS_HEADERS.length).setFontWeight('bold');
+  }
+  return sheet;
+}
+
+function getPropertyContacts() {
+  var sheet = ensurePropertyContactsSheet();
+  var data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return { success: true, links: [] };
+  var headers = data[0];
+  var links = [];
+  for (var i = 1; i < data.length; i++) {
+    var obj = {};
+    for (var j = 0; j < headers.length; j++) {
+      obj[headers[j]] = data[i][j];
+    }
+    links.push(obj);
+  }
+  return { success: true, links: links };
+}
+
+function linkContactToProperty(data) {
+  var sheet = ensurePropertyContactsSheet();
+  var linkId = 'LINK-' + Date.now();
+  var now = new Date().toISOString();
+  sheet.appendRow([
+    linkId,
+    data.propertyId || '',
+    data.contactId || '',
+    data.role || 'Owner',
+    now
+  ]);
+  return { success: true, linkId: linkId };
+}
+
+function unlinkContactFromProperty(data) {
+  var sheet = ensurePropertyContactsSheet();
+  var allData = sheet.getDataRange().getValues();
+  // Can unlink by linkId OR by propertyId+contactId
+  for (var i = allData.length - 1; i >= 1; i--) {
+    if (data.linkId && String(allData[i][0]) === String(data.linkId)) {
+      sheet.deleteRow(i + 1);
+      return { success: true };
+    }
+    if (data.propertyId && data.contactId &&
+        String(allData[i][1]) === String(data.propertyId) &&
+        String(allData[i][2]) === String(data.contactId)) {
+      sheet.deleteRow(i + 1);
+      return { success: true };
+    }
+  }
+  return { success: false, error: 'Link not found' };
+}
+
+function deletePropertyContactLinks(propertyId) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('PropertyContacts');
+  if (!sheet) return;
+  var allData = sheet.getDataRange().getValues();
+  for (var i = allData.length - 1; i >= 1; i--) {
+    if (String(allData[i][1]) === String(propertyId)) {
+      sheet.deleteRow(i + 1);
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SUB-CONTRACTORS
+// ═══════════════════════════════════════════════════════════════
+
+var SUB_CONTRACTORS_HEADERS = [
+  'subContractorId', 'propertyId', 'companyName', 'serviceType',
+  'contractNotes', 'phone', 'email', 'createdAt', 'updatedAt'
+];
+
+function ensureSubContractorsSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('SubContractors');
+  if (!sheet) {
+    sheet = ss.insertSheet('SubContractors');
+    sheet.getRange(1, 1, 1, SUB_CONTRACTORS_HEADERS.length).setValues([SUB_CONTRACTORS_HEADERS]);
+    sheet.getRange(1, 1, 1, SUB_CONTRACTORS_HEADERS.length).setFontWeight('bold');
+  }
+  return sheet;
+}
+
+function getSubContractors(propertyId) {
+  var sheet = ensureSubContractorsSheet();
+  var data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return { success: true, subContractors: [] };
+  var headers = data[0];
+  var subs = [];
+  for (var i = 1; i < data.length; i++) {
+    var obj = {};
+    for (var j = 0; j < headers.length; j++) {
+      obj[headers[j]] = data[i][j];
+    }
+    if (!propertyId || String(obj.propertyId) === String(propertyId)) {
+      subs.push(obj);
+    }
+  }
+  return { success: true, subContractors: subs };
+}
+
+function saveSubContractor(data) {
+  var sheet = ensureSubContractorsSheet();
+  var allData = sheet.getDataRange().getValues();
+  var headers = allData[0];
+  var idCol = headers.indexOf('subContractorId');
+
+  // Generate SUB-0001 format
+  var maxNum = 0;
+  for (var i = 1; i < allData.length; i++) {
+    var existingId = String(allData[i][idCol] || '');
+    if (existingId.indexOf('SUB-') === 0) {
+      var num = parseInt(existingId.replace('SUB-', ''), 10);
+      if (num > maxNum) maxNum = num;
+    }
+  }
+  var subId = 'SUB-' + String(maxNum + 1).padStart(4, '0');
+  var now = new Date().toISOString();
+
+  sheet.appendRow([
+    subId,
+    data.propertyId || '',
+    data.companyName || '',
+    data.serviceType || '',
+    data.contractNotes || '',
+    data.phone || '',
+    data.email || '',
+    now,
+    now
+  ]);
+  return { success: true, subContractorId: subId };
+}
+
+function updateSubContractor(data) {
+  var sheet = ensureSubContractorsSheet();
+  var allData = sheet.getDataRange().getValues();
+  var headers = allData[0];
+  var idCol = headers.indexOf('subContractorId');
+
+  for (var i = 1; i < allData.length; i++) {
+    if (String(allData[i][idCol]) === String(data.subContractorId)) {
+      var now = new Date().toISOString();
+      var rowData = headers.map(function(h) {
+        if (h === 'subContractorId') return data.subContractorId;
+        if (h === 'createdAt') return allData[i][headers.indexOf('createdAt')];
+        if (h === 'updatedAt') return now;
+        return data[h] !== undefined ? data[h] : allData[i][headers.indexOf(h)];
+      });
+      sheet.getRange(i + 1, 1, 1, headers.length).setValues([rowData]);
+      return { success: true };
+    }
+  }
+  return { success: false, error: 'Sub-contractor not found' };
+}
+
+function deleteSubContractor(data) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('SubContractors');
+  if (!sheet) return { success: false, error: 'SubContractors sheet not found' };
+
+  var allData = sheet.getDataRange().getValues();
+  var idCol = allData[0].indexOf('subContractorId');
+
+  for (var i = 1; i < allData.length; i++) {
+    if (String(allData[i][idCol]) === String(data.subContractorId)) {
+      sheet.deleteRow(i + 1);
+      return { success: true };
+    }
+  }
+  return { success: false, error: 'Sub-contractor not found' };
+}
+
+function deletePropertySubContractors(propertyId) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('SubContractors');
+  if (!sheet) return;
+  var allData = sheet.getDataRange().getValues();
+  var propCol = allData[0].indexOf('propertyId');
+  for (var i = allData.length - 1; i >= 1; i--) {
+    if (String(allData[i][propCol]) === String(propertyId)) {
+      sheet.deleteRow(i + 1);
+    }
+  }
 }

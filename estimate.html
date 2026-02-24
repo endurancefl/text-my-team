@@ -270,8 +270,13 @@
                     </div>
                   </div>
                   <div class="form-group">
-                    <label class="form-label">Property Address</label>
-                    <input type="text" class="form-input" id="prop-address" placeholder="Enter address...">
+                    <label class="form-label">Property</label>
+                    <div class="property-picker-wrapper">
+                      <select class="form-select" id="estimate-property-picker" onchange="onEstimatePropertySelect(this.value)">
+                        <option value="">— Select property or type address —</option>
+                      </select>
+                    </div>
+                    <input type="text" class="form-input" id="prop-address" placeholder="Or type address manually..." style="margin-top: 6px;">
                   </div>
                   <div class="form-group">
                     <label class="form-label">Property Type</label>
@@ -1344,6 +1349,12 @@
                     <p class="contact-no-estimates">No contracts linked to this contact.</p>
                   </div>
                 </div>
+                <div class="contact-detail-section">
+                  <h4>Linked Properties</h4>
+                  <div id="contact-linked-properties" class="contact-estimates-list">
+                    <p class="contact-no-estimates">No properties linked to this contact.</p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1362,6 +1373,10 @@
                   <button class="contacts-filter-btn" data-property-filter="none">No Contract</button>
                 </div>
               </div>
+              <button class="btn btn-primary" onclick="openPropertyModal('add')" style="flex-shrink: 0;">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                Add Property
+              </button>
             </div>
             <div class="contacts-count" id="properties-count"></div>
             <div class="contacts-grid" id="properties-grid"></div>
@@ -1369,13 +1384,17 @@
 
           <!-- Property Profile (shown when clicking a property) -->
           <div id="property-profile-view" style="display: none;">
-            <div class="contact-profile-back">
+            <div class="contact-profile-back" style="display: flex; justify-content: space-between; align-items: center;">
               <button class="btn btn-text" onclick="showPropertiesList()">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="18" height="18">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
                 </svg>
                 Back to Properties
               </button>
+              <div style="display: flex; gap: 8px;">
+                <button class="btn btn-secondary" onclick="openPropertyModal('edit')" style="font-size: 13px; padding: 6px 12px;">Edit Property</button>
+                <button class="btn btn-danger-text" id="property-delete-btn" onclick="deleteCurrentProperty()" style="font-size: 13px; padding: 6px 12px;">Delete</button>
+              </div>
             </div>
             <div class="contact-profile-card">
               <div class="contact-profile-header">
@@ -1389,6 +1408,7 @@
                   <div class="contact-profile-meta">
                     <span id="property-profile-type"></span>
                     <span id="property-profile-status"></span>
+                    <span class="property-source-badge" id="property-profile-source-badge" style="display: none;"></span>
                   </div>
                 </div>
               </div>
@@ -1396,7 +1416,10 @@
               <div class="contact-profile-details">
                 <!-- Measurements -->
                 <div class="contact-detail-section">
-                  <h4>Measurements</h4>
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h4>Measurements</h4>
+                    <span id="property-attentive-link" style="display: none;"><a href="#" target="_blank" style="font-size: 12px; color: var(--gw-primary); text-decoration: none;">View Attentive Report</a></span>
+                  </div>
                   <div class="property-measurements-grid" id="property-measurements-grid">
                     <p style="color: var(--gw-text-disabled);">No measurements available.</p>
                   </div>
@@ -1404,9 +1427,23 @@
 
                 <!-- Linked Contacts -->
                 <div class="contact-detail-section">
-                  <h4>Linked Contacts</h4>
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h4>Linked Contacts</h4>
+                    <button class="btn btn-text" onclick="openContactLinker()" style="font-size: 13px; padding: 4px 8px;">+ Link Contact</button>
+                  </div>
                   <div id="property-contacts-list" class="contact-estimates-list">
                     <p class="contact-no-estimates">No contacts linked to this property.</p>
+                  </div>
+                </div>
+
+                <!-- Sub-Contractors -->
+                <div class="contact-detail-section">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h4>Sub-Contractors</h4>
+                    <button class="btn btn-text" onclick="openSubContractorModal('add')" style="font-size: 13px; padding: 4px 8px;">+ Add Sub</button>
+                  </div>
+                  <div id="property-subs-list" class="contact-estimates-list">
+                    <p class="contact-no-estimates">No sub-contractors for this property.</p>
                   </div>
                 </div>
 
@@ -1426,11 +1463,11 @@
                   </div>
                 </div>
 
-                <!-- Service History -->
+                <!-- Project History by Division -->
                 <div class="contact-detail-section">
-                  <h4>Service History</h4>
-                  <div id="property-service-history" class="contact-estimates-list">
-                    <p class="contact-no-estimates">No service history available.</p>
+                  <h4>Project History</h4>
+                  <div id="property-project-history" class="contact-estimates-list">
+                    <p class="contact-no-estimates">No project history available.</p>
                   </div>
                 </div>
               </div>
@@ -2081,6 +2118,263 @@
     </div>
   </div>
 
+  <!-- Property Add/Edit Modal -->
+  <div class="modal-overlay" id="property-modal">
+    <div class="modal" style="max-width: 640px;">
+      <div class="modal-header">
+        <h3 id="property-modal-title">New Property</h3>
+        <button class="modal-close" onclick="closePropertyModal()">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 20px 24px; max-height: 70vh; overflow-y: auto;">
+        <!-- Address Section -->
+        <div class="form-group">
+          <label class="form-label">Street Address *</label>
+          <input type="text" class="form-input" id="property-address" placeholder="123 Main St">
+        </div>
+        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 16px; margin-top: 16px;">
+          <div class="form-group">
+            <label class="form-label">City</label>
+            <input type="text" class="form-input" id="property-city" placeholder="Orlando">
+          </div>
+          <div class="form-group">
+            <label class="form-label">State</label>
+            <input type="text" class="form-input" id="property-state" placeholder="FL" maxlength="2" style="text-transform: uppercase;">
+          </div>
+          <div class="form-group">
+            <label class="form-label">ZIP</label>
+            <input type="text" class="form-input" id="property-zip" placeholder="32801" maxlength="10">
+          </div>
+        </div>
+
+        <!-- Details Section -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-top: 16px;">
+          <div class="form-group">
+            <label class="form-label">Property Type</label>
+            <select class="form-select" id="property-type-select">
+              <option value="Residential">Residential</option>
+              <option value="Commercial">Commercial</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">PIN (4-digit)</label>
+            <input type="text" class="form-input" id="property-pin" placeholder="0000" maxlength="4">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Gate Code</label>
+            <input type="text" class="form-input" id="property-gate-code" placeholder="e.g. #1234">
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px;">
+          <div class="form-group">
+            <label class="form-label">Assigned Crew</label>
+            <input type="text" class="form-input" id="property-crew" placeholder="Crew name">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Crew Phone</label>
+            <input type="tel" class="form-input" id="property-crew-phone" placeholder="(555) 555-5555" maxlength="14">
+          </div>
+        </div>
+
+        <!-- Measurements Section (collapsible) -->
+        <div class="property-modal-section" style="margin-top: 20px;">
+          <div class="property-modal-section-header" onclick="togglePropertySection('measurements')">
+            <h4 style="margin: 0;">Measurements</h4>
+            <svg id="property-measurements-chevron" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="18" height="18" style="transition: transform 0.2s;"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+          </div>
+          <div id="property-measurements-section" style="display: none; margin-top: 12px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+              <div class="form-group">
+                <label class="form-label">Measurement Source</label>
+                <select class="form-select" id="property-measurement-source" onchange="toggleAttentiveUrl()">
+                  <option value="">Not specified</option>
+                  <option value="attentive">Attentive</option>
+                  <option value="manual">Manual</option>
+                  <option value="polygon">Polygon</option>
+                  <option value="gps_trace">GPS Trace</option>
+                  <option value="drone">Drone</option>
+                </select>
+              </div>
+              <div class="form-group" id="property-attentive-url-group" style="display: none;">
+                <label class="form-label">Attentive Report URL</label>
+                <input type="url" class="form-input" id="property-attentive-url" placeholder="https://drive.google.com/...">
+              </div>
+            </div>
+            <!-- Area Measurements -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 12px;">
+              <div class="form-group">
+                <label class="form-label">Lot Size (SF)</label>
+                <input type="text" class="form-input property-num-input" id="pm-lot-size" placeholder="0">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Lawn Area (SF)</label>
+                <input type="text" class="form-input property-num-input" id="pm-lawn-sf" placeholder="0">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Lawn Perimeter (LF)</label>
+                <input type="text" class="form-input property-num-input" id="pm-lawn-perimeter" placeholder="0">
+              </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px;">
+              <div class="form-group">
+                <label class="form-label">Hard Edge (LF)</label>
+                <input type="text" class="form-input property-num-input" id="pm-hard-edge" placeholder="0">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Soft Edge (LF)</label>
+                <input type="text" class="form-input property-num-input" id="pm-soft-edge" placeholder="0">
+              </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 12px;">
+              <div class="form-group">
+                <label class="form-label">Mulch Bed (SF)</label>
+                <input type="text" class="form-input property-num-input" id="pm-mulch-sf" placeholder="0">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Mulch Perimeter (LF)</label>
+                <input type="text" class="form-input property-num-input" id="pm-mulch-perimeter" placeholder="0">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Hedge (SF)</label>
+                <input type="text" class="form-input property-num-input" id="pm-hedge-sf" placeholder="0">
+              </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 12px;">
+              <div class="form-group">
+                <label class="form-label">Hedge (LF)</label>
+                <input type="text" class="form-input property-num-input" id="pm-hedge-lf" placeholder="0">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Driveway/Pavement (SF)</label>
+                <input type="text" class="form-input property-num-input" id="pm-driveway-sf" placeholder="0">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Sidewalk (SF)</label>
+                <input type="text" class="form-input property-num-input" id="pm-sidewalk-sf" placeholder="0">
+              </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px;">
+              <div class="form-group">
+                <label class="form-label">Tree Count</label>
+                <input type="text" class="form-input property-num-input" id="pm-tree-count" placeholder="0">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Irrigation Zones</label>
+                <input type="text" class="form-input property-num-input" id="pm-irrigation-zones" placeholder="0">
+              </div>
+            </div>
+
+            <!-- Difficulty Splits (collapsible sub-section) -->
+            <div style="margin-top: 16px;">
+              <div class="property-modal-section-header" onclick="togglePropertySection('difficulty')" style="padding: 8px 0;">
+                <span style="font-size: 13px; font-weight: 500; color: var(--gw-text-secondary);">Difficulty Splits</span>
+                <svg id="property-difficulty-chevron" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16" style="transition: transform 0.2s;"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+              </div>
+              <div id="property-difficulty-section" style="display: none; margin-top: 8px;">
+                <p style="font-size: 12px; color: var(--gw-text-disabled); margin: 0 0 8px 0;">Each row should sum to 100%.</p>
+                <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
+                  <thead>
+                    <tr style="border-bottom: 1px solid var(--gw-divider);">
+                      <th style="text-align: left; padding: 4px 8px; font-weight: 500;">Category</th>
+                      <th style="text-align: center; padding: 4px 8px; font-weight: 500;">Easy %</th>
+                      <th style="text-align: center; padding: 4px 8px; font-weight: 500;">Med %</th>
+                      <th style="text-align: center; padding: 4px 8px; font-weight: 500;">Hard %</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr><td style="padding: 4px 8px;">Lawn</td><td style="padding: 4px;"><input type="number" class="form-input diff-input" id="diff-lawn-easy" value="100" min="0" max="100" style="text-align:center; padding: 4px;"></td><td style="padding: 4px;"><input type="number" class="form-input diff-input" id="diff-lawn-med" value="0" min="0" max="100" style="text-align:center; padding: 4px;"></td><td style="padding: 4px;"><input type="number" class="form-input diff-input" id="diff-lawn-hard" value="0" min="0" max="100" style="text-align:center; padding: 4px;"></td></tr>
+                    <tr><td style="padding: 4px 8px;">Mulch</td><td style="padding: 4px;"><input type="number" class="form-input diff-input" id="diff-mulch-easy" value="100" min="0" max="100" style="text-align:center; padding: 4px;"></td><td style="padding: 4px;"><input type="number" class="form-input diff-input" id="diff-mulch-med" value="0" min="0" max="100" style="text-align:center; padding: 4px;"></td><td style="padding: 4px;"><input type="number" class="form-input diff-input" id="diff-mulch-hard" value="0" min="0" max="100" style="text-align:center; padding: 4px;"></td></tr>
+                    <tr><td style="padding: 4px 8px;">Hedge</td><td style="padding: 4px;"><input type="number" class="form-input diff-input" id="diff-hedge-easy" value="100" min="0" max="100" style="text-align:center; padding: 4px;"></td><td style="padding: 4px;"><input type="number" class="form-input diff-input" id="diff-hedge-med" value="0" min="0" max="100" style="text-align:center; padding: 4px;"></td><td style="padding: 4px;"><input type="number" class="form-input diff-input" id="diff-hedge-hard" value="0" min="0" max="100" style="text-align:center; padding: 4px;"></td></tr>
+                    <tr><td style="padding: 4px 8px;">Hard Edge</td><td style="padding: 4px;"><input type="number" class="form-input diff-input" id="diff-hardEdge-easy" value="100" min="0" max="100" style="text-align:center; padding: 4px;"></td><td style="padding: 4px;"><input type="number" class="form-input diff-input" id="diff-hardEdge-med" value="0" min="0" max="100" style="text-align:center; padding: 4px;"></td><td style="padding: 4px;"><input type="number" class="form-input diff-input" id="diff-hardEdge-hard" value="0" min="0" max="100" style="text-align:center; padding: 4px;"></td></tr>
+                    <tr><td style="padding: 4px 8px;">Soft Edge</td><td style="padding: 4px;"><input type="number" class="form-input diff-input" id="diff-softEdge-easy" value="100" min="0" max="100" style="text-align:center; padding: 4px;"></td><td style="padding: 4px;"><input type="number" class="form-input diff-input" id="diff-softEdge-med" value="0" min="0" max="100" style="text-align:center; padding: 4px;"></td><td style="padding: 4px;"><input type="number" class="form-input diff-input" id="diff-softEdge-hard" value="0" min="0" max="100" style="text-align:center; padding: 4px;"></td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Notes -->
+        <div class="form-group" style="margin-top: 16px;">
+          <label class="form-label">Notes</label>
+          <textarea class="form-input" id="property-notes" rows="3" style="height: auto; padding: 8px 12px; resize: vertical;" placeholder="Access instructions, special notes..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; padding: 16px 24px; border-top: 1px solid var(--gw-divider);">
+        <button class="btn btn-secondary" onclick="closePropertyModal()">Cancel</button>
+        <button class="btn btn-primary" id="property-save-btn" onclick="savePropertyFromModal()">Save Property</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sub-Contractor Add/Edit Modal -->
+  <div class="modal-overlay" id="subcontractor-modal">
+    <div class="modal" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3 id="subcontractor-modal-title">Add Sub-Contractor</h3>
+        <button class="modal-close" onclick="closeSubContractorModal()">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 20px 24px;">
+        <div class="form-group">
+          <label class="form-label">Company Name *</label>
+          <input type="text" class="form-input" id="sub-company-name" placeholder="e.g. TruGreen">
+        </div>
+        <div class="form-group" style="margin-top: 16px;">
+          <label class="form-label">Service Type</label>
+          <input type="text" class="form-input" id="sub-service-type" placeholder="e.g. Fertilization & Pest Control">
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px;">
+          <div class="form-group">
+            <label class="form-label">Phone</label>
+            <input type="tel" class="form-input" id="sub-phone" placeholder="(555) 555-5555" maxlength="14">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input type="email" class="form-input" id="sub-email" placeholder="contact@company.com">
+          </div>
+        </div>
+        <div class="form-group" style="margin-top: 16px;">
+          <label class="form-label">Contract Notes</label>
+          <textarea class="form-input" id="sub-contract-notes" rows="3" style="height: auto; padding: 8px 12px; resize: vertical;" placeholder="Contract details, renewal dates..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; padding: 16px 24px; border-top: 1px solid var(--gw-divider);">
+        <button class="btn btn-secondary" onclick="closeSubContractorModal()">Cancel</button>
+        <button class="btn btn-primary" id="sub-save-btn" onclick="saveSubContractorFromModal()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Contact Linker Overlay -->
+  <div class="modal-overlay" id="contact-linker-modal">
+    <div class="modal" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3>Link Contact to Property</h3>
+        <button class="modal-close" onclick="closeContactLinker()">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 20px 24px;">
+        <div class="form-group">
+          <label class="form-label">Search Contacts</label>
+          <input type="text" class="form-input" id="contact-linker-search" placeholder="Search by name..." oninput="renderContactLinkerResults()">
+        </div>
+        <div id="contact-linker-results" style="margin-top: 12px; max-height: 240px; overflow-y: auto;"></div>
+        <div class="form-group" style="margin-top: 16px;">
+          <label class="form-label">Role</label>
+          <select class="form-select" id="contact-linker-role">
+            <option value="Owner">Owner</option>
+            <option value="Property Manager">Property Manager</option>
+            <option value="Billing Contact">Billing Contact</option>
+            <option value="Tenant">Tenant</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; padding: 16px 24px; border-top: 1px solid var(--gw-divider);">
+        <button class="btn btn-secondary" onclick="closeContactLinker()">Cancel</button>
+        <button class="btn btn-primary" id="contact-linker-save-btn" onclick="saveLinkFromLinker()" disabled>Link Contact</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification -->
   <div class="toast-notification" id="toast-notification"></div>
 
@@ -2168,10 +2462,13 @@ let contacts = [];               // All contacts loaded from Google Sheets
 let currentContact = null;       // Currently viewed/edited contact
 let contactSearchQuery = '';     // Current search filter
 let contactStageFilter = 'all';  // 'all', 'Lead', 'Prospect', 'Customer'
-let properties = [];             // Aggregated properties from contacts/bids/contracts
+let properties = [];             // Properties loaded from backend (first-class entities)
 let currentProperty = null;      // Currently viewed property
 let propertySearchQuery = '';    // Property search filter
 let propertyFilter = 'all';     // 'all', 'active', 'none'
+let propertyContacts = [];       // Junction links from PropertyContacts sheet
+let propertySubContractors = []; // Sub-contractors from SubContractors sheet
+let selectedLinkerContactId = null; // Contact selected in the linker overlay
 let invoices = [];               // All invoices loaded from backend
 let currentInvoice = null;       // Currently viewed invoice
 let invoiceSearchQuery = '';     // Invoice search filter
@@ -2182,6 +2479,7 @@ let invoicePayments = [];        // Payments for current invoice
 let currentEstimate = {
   propertyType: 'Residential',
   propertyAddress: '',
+  propertyId: '',
   contactId: '',
   contactName: '',
   lotSizeSF: 0,
@@ -4990,6 +5288,29 @@ async function openContactProfile(contactId) {
       </div>`;
     }).join('');
   }
+
+  // Linked Properties (from junction table)
+  const linkedPropsEl = document.getElementById('contact-linked-properties');
+  if (linkedPropsEl) {
+    const linkedProps = getLinkedPropertiesForContact(contactId);
+    if (linkedProps.length > 0) {
+      linkedPropsEl.innerHTML = linkedProps.map(({ property: prop, role }) => {
+        const statusBadge = prop.hasActiveContract
+          ? '<span class="property-contract-badge active" style="font-size: 10px;">Active</span>'
+          : '';
+        return `<div class="contact-estimate-card" onclick="showView('properties'); setTimeout(() => openPropertyProfile('${prop.propertyId}'), 100);">
+          <div>
+            <div style="font-size: 14px; font-weight: 500;">${prop.address || 'Unknown'}</div>
+            <div style="font-size: 12px; color: var(--gw-text-secondary);">${role || 'Owner'} ${statusBadge}</div>
+          </div>
+        </div>`;
+      }).join('');
+    } else if (contact.propertyAddress) {
+      linkedPropsEl.innerHTML = `<p style="font-size: 13px; color: var(--gw-text-secondary);">${contact.propertyAddress} <span style="font-size: 11px; color: var(--gw-text-disabled);">(legacy address — use property linking instead)</span></p>`;
+    } else {
+      linkedPropsEl.innerHTML = '<p class="contact-no-estimates">No properties linked to this contact.</p>';
+    }
+  }
 }
 
 function showContactsList() {
@@ -5191,7 +5512,11 @@ function aggregateProperties() {
 }
 
 function loadProperties() {
-  properties = aggregateProperties();
+  // Synchronous fallback using aggregation — called after contacts/bids load
+  // The async loadPropertiesFromBackend() is the primary loader
+  if (properties.length === 0) {
+    properties = aggregateProperties();
+  }
   if (currentView === 'properties') {
     renderPropertiesList();
   }
@@ -5225,7 +5550,7 @@ function renderPropertiesList() {
 
   if (filtered.length === 0) {
     grid.innerHTML = '<div style="text-align: center; padding: 40px 20px; color: var(--gw-text-disabled);">' +
-      (properties.length === 0 ? 'No properties found. Properties are derived from contacts, estimates, and contracts.' : 'No properties match your search.') +
+      (properties.length === 0 ? 'No properties yet. Click "Add Property" to create one.' : 'No properties match your search.') +
       '</div>';
     return;
   }
@@ -5235,7 +5560,8 @@ function renderPropertiesList() {
       ? '<span class="property-contract-badge active">Active Contract</span>'
       : '<span class="property-contract-badge none">No Contract</span>';
     const valueStr = p.contractValue > 0 ? formatCurrency(p.contractValue) + '/mo' : '';
-    return `<div class="contact-card" onclick="openPropertyProfile('${p.normalizedAddress.replace(/'/g, "\\'")}')">
+    const clickId = p.propertyId || p.normalizedAddress;
+    return `<div class="contact-card" onclick="openPropertyProfile('${(clickId || '').replace(/'/g, "\\'")}')">
       <div class="contact-avatar" style="background: var(--gw-green-surface, rgba(30,142,62,0.12)); color: var(--gw-green);">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="18" height="18">
           <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z"/>
@@ -5393,6 +5719,898 @@ function showPropertiesList() {
   currentProperty = null;
   document.getElementById('property-profile-view').style.display = 'none';
   document.getElementById('properties-list-view').style.display = 'block';
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PROPERTY MODAL (Add/Edit)
+// ═══════════════════════════════════════════════════════════════
+
+function openPropertyModal(mode) {
+  const modal = document.getElementById('property-modal');
+  const title = document.getElementById('property-modal-title');
+  const saveBtn = document.getElementById('property-save-btn');
+
+  if (mode === 'edit' && currentProperty) {
+    title.textContent = 'Edit Property';
+    saveBtn.textContent = 'Update Property';
+    const p = currentProperty;
+    document.getElementById('property-address').value = p.address || '';
+    document.getElementById('property-city').value = p.city || '';
+    document.getElementById('property-state').value = p.state || '';
+    document.getElementById('property-zip').value = p.zip || '';
+    document.getElementById('property-type-select').value = p.propertyType || 'Residential';
+    document.getElementById('property-pin').value = p.pin || '';
+    document.getElementById('property-gate-code').value = p.gateCode || '';
+    document.getElementById('property-crew').value = p.crew || '';
+    document.getElementById('property-crew-phone').value = p.crewPhone || '';
+    document.getElementById('property-measurement-source').value = p.measurementSource || '';
+    document.getElementById('property-attentive-url').value = p.attentiveReportUrl || '';
+    document.getElementById('pm-lot-size').value = p.lotSizeSF || '';
+    document.getElementById('pm-lawn-sf').value = p.lawnRawSF || '';
+    document.getElementById('pm-lawn-perimeter').value = p.lawnPerimeterLF || '';
+    document.getElementById('pm-hard-edge').value = p.hardEdgeLF || '';
+    document.getElementById('pm-soft-edge').value = p.softEdgeLF || '';
+    document.getElementById('pm-mulch-sf').value = p.mulchBedSF || '';
+    document.getElementById('pm-mulch-perimeter').value = p.mulchBedPerimeterLF || '';
+    document.getElementById('pm-hedge-sf').value = p.hedgeSF || '';
+    document.getElementById('pm-hedge-lf').value = p.hedgeLF || '';
+    document.getElementById('pm-driveway-sf').value = p.drivewayPavementSF || '';
+    document.getElementById('pm-sidewalk-sf').value = p.sidewalkSF || '';
+    document.getElementById('pm-tree-count').value = p.treeCount || '';
+    document.getElementById('pm-irrigation-zones').value = p.irrigationZones || '';
+    document.getElementById('property-notes').value = p.notes || '';
+    // Difficulty splits
+    const diff = p.difficultyParsed || {};
+    ['lawn', 'mulch', 'hedge', 'hardEdge', 'softEdge'].forEach(cat => {
+      const d = diff[cat] || {};
+      document.getElementById('diff-' + cat + '-easy').value = d.easy != null ? d.easy : 100;
+      document.getElementById('diff-' + cat + '-med').value = d.med != null ? d.med : 0;
+      document.getElementById('diff-' + cat + '-hard').value = d.hard != null ? d.hard : 0;
+    });
+    toggleAttentiveUrl();
+  } else {
+    title.textContent = 'New Property';
+    saveBtn.textContent = 'Save Property';
+    document.getElementById('property-address').value = '';
+    document.getElementById('property-city').value = '';
+    document.getElementById('property-state').value = '';
+    document.getElementById('property-zip').value = '';
+    document.getElementById('property-type-select').value = 'Residential';
+    document.getElementById('property-pin').value = '';
+    document.getElementById('property-gate-code').value = '';
+    document.getElementById('property-crew').value = '';
+    document.getElementById('property-crew-phone').value = '';
+    document.getElementById('property-measurement-source').value = '';
+    document.getElementById('property-attentive-url').value = '';
+    ['pm-lot-size','pm-lawn-sf','pm-lawn-perimeter','pm-hard-edge','pm-soft-edge',
+     'pm-mulch-sf','pm-mulch-perimeter','pm-hedge-sf','pm-hedge-lf',
+     'pm-driveway-sf','pm-sidewalk-sf','pm-tree-count','pm-irrigation-zones'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    document.getElementById('property-notes').value = '';
+    ['lawn', 'mulch', 'hedge', 'hardEdge', 'softEdge'].forEach(cat => {
+      document.getElementById('diff-' + cat + '-easy').value = 100;
+      document.getElementById('diff-' + cat + '-med').value = 0;
+      document.getElementById('diff-' + cat + '-hard').value = 0;
+    });
+    toggleAttentiveUrl();
+  }
+  // Collapse sections by default
+  document.getElementById('property-measurements-section').style.display = 'none';
+  document.getElementById('property-difficulty-section').style.display = 'none';
+  modal.classList.add('active');
+}
+
+function closePropertyModal() {
+  document.getElementById('property-modal').classList.remove('active');
+}
+
+function togglePropertySection(section) {
+  const el = document.getElementById('property-' + section + '-section');
+  const chevron = document.getElementById('property-' + section + '-chevron');
+  if (el.style.display === 'none') {
+    el.style.display = 'block';
+    if (chevron) chevron.style.transform = 'rotate(180deg)';
+  } else {
+    el.style.display = 'none';
+    if (chevron) chevron.style.transform = 'rotate(0deg)';
+  }
+}
+
+function toggleAttentiveUrl() {
+  const source = document.getElementById('property-measurement-source').value;
+  document.getElementById('property-attentive-url-group').style.display = source === 'attentive' ? '' : 'none';
+}
+
+function getPropertyDataFromModal() {
+  const difficultyJson = {};
+  ['lawn', 'mulch', 'hedge', 'hardEdge', 'softEdge'].forEach(cat => {
+    difficultyJson[cat] = {
+      easy: parseInt(document.getElementById('diff-' + cat + '-easy').value) || 0,
+      med: parseInt(document.getElementById('diff-' + cat + '-med').value) || 0,
+      hard: parseInt(document.getElementById('diff-' + cat + '-hard').value) || 0
+    };
+  });
+
+  return {
+    address: document.getElementById('property-address').value.trim(),
+    city: document.getElementById('property-city').value.trim(),
+    state: document.getElementById('property-state').value.trim().toUpperCase(),
+    zip: document.getElementById('property-zip').value.trim(),
+    propertyType: document.getElementById('property-type-select').value,
+    pin: document.getElementById('property-pin').value.trim(),
+    gateCode: document.getElementById('property-gate-code').value.trim(),
+    crew: document.getElementById('property-crew').value.trim(),
+    crewPhone: document.getElementById('property-crew-phone').value.trim(),
+    measurementSource: document.getElementById('property-measurement-source').value,
+    attentiveReportUrl: document.getElementById('property-attentive-url').value.trim(),
+    lotSizeSF: parseFloat(document.getElementById('pm-lot-size').value) || 0,
+    lawnRawSF: parseFloat(document.getElementById('pm-lawn-sf').value) || 0,
+    lawnPerimeterLF: parseFloat(document.getElementById('pm-lawn-perimeter').value) || 0,
+    hardEdgeLF: parseFloat(document.getElementById('pm-hard-edge').value) || 0,
+    softEdgeLF: parseFloat(document.getElementById('pm-soft-edge').value) || 0,
+    mulchBedSF: parseFloat(document.getElementById('pm-mulch-sf').value) || 0,
+    mulchBedPerimeterLF: parseFloat(document.getElementById('pm-mulch-perimeter').value) || 0,
+    hedgeSF: parseFloat(document.getElementById('pm-hedge-sf').value) || 0,
+    hedgeLF: parseFloat(document.getElementById('pm-hedge-lf').value) || 0,
+    drivewayPavementSF: parseFloat(document.getElementById('pm-driveway-sf').value) || 0,
+    sidewalkSF: parseFloat(document.getElementById('pm-sidewalk-sf').value) || 0,
+    treeCount: parseInt(document.getElementById('pm-tree-count').value) || 0,
+    irrigationZones: parseInt(document.getElementById('pm-irrigation-zones').value) || 0,
+    difficultyJson: difficultyJson,
+    notes: document.getElementById('property-notes').value.trim()
+  };
+}
+
+async function savePropertyFromModal() {
+  const propData = getPropertyDataFromModal();
+  if (!propData.address) {
+    showToast('Please enter a street address.', 'error');
+    return;
+  }
+
+  const saveBtn = document.getElementById('property-save-btn');
+  saveBtn.classList.add('btn--loading');
+
+  const isEdit = document.getElementById('property-modal-title').textContent === 'Edit Property';
+
+  try {
+    if (isEdit && currentProperty && currentProperty.propertyId) {
+      propData.updateProperty = true;
+      propData.propertyId = currentProperty.propertyId;
+    } else {
+      propData.saveProperty = true;
+    }
+
+    const resp = await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify(propData)
+    });
+    const result = await resp.json();
+
+    if (result.success) {
+      await loadPropertiesFromBackend();
+      closePropertyModal();
+
+      if (isEdit && currentProperty) {
+        // Re-open the profile with updated data
+        const updated = properties.find(p => p.propertyId === currentProperty.propertyId);
+        if (updated) openPropertyProfile(updated.propertyId);
+        showToast('Property updated.', 'success');
+      } else {
+        showToast('Property created.', 'success');
+        if (result.propertyId) {
+          const newProp = properties.find(p => p.propertyId === result.propertyId);
+          if (newProp) openPropertyProfile(newProp.propertyId);
+        }
+      }
+    } else {
+      showToast('Error: ' + (result.error || 'Unknown error'), 'error');
+    }
+  } catch (err) {
+    console.error('Error saving property:', err);
+    showToast('Error saving property. Please try again.', 'error');
+  } finally {
+    saveBtn.classList.remove('btn--loading');
+  }
+}
+
+async function deleteCurrentProperty() {
+  if (!currentProperty || !currentProperty.propertyId) return;
+  if (!confirm('Delete this property? This will also remove all contact links and sub-contractors for this property.')) return;
+
+  try {
+    const resp = await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ deleteProperty: true, propertyId: currentProperty.propertyId })
+    });
+    const result = await resp.json();
+    if (result.success) {
+      await loadPropertiesFromBackend();
+      showPropertiesList();
+      renderPropertiesList();
+      showToast('Property deleted.', 'success');
+    } else {
+      showToast('Error: ' + (result.error || 'Unknown error'), 'error');
+    }
+  } catch (err) {
+    console.error('Error deleting property:', err);
+    showToast('Error deleting property.', 'error');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PROPERTY LOADING (Backend-first with aggregation fallback)
+// ═══════════════════════════════════════════════════════════════
+
+async function loadPropertiesFromBackend() {
+  try {
+    const [propResp, linksResp, subsResp] = await Promise.all([
+      fetch(GOOGLE_SHEETS_URL + '?action=getEstimatingProperties'),
+      fetch(GOOGLE_SHEETS_URL + '?action=getPropertyContacts'),
+      fetch(GOOGLE_SHEETS_URL + '?action=getSubContractors')
+    ]);
+    const [propData, linksData, subsData] = await Promise.all([
+      propResp.json(), linksResp.json(), subsResp.json()
+    ]);
+
+    if (propData.success) {
+      const backendProps = propData.properties || [];
+      if (backendProps.length > 0) {
+        // Enrich backend properties with associated bids/contracts from aggregation
+        properties = enrichPropertiesWithBidsContracts(backendProps);
+      } else {
+        // Fallback: no backend properties yet, use aggregation
+        properties = aggregateProperties();
+      }
+    } else {
+      properties = aggregateProperties();
+    }
+
+    if (linksData.success) propertyContacts = linksData.links || [];
+    if (subsData.success) propertySubContractors = subsData.subContractors || [];
+
+  } catch (err) {
+    console.error('Error loading properties from backend:', err);
+    // Fallback to aggregation
+    properties = aggregateProperties();
+  }
+
+  if (currentView === 'properties') {
+    renderPropertiesList();
+  }
+}
+
+function enrichPropertiesWithBidsContracts(backendProps) {
+  return backendProps.map(p => {
+    const normAddr = normalizeAddress(p.address);
+    // Match bids by address
+    p.bids = (savedBids || []).filter(b => normalizeAddress(b.propertyAddress) === normAddr || b.propertyId === p.propertyId);
+    // Match contracts by address
+    p.contracts = (allContracts || []).filter(c => normalizeAddress(c.propertyAddress) === normAddr || c.propertyId === p.propertyId);
+    // Derived fields
+    p.hasActiveContract = p.contracts.some(c => (c.status || '').toLowerCase() === 'active');
+    const activeContract = p.contracts.find(c => (c.status || '').toLowerCase() === 'active');
+    p.contractValue = activeContract ? (activeContract.monthlyPayment || 0) : 0;
+    p.normalizedAddress = normAddr;
+    // Contact name from junction links
+    const propLinks = (propertyContacts || []).filter(l => l.propertyId === p.propertyId);
+    if (propLinks.length > 0) {
+      const primaryContact = contacts.find(c => c.contactId === propLinks[0].contactId);
+      p.contactName = primaryContact ? getContactDisplayName(primaryContact) : '';
+    } else {
+      // Fallback: match contacts by address
+      const addrContacts = (contacts || []).filter(c => normalizeAddress(c.propertyAddress) === normAddr);
+      p.contactName = addrContacts.length > 0 ? getContactDisplayName(addrContacts[0]) : '';
+    }
+    return p;
+  }).sort((a, b) => (a.address || '').localeCompare(b.address || ''));
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  UPDATED PROPERTY PROFILE
+// ═══════════════════════════════════════════════════════════════
+
+function openPropertyProfile(propIdOrNormAddr) {
+  // Support both propertyId (new) and normalizedAddress (legacy)
+  let prop = properties.find(p => p.propertyId === propIdOrNormAddr);
+  if (!prop) prop = properties.find(p => p.normalizedAddress === propIdOrNormAddr);
+  if (!prop) return;
+  currentProperty = prop;
+
+  document.getElementById('properties-list-view').style.display = 'none';
+  document.getElementById('property-profile-view').style.display = 'block';
+
+  // Header
+  document.getElementById('property-profile-address').textContent = prop.address;
+  document.getElementById('property-profile-type').textContent = prop.propertyType || 'Residential';
+  document.getElementById('property-profile-status').textContent = prop.hasActiveContract ? 'Active Contract' : 'No Active Contract';
+
+  // Source badge
+  const sourceBadge = document.getElementById('property-profile-source-badge');
+  if (prop.measurementSource) {
+    sourceBadge.textContent = prop.measurementSource;
+    sourceBadge.className = 'property-source-badge source-' + prop.measurementSource;
+    sourceBadge.style.display = '';
+  } else {
+    sourceBadge.style.display = 'none';
+  }
+
+  // Attentive report link
+  const attentiveLink = document.getElementById('property-attentive-link');
+  if (prop.attentiveReportUrl) {
+    attentiveLink.style.display = '';
+    attentiveLink.querySelector('a').href = prop.attentiveReportUrl;
+  } else {
+    attentiveLink.style.display = 'none';
+  }
+
+  // Show/hide delete button based on whether it's a backend property
+  document.getElementById('property-delete-btn').style.display = prop.propertyId ? '' : 'none';
+
+  // Measurements from property record (first-class) or fallback to bid takeoffs
+  const measurementsGrid = document.getElementById('property-measurements-grid');
+  const measurements = [];
+  if (prop.lotSizeSF) measurements.push({ label: 'Lot Size', value: Number(prop.lotSizeSF).toLocaleString() + ' SF' });
+  if (prop.lawnRawSF) measurements.push({ label: 'Lawn Area', value: Number(prop.lawnRawSF).toLocaleString() + ' SF' });
+  if (prop.lawnPerimeterLF) measurements.push({ label: 'Lawn Perimeter', value: Number(prop.lawnPerimeterLF).toLocaleString() + ' LF' });
+  if (prop.hardEdgeLF) measurements.push({ label: 'Hard Edge', value: Number(prop.hardEdgeLF).toLocaleString() + ' LF' });
+  if (prop.softEdgeLF) measurements.push({ label: 'Soft Edge', value: Number(prop.softEdgeLF).toLocaleString() + ' LF' });
+  if (prop.mulchBedSF) measurements.push({ label: 'Mulch Bed', value: Number(prop.mulchBedSF).toLocaleString() + ' SF' });
+  if (prop.mulchBedPerimeterLF) measurements.push({ label: 'Mulch Perimeter', value: Number(prop.mulchBedPerimeterLF).toLocaleString() + ' LF' });
+  if (prop.hedgeSF) measurements.push({ label: 'Hedge', value: Number(prop.hedgeSF).toLocaleString() + ' SF' });
+  if (prop.hedgeLF) measurements.push({ label: 'Hedge', value: Number(prop.hedgeLF).toLocaleString() + ' LF' });
+  if (prop.drivewayPavementSF) measurements.push({ label: 'Driveway', value: Number(prop.drivewayPavementSF).toLocaleString() + ' SF' });
+  if (prop.sidewalkSF) measurements.push({ label: 'Sidewalk', value: Number(prop.sidewalkSF).toLocaleString() + ' SF' });
+  if (prop.treeCount) measurements.push({ label: 'Trees', value: prop.treeCount });
+  if (prop.irrigationZones) measurements.push({ label: 'Irrigation Zones', value: prop.irrigationZones });
+
+  // Fallback to most recent bid takeoffs if no property-level measurements
+  if (measurements.length === 0 && prop.bids && prop.bids.length > 0) {
+    const recentBid = prop.bids[prop.bids.length - 1];
+    if (recentBid.lotSizeSF) measurements.push({ label: 'Lot Size', value: Number(recentBid.lotSizeSF).toLocaleString() + ' SF' });
+    if (recentBid.takeoffs) {
+      const t = recentBid.takeoffs;
+      if (t.lawn && t.lawn.rawSF) measurements.push({ label: 'Lawn Area', value: Number(t.lawn.rawSF).toLocaleString() + ' SF' });
+      if (t.edge) {
+        if (t.edge.rawHardLF) measurements.push({ label: 'Hard Edge', value: Number(t.edge.rawHardLF).toLocaleString() + ' LF' });
+        if (t.edge.rawSoftLF) measurements.push({ label: 'Soft Edge', value: Number(t.edge.rawSoftLF).toLocaleString() + ' LF' });
+      }
+    }
+  }
+
+  if (measurements.length > 0) {
+    measurementsGrid.innerHTML = measurements.map(m =>
+      `<div class="property-measurement-card">
+        <div class="property-measurement-value">${m.value}</div>
+        <div class="property-measurement-label">${m.label}</div>
+      </div>`
+    ).join('');
+  } else {
+    measurementsGrid.innerHTML = '<p style="color: var(--gw-text-disabled);">No measurements available.</p>';
+  }
+
+  // Linked Contacts (from junction table)
+  renderPropertyLinkedContacts();
+
+  // Sub-Contractors
+  renderPropertySubContractors();
+
+  // Estimates
+  const estimatesList = document.getElementById('property-estimates-list');
+  if (prop.bids && prop.bids.length > 0) {
+    estimatesList.innerHTML = prop.bids.map(b => {
+      const statusClass = 'status-' + (b.status || 'draft').toLowerCase();
+      return `<div class="contact-estimate-card" onclick="openSavedEstimate('${b.bidId}')">
+        <div>
+          <div style="font-size: 14px; font-weight: 500;">${b.bidId}</div>
+          <div style="font-size: 12px; color: var(--gw-text-secondary);">${b.date || ''}</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-feature-settings: 'tnum';">${formatCurrency(b.bidTotal || 0)}</span>
+          <span class="status-badge ${statusClass}">${b.status || 'Draft'}</span>
+        </div>
+      </div>`;
+    }).join('');
+  } else {
+    estimatesList.innerHTML = '<p class="contact-no-estimates">No estimates for this property.</p>';
+  }
+
+  // Contracts
+  const contractsList = document.getElementById('property-contracts-list');
+  if (prop.contracts && prop.contracts.length > 0) {
+    contractsList.innerHTML = prop.contracts.map(c => {
+      const monthly = typeof c.monthlyPayment === 'number' ? formatCurrency(c.monthlyPayment) + '/mo' : '';
+      const statusClass = (c.status || 'active').toLowerCase();
+      const division = c.division || 'MNT';
+      const divClass = 'div-' + division.toLowerCase();
+      const pdfLink = c.pdfUrl
+        ? `<a href="${c.pdfUrl}" target="_blank" onclick="event.stopPropagation()" style="font-size: 12px; color: var(--gw-primary); text-decoration: none;">View PDF</a>`
+        : '';
+      return `<div class="contact-estimate-card" onclick="openContractDetail('${c.contractId}', '${(c.propertyAddress || '').replace(/'/g, "\\'")}')">
+        <div>
+          <div style="font-size: 14px; font-weight: 500;">${c.contractId} <span class="division-badge ${divClass}">${division}</span></div>
+          <div style="font-size: 12px; color: var(--gw-text-secondary);"><span style="text-transform: capitalize;">${c.status || 'active'}</span> — ${c.startDate || ''} to ${c.endDate || ''}</div>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-size: 14px; font-weight: 500; font-feature-settings: 'tnum';">${monthly}</div>
+          ${pdfLink}
+        </div>
+      </div>`;
+    }).join('');
+  } else {
+    contractsList.innerHTML = '<p class="contact-no-estimates">No contracts for this property.</p>';
+  }
+
+  // Project History (completed tickets grouped by division)
+  renderPropertyProjectHistory();
+}
+
+function renderPropertyLinkedContacts() {
+  const listEl = document.getElementById('property-contacts-list');
+  if (!currentProperty) return;
+
+  // Get links for this property
+  const links = (propertyContacts || []).filter(l => l.propertyId === currentProperty.propertyId);
+
+  // Also include contacts matched by address (legacy)
+  const normAddr = currentProperty.normalizedAddress || normalizeAddress(currentProperty.address);
+  const addrContacts = (contacts || []).filter(c => normalizeAddress(c.propertyAddress) === normAddr);
+
+  // Combine: junction contacts first, then address-matched ones not already in junction
+  const linkedContactIds = new Set(links.map(l => l.contactId));
+  const allLinked = [];
+
+  links.forEach(link => {
+    const contact = contacts.find(c => c.contactId === link.contactId);
+    if (contact) {
+      allLinked.push({ contact, role: link.role || 'Owner', linkId: link.linkId, fromJunction: true });
+    }
+  });
+
+  addrContacts.forEach(c => {
+    if (!linkedContactIds.has(c.contactId)) {
+      allLinked.push({ contact: c, role: 'Address Match', linkId: null, fromJunction: false });
+    }
+  });
+
+  if (allLinked.length > 0) {
+    listEl.innerHTML = allLinked.map(({ contact: c, role, linkId, fromJunction }) => {
+      const name = getContactDisplayName(c);
+      const initials = getContactInitials(c);
+      const unlinkBtn = fromJunction
+        ? `<button class="unlink-btn" onclick="event.stopPropagation(); unlinkContact('${linkId}')" title="Unlink contact">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>`
+        : '';
+      return `<div class="property-linked-contact contact-card" onclick="openContactProfile('${c.contactId}')" style="padding: 10px 16px;">
+        <div class="contact-avatar" style="width:32px; height:32px; font-size:12px;">${initials}</div>
+        <div class="contact-card-info" style="flex: 1; min-width: 0;">
+          <div class="contact-card-name">${name}</div>
+          <div class="contact-card-detail">${c.email || c.phone || ''}</div>
+        </div>
+        <span class="contact-role-badge">${role}</span>
+        ${unlinkBtn}
+      </div>`;
+    }).join('');
+  } else {
+    listEl.innerHTML = '<p class="contact-no-estimates">No contacts linked to this property.</p>';
+  }
+}
+
+async function unlinkContact(linkId) {
+  if (!confirm('Remove this contact link?')) return;
+  try {
+    await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ unlinkContactFromProperty: true, linkId })
+    });
+    // Refresh links
+    const linksResp = await fetch(GOOGLE_SHEETS_URL + '?action=getPropertyContacts');
+    const linksData = await linksResp.json();
+    if (linksData.success) propertyContacts = linksData.links || [];
+    renderPropertyLinkedContacts();
+    showToast('Contact unlinked.', 'success');
+  } catch (err) {
+    console.error('Error unlinking contact:', err);
+    showToast('Error unlinking contact.', 'error');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CONTACT LINKER OVERLAY
+// ═══════════════════════════════════════════════════════════════
+
+function openContactLinker() {
+  selectedLinkerContactId = null;
+  document.getElementById('contact-linker-search').value = '';
+  document.getElementById('contact-linker-role').value = 'Owner';
+  document.getElementById('contact-linker-save-btn').disabled = true;
+  renderContactLinkerResults();
+  document.getElementById('contact-linker-modal').classList.add('active');
+}
+
+function closeContactLinker() {
+  document.getElementById('contact-linker-modal').classList.remove('active');
+  selectedLinkerContactId = null;
+}
+
+function renderContactLinkerResults() {
+  const query = (document.getElementById('contact-linker-search').value || '').toLowerCase();
+  const resultsEl = document.getElementById('contact-linker-results');
+
+  // Filter contacts, exclude already linked ones
+  const alreadyLinked = new Set((propertyContacts || [])
+    .filter(l => currentProperty && l.propertyId === currentProperty.propertyId)
+    .map(l => l.contactId));
+
+  let filtered = contacts.filter(c => !alreadyLinked.has(c.contactId));
+  if (query) {
+    filtered = filtered.filter(c => {
+      const name = getContactDisplayName(c).toLowerCase();
+      return name.includes(query) || (c.email || '').toLowerCase().includes(query) || (c.phone || '').includes(query);
+    });
+  }
+
+  if (filtered.length === 0) {
+    resultsEl.innerHTML = '<p style="text-align: center; color: var(--gw-text-disabled); padding: 12px;">No contacts found.</p>';
+    return;
+  }
+
+  resultsEl.innerHTML = filtered.slice(0, 20).map(c => {
+    const name = getContactDisplayName(c);
+    const initials = getContactInitials(c);
+    const selected = selectedLinkerContactId === c.contactId ? 'selected' : '';
+    return `<div class="contact-linker-item ${selected}" onclick="selectLinkerContact('${c.contactId}')">
+      <div class="contact-avatar">${initials}</div>
+      <div style="flex: 1; min-width: 0;">
+        <div style="font-size: 14px; font-weight: 500;">${name}</div>
+        <div style="font-size: 12px; color: var(--gw-text-secondary);">${c.email || c.phone || ''}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function selectLinkerContact(contactId) {
+  selectedLinkerContactId = contactId;
+  document.getElementById('contact-linker-save-btn').disabled = false;
+  renderContactLinkerResults();
+}
+
+async function saveLinkFromLinker() {
+  if (!selectedLinkerContactId || !currentProperty || !currentProperty.propertyId) return;
+
+  const saveBtn = document.getElementById('contact-linker-save-btn');
+  saveBtn.classList.add('btn--loading');
+
+  try {
+    const resp = await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        linkContactToProperty: true,
+        propertyId: currentProperty.propertyId,
+        contactId: selectedLinkerContactId,
+        role: document.getElementById('contact-linker-role').value
+      })
+    });
+    const result = await resp.json();
+    if (result.success) {
+      // Refresh links
+      const linksResp = await fetch(GOOGLE_SHEETS_URL + '?action=getPropertyContacts');
+      const linksData = await linksResp.json();
+      if (linksData.success) propertyContacts = linksData.links || [];
+      closeContactLinker();
+      renderPropertyLinkedContacts();
+      showToast('Contact linked.', 'success');
+    } else {
+      showToast('Error: ' + (result.error || 'Unknown'), 'error');
+    }
+  } catch (err) {
+    console.error('Error linking contact:', err);
+    showToast('Error linking contact.', 'error');
+  } finally {
+    saveBtn.classList.remove('btn--loading');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SUB-CONTRACTORS
+// ═══════════════════════════════════════════════════════════════
+
+let editingSubContractorId = null;
+
+function renderPropertySubContractors() {
+  const listEl = document.getElementById('property-subs-list');
+  if (!currentProperty) return;
+
+  const subs = (propertySubContractors || []).filter(s => s.propertyId === currentProperty.propertyId);
+
+  if (subs.length > 0) {
+    listEl.innerHTML = subs.map(s => {
+      return `<div class="sub-contractor-card">
+        <div class="sub-contractor-info">
+          <div class="sub-contractor-name">${s.companyName || 'Unknown'}</div>
+          ${s.serviceType ? `<div class="sub-contractor-service">${s.serviceType}</div>` : ''}
+          ${s.phone || s.email ? `<div class="sub-contractor-detail">${[s.phone, s.email].filter(Boolean).join(' | ')}</div>` : ''}
+          ${s.contractNotes ? `<div class="sub-contractor-detail" style="margin-top: 4px;">${s.contractNotes}</div>` : ''}
+        </div>
+        <div class="sub-contractor-actions">
+          <button onclick="event.stopPropagation(); openSubContractorModal('edit', '${s.subContractorId}')" title="Edit">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+          </button>
+          <button onclick="event.stopPropagation(); deleteSubContractor('${s.subContractorId}')" title="Delete">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          </button>
+        </div>
+      </div>`;
+    }).join('');
+  } else {
+    listEl.innerHTML = '<p class="contact-no-estimates">No sub-contractors for this property.</p>';
+  }
+}
+
+function openSubContractorModal(mode, subId) {
+  const modal = document.getElementById('subcontractor-modal');
+  const title = document.getElementById('subcontractor-modal-title');
+  const saveBtn = document.getElementById('sub-save-btn');
+  editingSubContractorId = null;
+
+  if (mode === 'edit' && subId) {
+    const sub = propertySubContractors.find(s => s.subContractorId === subId);
+    if (!sub) return;
+    editingSubContractorId = subId;
+    title.textContent = 'Edit Sub-Contractor';
+    saveBtn.textContent = 'Update';
+    document.getElementById('sub-company-name').value = sub.companyName || '';
+    document.getElementById('sub-service-type').value = sub.serviceType || '';
+    document.getElementById('sub-phone').value = sub.phone || '';
+    document.getElementById('sub-email').value = sub.email || '';
+    document.getElementById('sub-contract-notes').value = sub.contractNotes || '';
+  } else {
+    title.textContent = 'Add Sub-Contractor';
+    saveBtn.textContent = 'Save';
+    document.getElementById('sub-company-name').value = '';
+    document.getElementById('sub-service-type').value = '';
+    document.getElementById('sub-phone').value = '';
+    document.getElementById('sub-email').value = '';
+    document.getElementById('sub-contract-notes').value = '';
+  }
+  modal.classList.add('active');
+}
+
+function closeSubContractorModal() {
+  document.getElementById('subcontractor-modal').classList.remove('active');
+  editingSubContractorId = null;
+}
+
+async function saveSubContractorFromModal() {
+  const companyName = document.getElementById('sub-company-name').value.trim();
+  if (!companyName) {
+    showToast('Please enter a company name.', 'error');
+    return;
+  }
+  if (!currentProperty || !currentProperty.propertyId) {
+    showToast('No property selected.', 'error');
+    return;
+  }
+
+  const saveBtn = document.getElementById('sub-save-btn');
+  saveBtn.classList.add('btn--loading');
+
+  const subData = {
+    propertyId: currentProperty.propertyId,
+    companyName,
+    serviceType: document.getElementById('sub-service-type').value.trim(),
+    phone: document.getElementById('sub-phone').value.trim(),
+    email: document.getElementById('sub-email').value.trim(),
+    contractNotes: document.getElementById('sub-contract-notes').value.trim()
+  };
+
+  try {
+    if (editingSubContractorId) {
+      subData.updateSubContractor = true;
+      subData.subContractorId = editingSubContractorId;
+    } else {
+      subData.saveSubContractor = true;
+    }
+
+    const resp = await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify(subData)
+    });
+    const result = await resp.json();
+
+    if (result.success) {
+      // Refresh sub-contractors
+      const subsResp = await fetch(GOOGLE_SHEETS_URL + '?action=getSubContractors');
+      const subsData = await subsResp.json();
+      if (subsData.success) propertySubContractors = subsData.subContractors || [];
+      closeSubContractorModal();
+      renderPropertySubContractors();
+      showToast(editingSubContractorId ? 'Sub-contractor updated.' : 'Sub-contractor added.', 'success');
+    } else {
+      showToast('Error: ' + (result.error || 'Unknown'), 'error');
+    }
+  } catch (err) {
+    console.error('Error saving sub-contractor:', err);
+    showToast('Error saving sub-contractor.', 'error');
+  } finally {
+    saveBtn.classList.remove('btn--loading');
+  }
+}
+
+async function deleteSubContractor(subId) {
+  if (!confirm('Delete this sub-contractor?')) return;
+  try {
+    await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ deleteSubContractor: true, subContractorId: subId })
+    });
+    // Refresh
+    const subsResp = await fetch(GOOGLE_SHEETS_URL + '?action=getSubContractors');
+    const subsData = await subsResp.json();
+    if (subsData.success) propertySubContractors = subsData.subContractors || [];
+    renderPropertySubContractors();
+    showToast('Sub-contractor deleted.', 'success');
+  } catch (err) {
+    console.error('Error deleting sub-contractor:', err);
+    showToast('Error deleting sub-contractor.', 'error');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PROJECT HISTORY BY DIVISION
+// ═══════════════════════════════════════════════════════════════
+
+async function renderPropertyProjectHistory() {
+  const historyEl = document.getElementById('property-project-history');
+  if (!currentProperty) return;
+
+  // Load tickets if not already loaded
+  try {
+    const normAddr = normalizeAddress(currentProperty.address);
+    const resp = await fetch(GOOGLE_SHEETS_URL + '?action=getTickets');
+    const data = await resp.json();
+    if (!data.success || !data.tickets) {
+      historyEl.innerHTML = '<p class="contact-no-estimates">No project history available.</p>';
+      return;
+    }
+
+    // Filter tickets for this property
+    const propTickets = data.tickets.filter(t =>
+      normalizeAddress(t.propertyAddress) === normAddr && (t.status === 'completed' || t.status === 'partial')
+    );
+
+    if (propTickets.length === 0) {
+      historyEl.innerHTML = '<p class="contact-no-estimates">No completed work for this property.</p>';
+      return;
+    }
+
+    // Group by division
+    const byDivision = {};
+    propTickets.forEach(t => {
+      const div = t.division || 'MNT';
+      if (!byDivision[div]) byDivision[div] = [];
+      byDivision[div].push(t);
+    });
+
+    historyEl.innerHTML = Object.entries(byDivision).map(([div, tickets]) => {
+      const divClass = 'div-' + div.toLowerCase();
+      const ticketHtml = tickets.slice(0, 10).map(t => {
+        return `<div style="display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; border-bottom: 1px solid var(--gw-divider);">
+          <span>${t.ticketId} — ${t.eventDate || ''}</span>
+          <span style="color: var(--gw-text-secondary);">${t.status}</span>
+        </div>`;
+      }).join('');
+      return `<div style="margin-bottom: 16px;">
+        <div style="margin-bottom: 8px;"><span class="division-badge ${divClass}">${div}</span> <span style="font-size: 12px; color: var(--gw-text-secondary);">${tickets.length} completed</span></div>
+        ${ticketHtml}
+        ${tickets.length > 10 ? `<div style="font-size: 12px; color: var(--gw-text-disabled); padding-top: 4px;">...and ${tickets.length - 10} more</div>` : ''}
+      </div>`;
+    }).join('');
+  } catch (err) {
+    console.error('Error loading project history:', err);
+    historyEl.innerHTML = '<p class="contact-no-estimates">Error loading project history.</p>';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  ESTIMATE BUILDER PROPERTY PICKER
+// ═══════════════════════════════════════════════════════════════
+
+function populateEstimatePropertyPicker() {
+  const picker = document.getElementById('estimate-property-picker');
+  if (!picker) return;
+
+  const currentVal = picker.value;
+  picker.innerHTML = '<option value="">— Select property or type address —</option>';
+  properties.forEach(p => {
+    if (p.propertyId && p.address) {
+      const opt = document.createElement('option');
+      opt.value = p.propertyId;
+      opt.textContent = p.address;
+      picker.appendChild(opt);
+    }
+  });
+  // Restore selection
+  if (currentVal) picker.value = currentVal;
+}
+
+function onEstimatePropertySelect(propertyId) {
+  if (!propertyId) return;
+  const prop = properties.find(p => p.propertyId === propertyId);
+  if (!prop) return;
+
+  // Auto-fill address
+  currentEstimate.propertyAddress = prop.address;
+  currentEstimate.propertyId = prop.propertyId;
+  document.getElementById('prop-address').value = prop.address;
+  document.getElementById('header-subtitle').textContent = prop.address;
+
+  // Auto-fill property type
+  if (prop.propertyType) {
+    currentEstimate.propertyType = prop.propertyType;
+    document.getElementById('prop-type').value = prop.propertyType;
+  }
+
+  // Auto-fill lot size
+  if (prop.lotSizeSF) {
+    currentEstimate.lotSizeSF = Number(prop.lotSizeSF);
+    document.getElementById('prop-lot-size').value = Number(prop.lotSizeSF).toLocaleString('en-US');
+  }
+
+  // Auto-fill measurements into takeoffs
+  if (prop.lawnRawSF) {
+    currentEstimate.takeoffs.lawn.rawSF = Number(prop.lawnRawSF);
+    setLawnSF(Number(prop.lawnRawSF));
+  }
+  if (prop.hardEdgeLF) {
+    currentEstimate.takeoffs.edge.rawHardLF = Number(prop.hardEdgeLF);
+  }
+  if (prop.softEdgeLF) {
+    currentEstimate.takeoffs.edge.rawSoftLF = Number(prop.softEdgeLF);
+  }
+
+  // Auto-fill difficulty splits from property
+  if (prop.difficultyParsed && prop.difficultyParsed.lawn) {
+    const d = prop.difficultyParsed.lawn;
+    currentEstimate.takeoffs.lawn.diffEasy = d.easy || 100;
+    currentEstimate.takeoffs.lawn.diffMedium = d.med || 0;
+    currentEstimate.takeoffs.lawn.diffHard = d.hard || 0;
+  }
+
+  // Update edge and recalculate
+  recalcTotalEdge();
+  recalcHardscape();
+  renderPropertySetupTables();
+  buildServicesFromTakeoffs();
+  markEstimateDirty();
+
+  // Filter contact picker to show contacts linked to this property
+  const propLinks = (propertyContacts || []).filter(l => l.propertyId === propertyId);
+  if (propLinks.length > 0) {
+    const firstLink = propLinks[0];
+    const contactPicker = document.getElementById('estimate-contact-picker');
+    if (contactPicker && !currentEstimate.contactId) {
+      contactPicker.value = firstLink.contactId;
+      onEstimateContactChange(firstLink.contactId);
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CONTACT PROFILE — LINKED PROPERTIES SECTION
+// ═══════════════════════════════════════════════════════════════
+
+function getLinkedPropertiesForContact(contactId) {
+  // From junction table
+  const links = (propertyContacts || []).filter(l => l.contactId === contactId);
+  const linkedProps = [];
+  links.forEach(link => {
+    const prop = properties.find(p => p.propertyId === link.propertyId);
+    if (prop) linkedProps.push({ property: prop, role: link.role, linkId: link.linkId });
+  });
+  return linkedProps;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -6976,6 +8194,7 @@ function showView(viewId) {
   if (viewId === 'builder') {
     renderPropertySetupTables();
     updateHeaderActions();
+    populateEstimatePropertyPicker();
   }
 
   // Load schedule view when shown
@@ -10944,6 +12163,7 @@ async function _handleSaveBidInner() {
   // Step 2: Save bid summary + fileId to Bids sheet
   const bidData = {
     propertyAddress: currentEstimate.propertyAddress,
+    propertyId: currentEstimate.propertyId || '',
     contactId: currentEstimate.contactId || '',
     contactName: currentEstimate.contactName || '',
     division: bidSettings.division || 'Maintenance',
@@ -11216,6 +12436,8 @@ document.addEventListener('DOMContentLoaded', function() {
       document.getElementById('login-screen').style.display = 'none';
       document.getElementById('app-container').classList.add('active');
       await Promise.all([loadItemCatalog(), loadBidSettings(), loadBids(), loadTemplates(), loadServiceCatalog(), loadContacts()]);
+      await loadPropertiesFromBackend();
+      populateEstimatePropertyPicker();
       // Check for saved estimate after data is loaded
       checkForSavedEstimate();
     }
@@ -11227,12 +12449,15 @@ document.addEventListener('DOMContentLoaded', function() {
   localStorage.setItem('estimatePhone', savedPhone);
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app-container').classList.add('active');
-  Promise.all([loadItemCatalog(), loadBidSettings(), loadBids(), loadTemplates(), loadServiceCatalog(), loadContacts()]).then(() => {
+  Promise.all([loadItemCatalog(), loadBidSettings(), loadBids(), loadTemplates(), loadServiceCatalog(), loadContacts()]).then(async () => {
     // Check for saved estimate after data is loaded
     checkForSavedEstimate();
     // Initialize Property Setup tables
     renderMowerTable();
     renderEdgeTable();
+    // Load properties from backend (after contacts/bids loaded for enrichment)
+    await loadPropertiesFromBackend();
+    populateEstimatePropertyPicker();
   });
 
   // Navigation

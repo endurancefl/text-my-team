@@ -4975,6 +4975,195 @@ select option:checked {
   color: var(--gw-text-secondary);
 }
 
+/* Property Source Badge */
+.property-source-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--gw-radius-full);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.property-source-badge.source-attentive {
+  background: rgba(30, 142, 62, 0.12);
+  color: var(--gw-green);
+}
+.property-source-badge.source-manual {
+  background: rgba(66, 133, 244, 0.12);
+  color: var(--gw-primary);
+}
+.property-source-badge.source-polygon,
+.property-source-badge.source-gps_trace,
+.property-source-badge.source-drone {
+  background: rgba(251, 188, 4, 0.15);
+  color: #b8860b;
+}
+
+/* Property Modal Sections */
+.property-modal-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  padding: 8px 0;
+  border-top: 1px solid var(--gw-divider);
+  user-select: none;
+}
+.property-modal-section-header:hover {
+  color: var(--gw-primary);
+}
+.property-modal-section-header.open svg {
+  transform: rotate(180deg);
+}
+.property-num-input {
+  font-feature-settings: 'tnum';
+}
+
+/* Sub-Contractor Cards */
+.sub-contractor-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 12px 16px;
+  border: 1px solid var(--gw-border);
+  border-radius: var(--gw-radius-sm);
+  margin-bottom: 8px;
+  background: var(--gw-bg-primary);
+}
+.sub-contractor-card:last-child {
+  margin-bottom: 0;
+}
+.sub-contractor-info {
+  flex: 1;
+  min-width: 0;
+}
+.sub-contractor-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gw-text-primary);
+}
+.sub-contractor-service {
+  font-size: 12px;
+  color: var(--gw-text-secondary);
+  margin-top: 2px;
+}
+.sub-contractor-detail {
+  font-size: 12px;
+  color: var(--gw-text-disabled);
+  margin-top: 2px;
+}
+.sub-contractor-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+.sub-contractor-actions button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  color: var(--gw-text-secondary);
+}
+.sub-contractor-actions button:hover {
+  background: var(--gw-surface-container);
+  color: var(--gw-text-primary);
+}
+
+/* Contact Linker Results */
+.contact-linker-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--gw-border);
+  border-radius: var(--gw-radius-sm);
+  margin-bottom: 6px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.contact-linker-item:hover {
+  background: var(--gw-surface-container);
+}
+.contact-linker-item.selected {
+  border-color: var(--gw-primary);
+  background: rgba(66, 133, 244, 0.06);
+}
+.contact-linker-item .contact-avatar {
+  width: 32px;
+  height: 32px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+/* Linked Contact Row with Role + Unlink */
+.property-linked-contact {
+  display: flex;
+  align-items: center;
+  padding: 10px 16px;
+  gap: 10px;
+}
+.property-linked-contact .contact-role-badge {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: var(--gw-radius-full);
+  background: var(--gw-surface-container-high);
+  color: var(--gw-text-secondary);
+  flex-shrink: 0;
+}
+.property-linked-contact .unlink-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  color: var(--gw-text-disabled);
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.property-linked-contact .unlink-btn:hover {
+  color: var(--gw-error);
+}
+
+/* Property Picker in Estimate Builder */
+.property-picker-wrapper {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.property-picker-wrapper select {
+  flex: 1;
+}
+
+/* Division badge for project history */
+.division-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--gw-radius-full);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.division-badge.div-mnt { background: rgba(30,142,62,0.12); color: var(--gw-green); }
+.division-badge.div-irr { background: rgba(66,133,244,0.12); color: var(--gw-primary); }
+.division-badge.div-con { background: rgba(251,188,4,0.15); color: #b8860b; }
+.division-badge.div-enh { background: rgba(142,68,173,0.12); color: #8e44ad; }
+
+/* Danger text button */
+.btn-danger-text {
+  background: none;
+  border: 1px solid var(--gw-error, #d93025);
+  color: var(--gw-error, #d93025);
+  border-radius: var(--gw-radius-sm);
+  cursor: pointer;
+}
+.btn-danger-text:hover {
+  background: rgba(217, 48, 37, 0.08);
+}
+
 /* ═══════════════════════════════════════════════════════════════
    INVOICES VIEW
    ═══════════════════════════════════════════════════════════════ */
