@@ -1813,6 +1813,88 @@ These are cross-cutting features that emerge from the data pipeline connecting e
 | **Service offer suggestion** | Crew completes site report with photos showing bare mulch beds, overgrown hedges, faded seasonal color | Suggest adding a service offer for that category pre-populated with catalog pricing |
 | **Offer follow-up** | Service offer pending for 7+ days with no response | Auto-send a follow-up reminder to the customer; expire at 30 days |
 | **Offer conversion tracking** | Monthly aggregation | Report: offers sent, approved, declined, expired, revenue generated — by crew, property, service type |
+| **Intelligent crew reassignment** | Crew member finishes assigned ticket/service | Data-driven recommendation on which remaining ticket to add the freed member to (see detailed design below) |
+
+---
+
+## Intelligent Crew Reassignment (Data-Driven "Where to Next?")
+
+The existing "Where to Next?" wizard already shows time projections for adding freed crew to services *within the same ticket*. This feature extends that concept **across tickets on the day's route** and uses **historical production data** to rank which tickets benefit most from extra crew.
+
+### The Problem
+
+When a crew member finishes their assigned ticket, the crew leader has to decide: add them to Ticket A (leaf cleanup), Ticket B (mowing), or Ticket C (weed control)? Today this is gut instinct. But the data to make this decision well already exists in our time entries.
+
+### Core Insight
+
+Not all services benefit equally from additional crew:
+- **Leaf cleanup** — highly scalable. Adding a crew member cuts remaining time significantly. More hands = more bags = faster.
+- **Mowing** — scalable with diminishing returns. A second mower helps a lot; a fourth mower may not (limited by mower count, property layout, gate access).
+- **Weed control / chemical application** — fixed duration. One person sprays the property in X minutes regardless of how many crew are present. Adding crew here is wasted labor.
+- **Hedge trimming** — moderately scalable. Depends on hedge linear footage and how many can work simultaneously.
+
+The system can learn these patterns from its own data rather than hardcoding them.
+
+### Data Sources (Already Collected)
+
+| Data | Source | What It Tells Us |
+|------|--------|-----------------|
+| Estimated man-hours per service | `estimatedHours` in ticket services | What we predicted |
+| Actual man-hours per service | Time Entries with `serviceName`, `memberCount`, timestamps | What actually happened |
+| Crew size per service entry | `memberCount` on each time entry | How many people were on the service |
+| Service splits on crew change | `splitTimeEntry()` creates before/after entries | Exact productivity delta when adding/removing a crew member |
+| Duration type | `durationType` on service (`scalable` / `fixed`) | Baseline classification |
+| Production rate analysis | `getProductionAnalysis` endpoint | Service-level efficiency (est vs actual) with per-ticket detail |
+
+### The Key Metric: **Crew Scalability Factor**
+
+For each service type, calculate how much faster the service actually gets per additional crew member:
+
+```
+scalability_factor = Δ wall_time_reduction / Δ crew_added
+```
+
+Derived from historical time entry splits — every time `splitTimeEntry()` fires because a crew member was added, we have a natural A/B test: same service, same property, before and after adding crew. Over hundreds of entries, this builds a reliable per-service-type scalability curve.
+
+A scalability factor near 1.0 means perfectly scalable (2 crew = half the time). Near 0.0 means fixed (extra crew doesn't help). Most services fall somewhere in between.
+
+### How It Works in the App
+
+**When a crew member is freed** (finishes a ticket or service), the reassignment wizard ranks the remaining day's tickets by **time savings impact**:
+
+```
+impact_score = remaining_est_minutes × scalability_factor(service_type) × (1 / current_crew_count)
+```
+
+This naturally prioritizes:
+1. **Long tasks** with high scalability (leaf cleanup with 90 min remaining)
+2. **Undermanned tasks** (1-person mowing job benefits more from +1 than a 3-person job)
+3. **Scalable service types** over fixed-duration ones (weed control drops to the bottom)
+
+The wizard shows each available ticket with:
+- Remaining estimated time at current crew
+- **Projected time with the freed member added** (using the learned scalability factor, not a naive division)
+- A visual indicator of impact: high (green), moderate (yellow), low/none (gray)
+
+### Data Collection Phase
+
+Before the model has enough data, fall back to the existing `durationType` classification:
+- `scalable` services: assume linear scaling (optimistic, but better than nothing)
+- `fixed` services: show "Adding crew won't speed this up" (already implemented)
+
+As split-entry data accumulates (target: 50+ splits per service type), transition to the learned scalability factors. The Production Rates view can show a "Crew Scalability" column alongside existing efficiency metrics.
+
+### Backend Requirements
+
+- **New aggregation**: group time entry splits by service type, compute average wall-time reduction per crew member added
+- **Store scalability factors**: per service type in the Service Catalog (alongside production rates), updated monthly or on-demand
+- **Expose in API**: `getCrewScalability` endpoint or include in `getProductionAnalysis` response
+
+### Integration with Existing Systems
+
+- **Reassignment wizard** (`renderReassignWizard()`): already shows time projections for within-ticket reassignment. Extend to show cross-ticket recommendations when a crew member finishes their last service and has no more services in the current ticket.
+- **Production Rates view**: add a "Crew Scalability" tab or column showing the learned factors per service type, with data point counts and confidence indicators.
+- **Day Summary**: track "reassignment savings" — how much time was saved by following the recommended reassignment vs. a naive assignment.
 
 ---
 
