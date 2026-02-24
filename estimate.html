@@ -1519,12 +1519,11 @@
     .save-status.unsaved { color: var(--gw-yellow); }
 
     .main-body {
-      height: calc(100vh - var(--header-height));
-      overflow-y: auto;
-      overflow-x: hidden;
-      padding: 24px;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
       background: var(--gw-surface);
-      -webkit-overflow-scrolling: touch;
+      position: relative;
     }
 
     /* RIGHT SUMMARY PANEL - Google Sheets Explore Panel Style */
@@ -1622,6 +1621,15 @@
 
     .view.active {
       display: block !important;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 24px;
+      -webkit-overflow-scrolling: touch;
     }
 
     /* ESTIMATES LIST VIEW - Google Drive style cards */
@@ -9978,7 +9986,7 @@ async function loadContacts() {
       if (currentView === 'contacts') {
         renderContactsList();
         setTimeout(() => {
-          document.getElementById('main-body').scrollTop = 0;
+          var _sv = document.querySelector('.view.active'); if (_sv) _sv.scrollTop = 0;
         }, 0);
       }
     }
@@ -10182,7 +10190,7 @@ async function openContactProfile(contactId) {
   document.getElementById('contacts-list-view').style.display = 'none';
   document.getElementById('contact-profile-view').style.display = '';
   setTimeout(() => {
-    document.getElementById('main-body').scrollTop = 0;
+    var _sv = document.querySelector('.view.active'); if (_sv) _sv.scrollTop = 0;
   }, 0);
 
   document.getElementById('contact-profile-avatar').textContent = getContactInitials(contact);
@@ -10257,7 +10265,7 @@ function showContactsList() {
   document.getElementById('header-subtitle').textContent = contacts.length + ' contacts';
   renderContactsList();
   setTimeout(() => {
-    document.getElementById('main-body').scrollTop = 0;
+    var _sv = document.querySelector('.view.active'); if (_sv) _sv.scrollTop = 0;
   }, 0);
 }
 
@@ -12183,8 +12191,8 @@ function showView(viewId) {
   // Scroll to top when switching views — use setTimeout to ensure
   // the browser has completed layout after view toggle
   setTimeout(() => {
-    const mb = document.getElementById('main-body');
-    mb.scrollTop = 0;
+    const activeView = document.querySelector('.view.active');
+    if (activeView) activeView.scrollTop = 0;
   }, 0);
 
   // Update header
@@ -17991,7 +17999,7 @@ async function loadWeeklyReports() {
 
   renderWeeklyReports();
   setTimeout(() => {
-    document.getElementById('main-body').scrollTop = 0;
+    var _sv = document.querySelector('.view.active'); if (_sv) _sv.scrollTop = 0;
   }, 0);
 }
 
