@@ -2202,10 +2202,10 @@
             <svg id="property-measurements-chevron" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="18" height="18" style="transition: transform 0.2s;"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
           </div>
           <div id="property-measurements-section" style="display: none; margin-top: 12px;">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 12px;">
+            <div style="margin-bottom: 12px;">
               <div class="form-group">
                 <label class="form-label">Measurement Source</label>
-                <select class="form-select" id="property-measurement-source" onchange="toggleAttentiveUrl()">
+                <select class="form-select" id="property-measurement-source">
                   <option value="">Not specified</option>
                   <option value="attentive">Attentive</option>
                   <option value="manual">Manual</option>
@@ -2213,10 +2213,6 @@
                   <option value="gps_trace">GPS Trace</option>
                   <option value="drone">Drone</option>
                 </select>
-              </div>
-              <div class="form-group" id="property-attentive-url-group" style="display: none;">
-                <label class="form-label">Attentive Report URL</label>
-                <input type="url" class="form-input" id="property-attentive-url" placeholder="https://drive.google.com/...">
               </div>
             </div>
             <!-- Excel-style measurement grid -->
@@ -5693,7 +5689,6 @@ function openPropertyModal(mode) {
     document.getElementById('property-crew').value = p.crew || '';
     document.getElementById('property-crew-phone').value = p.crewPhone || '';
     document.getElementById('property-measurement-source').value = p.measurementSource || '';
-    document.getElementById('property-attentive-url').value = p.attentiveReportUrl || '';
     document.getElementById('pm-lot-size').value = p.lotSizeSF || '';
     document.getElementById('pm-lawn-sf').value = p.lawnRawSF || '';
     document.getElementById('pm-lawn-perimeter').value = p.lawnPerimeterLF || '';
@@ -5708,7 +5703,6 @@ function openPropertyModal(mode) {
     document.getElementById('pm-tree-count').value = p.treeCount || '';
     document.getElementById('pm-irrigation-zones').value = p.irrigationZones || '';
     document.getElementById('property-notes').value = p.notes || '';
-    toggleAttentiveUrl();
     // Reset file upload zone
     document.getElementById('property-file-upload-zone').classList.remove('has-file');
     document.getElementById('property-file-upload-text').textContent = 'Upload .xlsx';
@@ -5726,14 +5720,12 @@ function openPropertyModal(mode) {
     document.getElementById('property-crew').value = '';
     document.getElementById('property-crew-phone').value = '';
     document.getElementById('property-measurement-source').value = '';
-    document.getElementById('property-attentive-url').value = '';
     ['pm-lot-size','pm-lawn-sf','pm-lawn-perimeter','pm-hard-edge','pm-soft-edge',
      'pm-mulch-sf','pm-mulch-perimeter','pm-hedge-sf','pm-hedge-lf',
      'pm-driveway-sf','pm-sidewalk-sf','pm-tree-count','pm-irrigation-zones'].forEach(id => {
       document.getElementById(id).value = '';
     });
     document.getElementById('property-notes').value = '';
-    toggleAttentiveUrl();
     // Reset file upload zone
     document.getElementById('property-file-upload-zone').classList.remove('has-file');
     document.getElementById('property-file-upload-text').textContent = 'Upload .xlsx';
@@ -5760,11 +5752,6 @@ function togglePropertySection(section) {
   }
 }
 
-function toggleAttentiveUrl() {
-  const source = document.getElementById('property-measurement-source').value;
-  document.getElementById('property-attentive-url-group').style.display = source === 'attentive' ? '' : 'none';
-}
-
 function getPropertyDataFromModal() {
   return {
     address: document.getElementById('property-address').value.trim(),
@@ -5777,7 +5764,7 @@ function getPropertyDataFromModal() {
     crew: document.getElementById('property-crew').value.trim(),
     crewPhone: document.getElementById('property-crew-phone').value.trim(),
     measurementSource: document.getElementById('property-measurement-source').value,
-    attentiveReportUrl: document.getElementById('property-attentive-url').value.trim(),
+    attentiveReportUrl: '',
     lotSizeSF: parseFloat(document.getElementById('pm-lot-size').value) || 0,
     lawnRawSF: parseFloat(document.getElementById('pm-lawn-sf').value) || 0,
     lawnPerimeterLF: parseFloat(document.getElementById('pm-lawn-perimeter').value) || 0,
@@ -12547,7 +12534,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         // Set measurement source to attentive
         document.getElementById('property-measurement-source').value = 'attentive';
-        toggleAttentiveUrl();
         // Show measurements section
         document.getElementById('property-measurements-section').style.display = 'block';
         const chevron = document.getElementById('property-measurements-chevron');
@@ -12575,7 +12561,6 @@ document.addEventListener('DOMContentLoaded', function() {
         propFileText.textContent = 'Upload .xlsx';
         propFileInput.value = '';
         document.getElementById('property-measurement-source').value = '';
-        toggleAttentiveUrl();
       }
     });
   }
