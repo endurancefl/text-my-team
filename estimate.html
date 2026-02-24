@@ -9539,6 +9539,7 @@ async function loadContacts() {
     const data = await response.json();
     if (data.success) {
       contacts = data.contacts || [];
+      if (currentView === 'contacts') renderContactsList();
     }
   } catch (err) {
     console.error('Error loading contacts:', err);
