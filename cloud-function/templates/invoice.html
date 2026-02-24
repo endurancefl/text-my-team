@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}Invoice {{ invoice_id }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ css_url('common.css') }}">
+<link rel="stylesheet" href="{{ css_url('invoice.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="report-header">
+  <div class="logo">
+    {% if logo_data_uri %}
+    <img src="{{ logo_data_uri }}" alt="Endurance Services">
+    {% else %}
+    <h2 style="color: var(--green);">Endurance Services</h2>
+    {% endif %}
+  </div>
+  <div class="invoice-title-block">
+    <h1 class="invoice-title">INVOICE</h1>
+    <div class="invoice-id">{{ invoice_id }}</div>
+  </div>
+</div>
+
+<div class="invoice-info-row">
+  <div class="invoice-bill-to">
+    <div class="invoice-section-label">Bill To</div>
+    <div class="invoice-bill-name">{{ contact_name }}</div>
+    <div class="invoice-bill-address">{{ billing_address }}</div>
+    <div class="invoice-bill-email">{{ contact_email }}</div>
+  </div>
+  <div class="invoice-details-box">
+    <div class="invoice-detail-row">
+      <span class="invoice-detail-label">Invoice Date</span>
+      <span class="invoice-detail-value">{{ invoice_date }}</span>
+    </div>
+    <div class="invoice-detail-row">
+      <span class="invoice-detail-label">Due Date</span>
+      <span class="invoice-detail-value">{{ due_date }}</span>
+    </div>
+    <div class="invoice-detail-row">
+      <span class="invoice-detail-label">Terms</span>
+      <span class="invoice-detail-value">{{ payment_terms }}</span>
+    </div>
+    <div class="invoice-detail-row">
+      <span class="invoice-detail-label">Billing Period</span>
+      <span class="invoice-detail-value">{{ billing_period_start }} — {{ billing_period_end }}</span>
+    </div>
+  </div>
+</div>
+
+<div class="invoice-property">
+  <span class="invoice-section-label">Service Address</span>
+  <span>{{ property_address }}</span>
+</div>
+
+<table class="invoice-table">
+  <thead>
+    <tr>
+      <th class="col-desc">Description</th>
+      <th class="col-qty">Qty</th>
+      <th class="col-rate">Rate</th>
+      <th class="col-amount">Amount</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in line_items %}
+    <tr>
+      <td>{{ item.description }}</td>
+      <td class="text-right">{{ item.quantity }}</td>
+      <td class="text-right">${{ "%.2f"|format(item.rate) }}</td>
+      <td class="text-right">${{ "%.2f"|format(item.amount) }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="invoice-totals">
+  <div class="total-row">
+    <span class="total-label">Subtotal</span>
+    <span class="total-value">${{ "%.2f"|format(subtotal) }}</span>
+  </div>
+  {% if tax_rate > 0 %}
+  <div class="total-row">
+    <span class="total-label">Tax ({{ tax_rate }}%)</span>
+    <span class="total-value">${{ "%.2f"|format(tax_amount) }}</span>
+  </div>
+  {% endif %}
+  <div class="total-row grand-total">
+    <span class="total-label">Total Due</span>
+    <span class="total-value">${{ "%.2f"|format(total) }}</span>
+  </div>
+</div>
+
+{% if pay_url %}
+<div class="pay-online">
+  <p>Pay online: <a href="{{ pay_url }}">{{ pay_url }}</a></p>
+</div>
+{% endif %}
+
+<div class="invoice-footer">
+  <p>Thank you for your business!</p>
+  <p class="invoice-footer-contact">Endurance Services &middot; (407) 579-4403 &middot; endurancefl.com</p>
+</div>
+{% endblock %}

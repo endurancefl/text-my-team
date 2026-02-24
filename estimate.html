@@ -4940,6 +4940,246 @@
       font-size: 13px;
     }
 
+    /* ═══════════════════════════════════════════════════════════════
+       PROPERTIES VIEW
+       ═══════════════════════════════════════════════════════════════ */
+    .property-measurements-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 10px;
+    }
+
+    .property-measurement-card {
+      background: var(--gw-surface-container, #f8f9fa);
+      border: 1px solid var(--gw-border);
+      border-radius: var(--gw-radius-sm);
+      padding: 12px;
+      text-align: center;
+    }
+
+    .property-measurement-value {
+      font-family: var(--gw-font-display);
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gw-text-primary);
+      font-feature-settings: 'tnum';
+    }
+
+    .property-measurement-label {
+      font-size: 11px;
+      color: var(--gw-text-secondary);
+      margin-top: 2px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .property-contract-badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 2px 10px;
+      border-radius: var(--gw-radius-full);
+    }
+
+    .property-contract-badge.active {
+      background: rgba(30, 142, 62, 0.12);
+      color: var(--gw-green);
+    }
+
+    .property-contract-badge.none {
+      background: var(--gw-surface-container-high);
+      color: var(--gw-text-secondary);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       INVOICES VIEW
+       ═══════════════════════════════════════════════════════════════ */
+    .invoice-status-badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 10px;
+      border-radius: var(--gw-radius-full);
+      text-transform: capitalize;
+    }
+
+    .invoice-status-badge.status-draft {
+      background: var(--gw-surface-container-high);
+      color: var(--gw-text-secondary);
+    }
+
+    .invoice-status-badge.status-finalized {
+      background: rgba(59, 130, 246, 0.12);
+      color: #2563eb;
+    }
+
+    .invoice-status-badge.status-sent {
+      background: var(--gw-blue-surface);
+      color: var(--gw-blue);
+    }
+
+    .invoice-status-badge.status-partial {
+      background: rgba(234, 179, 8, 0.12);
+      color: #ca8a04;
+    }
+
+    .invoice-status-badge.status-paid {
+      background: rgba(30, 142, 62, 0.12);
+      color: var(--gw-green);
+    }
+
+    .invoice-status-badge.status-overdue {
+      background: rgba(239, 68, 68, 0.12);
+      color: #dc2626;
+    }
+
+    .invoice-status-badge.status-void {
+      background: var(--gw-surface-container-high);
+      color: var(--gw-text-disabled);
+      text-decoration: line-through;
+    }
+
+    .invoice-detail-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .invoice-detail-meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 24px;
+      margin-bottom: 20px;
+      font-size: 13px;
+    }
+
+    .invoice-detail-meta dt {
+      color: var(--gw-text-secondary);
+    }
+
+    .invoice-detail-meta dd {
+      color: var(--gw-text-primary);
+      font-weight: 500;
+      margin: 0;
+    }
+
+    .invoice-line-items-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 16px;
+      font-size: 13px;
+    }
+
+    .invoice-line-items-table th {
+      text-align: left;
+      padding: 8px 12px;
+      border-bottom: 2px solid var(--gw-border);
+      color: var(--gw-text-secondary);
+      font-weight: 500;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .invoice-line-items-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--gw-border);
+      color: var(--gw-text-primary);
+    }
+
+    .invoice-line-items-table .text-right {
+      text-align: right;
+      font-feature-settings: 'tnum';
+    }
+
+    .invoice-totals {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+      margin-bottom: 20px;
+      font-size: 13px;
+    }
+
+    .invoice-totals .total-row {
+      display: flex;
+      gap: 24px;
+      min-width: 200px;
+      justify-content: space-between;
+    }
+
+    .invoice-totals .total-row.grand {
+      font-weight: 600;
+      font-size: 15px;
+      border-top: 2px solid var(--gw-border);
+      padding-top: 6px;
+      margin-top: 4px;
+    }
+
+    .invoice-totals .total-row .total-label {
+      color: var(--gw-text-secondary);
+    }
+
+    .invoice-totals .total-row .total-value {
+      color: var(--gw-text-primary);
+      font-feature-settings: 'tnum';
+    }
+
+    .invoice-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    .invoice-payment-history {
+      margin-top: 16px;
+    }
+
+    .invoice-payment-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--gw-border);
+      font-size: 13px;
+    }
+
+    .invoice-payment-item:last-child {
+      border-bottom: none;
+    }
+
+    .invoice-batch-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gw-border);
+    }
+
+    .invoice-batch-item:last-child {
+      border-bottom: none;
+    }
+
+    .invoice-batch-item input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--gw-blue);
+    }
+
+    .invoice-batch-warning {
+      background: rgba(234, 179, 8, 0.08);
+      border: 1px solid rgba(234, 179, 8, 0.3);
+      border-radius: var(--gw-radius-sm);
+      padding: 12px 16px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      color: #92400e;
+    }
+
     /* ─── Production Rates View ─── */
     .prod-variance-badge {
       display: inline-block;
@@ -5114,6 +5354,18 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
           </svg>
           <span>Contacts</span>
+        </div>
+        <div class="nav-item" data-view="properties">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z"/>
+          </svg>
+          <span>Properties</span>
+        </div>
+        <div class="nav-item" data-view="invoices">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/>
+          </svg>
+          <span>Invoices</span>
         </div>
         <div class="nav-item" data-view="settings">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -6355,6 +6607,188 @@
           </div>
         </div>
 
+        <!-- PROPERTIES VIEW -->
+        <div class="view" id="view-properties">
+          <!-- Property List (default) -->
+          <div id="properties-list-view">
+            <div class="contacts-toolbar">
+              <div class="contacts-toolbar-left">
+                <input type="text" class="form-input contacts-search" id="properties-search" placeholder="Search properties...">
+                <div class="contacts-stage-filters">
+                  <button class="contacts-filter-btn active" data-property-filter="all">All</button>
+                  <button class="contacts-filter-btn" data-property-filter="active">Active Contract</button>
+                  <button class="contacts-filter-btn" data-property-filter="none">No Contract</button>
+                </div>
+              </div>
+            </div>
+            <div class="contacts-count" id="properties-count"></div>
+            <div class="contacts-grid" id="properties-grid"></div>
+          </div>
+
+          <!-- Property Profile (shown when clicking a property) -->
+          <div id="property-profile-view" style="display: none;">
+            <div class="contact-profile-back">
+              <button class="btn btn-text" onclick="showPropertiesList()">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="18" height="18">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+                </svg>
+                Back to Properties
+              </button>
+            </div>
+            <div class="contact-profile-card">
+              <div class="contact-profile-header">
+                <div class="contact-avatar" style="width:48px; height:48px; font-size:20px; background: var(--gw-green-surface, rgba(30,142,62,0.12)); color: var(--gw-green);" id="property-profile-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="24" height="24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z"/>
+                  </svg>
+                </div>
+                <div class="contact-profile-info">
+                  <h2 id="property-profile-address"></h2>
+                  <div class="contact-profile-meta">
+                    <span id="property-profile-type"></span>
+                    <span id="property-profile-status"></span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="contact-profile-details">
+                <!-- Measurements -->
+                <div class="contact-detail-section">
+                  <h4>Measurements</h4>
+                  <div class="property-measurements-grid" id="property-measurements-grid">
+                    <p style="color: var(--gw-text-disabled);">No measurements available.</p>
+                  </div>
+                </div>
+
+                <!-- Linked Contacts -->
+                <div class="contact-detail-section">
+                  <h4>Linked Contacts</h4>
+                  <div id="property-contacts-list" class="contact-estimates-list">
+                    <p class="contact-no-estimates">No contacts linked to this property.</p>
+                  </div>
+                </div>
+
+                <!-- Open Estimates -->
+                <div class="contact-detail-section">
+                  <h4>Estimates</h4>
+                  <div id="property-estimates-list" class="contact-estimates-list">
+                    <p class="contact-no-estimates">No estimates for this property.</p>
+                  </div>
+                </div>
+
+                <!-- Active Contracts -->
+                <div class="contact-detail-section">
+                  <h4>Contracts</h4>
+                  <div id="property-contracts-list" class="contact-estimates-list">
+                    <p class="contact-no-estimates">No contracts for this property.</p>
+                  </div>
+                </div>
+
+                <!-- Service History -->
+                <div class="contact-detail-section">
+                  <h4>Service History</h4>
+                  <div id="property-service-history" class="contact-estimates-list">
+                    <p class="contact-no-estimates">No service history available.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- INVOICES VIEW -->
+        <div class="view" id="view-invoices">
+          <!-- Invoice List (default) -->
+          <div id="invoices-list-view">
+            <div id="invoices-summary-cards" class="fin-summary-cards" style="margin-bottom: 20px;"></div>
+            <div class="contacts-toolbar">
+              <div class="contacts-toolbar-left">
+                <input type="text" class="form-input contacts-search" id="invoices-search" placeholder="Search invoices...">
+                <div class="contacts-stage-filters">
+                  <button class="contacts-filter-btn active" data-invoice-filter="all">All</button>
+                  <button class="contacts-filter-btn" data-invoice-filter="draft">Draft</button>
+                  <button class="contacts-filter-btn" data-invoice-filter="sent">Sent</button>
+                  <button class="contacts-filter-btn" data-invoice-filter="overdue">Overdue</button>
+                  <button class="contacts-filter-btn" data-invoice-filter="paid">Paid</button>
+                </div>
+              </div>
+              <button class="btn btn-primary" onclick="generateInvoiceBatch()">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="18" height="18">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                </svg>
+                Generate Invoices
+              </button>
+            </div>
+            <div class="contacts-count" id="invoices-count"></div>
+            <div class="contacts-grid" id="invoices-grid"></div>
+          </div>
+
+          <!-- Invoice Detail (shown when clicking an invoice) -->
+          <div id="invoice-detail-view" style="display: none;">
+            <div class="contact-profile-back">
+              <button class="btn btn-text" onclick="showInvoicesList()">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="18" height="18">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+                </svg>
+                Back to Invoices
+              </button>
+            </div>
+            <div class="contact-profile-card" id="invoice-detail-content"></div>
+          </div>
+        </div>
+
+        <!-- Invoice Batch Review Modal -->
+        <div class="modal-overlay" id="invoice-batch-modal" style="display:none;">
+          <div class="modal" style="max-width: 700px; max-height: 80vh; overflow-y: auto;">
+            <div class="modal-header">
+              <h3>Review Generated Invoices</h3>
+              <button class="btn btn-text" onclick="closeInvoiceBatchModal()">&times;</button>
+            </div>
+            <div id="invoice-batch-content"></div>
+            <div class="modal-actions" style="margin-top: 16px;">
+              <button class="btn btn-secondary" onclick="closeInvoiceBatchModal()">Cancel</button>
+              <button class="btn btn-primary" id="finalize-batch-btn" onclick="finalizeBatchInvoices()">Finalize Selected</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Record Payment Modal -->
+        <div class="modal-overlay" id="record-payment-modal" style="display:none;">
+          <div class="modal" style="max-width: 480px;">
+            <div class="modal-header">
+              <h3>Record Payment</h3>
+              <button class="btn btn-text" onclick="closeRecordPaymentModal()">&times;</button>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 12px; padding: 16px 0;">
+              <div>
+                <label class="form-label">Amount</label>
+                <input type="number" class="form-input" id="payment-amount" step="0.01" min="0">
+              </div>
+              <div>
+                <label class="form-label">Payment Method</label>
+                <select class="form-select" id="payment-method">
+                  <option value="check">Check</option>
+                  <option value="cash">Cash</option>
+                  <option value="card">Card</option>
+                  <option value="ach">ACH</option>
+                </select>
+              </div>
+              <div>
+                <label class="form-label">Payment Date</label>
+                <input type="date" class="form-input" id="payment-date">
+              </div>
+              <div>
+                <label class="form-label">Notes</label>
+                <textarea class="form-input" id="payment-notes" rows="2" placeholder="Check #, reference, etc."></textarea>
+              </div>
+            </div>
+            <div class="modal-actions">
+              <button class="btn btn-secondary" onclick="closeRecordPaymentModal()">Cancel</button>
+              <button class="btn btn-primary" onclick="submitRecordPayment()">Record Payment</button>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -6992,6 +7426,15 @@ let contacts = [];               // All contacts loaded from Google Sheets
 let currentContact = null;       // Currently viewed/edited contact
 let contactSearchQuery = '';     // Current search filter
 let contactStageFilter = 'all';  // 'all', 'Lead', 'Prospect', 'Customer'
+let properties = [];             // Aggregated properties from contacts/bids/contracts
+let currentProperty = null;      // Currently viewed property
+let propertySearchQuery = '';    // Property search filter
+let propertyFilter = 'all';     // 'all', 'active', 'none'
+let invoices = [];               // All invoices loaded from backend
+let currentInvoice = null;       // Currently viewed invoice
+let invoiceSearchQuery = '';     // Invoice search filter
+let invoiceFilter = 'all';      // 'all', 'draft', 'sent', 'overdue', 'paid'
+let invoicePayments = [];        // Payments for current invoice
 
 // Current estimate state
 let currentEstimate = {
@@ -9950,6 +10393,792 @@ function startEstimateForContact() {
   });
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  PROPERTIES VIEW
+// ═══════════════════════════════════════════════════════════════
+
+function normalizeAddress(addr) {
+  if (!addr) return '';
+  return addr.toLowerCase().trim().replace(/[.,#]/g, '').replace(/\s+/g, ' ');
+}
+
+function aggregateProperties() {
+  const map = {};
+
+  // From contacts
+  (contacts || []).forEach(c => {
+    const addr = c.propertyAddress;
+    if (!addr || !addr.trim()) return;
+    const key = normalizeAddress(addr);
+    if (!map[key]) map[key] = { address: addr.trim(), normalizedAddress: key, contacts: [], bids: [], contracts: [] };
+    map[key].contacts.push(c);
+  });
+
+  // From saved bids
+  (savedBids || []).forEach(b => {
+    const addr = b.propertyAddress;
+    if (!addr || !addr.trim()) return;
+    const key = normalizeAddress(addr);
+    if (!map[key]) map[key] = { address: addr.trim(), normalizedAddress: key, contacts: [], bids: [], contracts: [] };
+    map[key].bids.push(b);
+  });
+
+  // From contracts
+  (allContracts || []).forEach(c => {
+    const addr = c.propertyAddress;
+    if (!addr || !addr.trim()) return;
+    const key = normalizeAddress(addr);
+    if (!map[key]) map[key] = { address: addr.trim(), normalizedAddress: key, contacts: [], bids: [], contracts: [] };
+    map[key].contracts.push(c);
+  });
+
+  // Compute derived fields
+  return Object.values(map).map(p => {
+    p.hasActiveContract = p.contracts.some(c => (c.status || '').toLowerCase() === 'active');
+    const activeContract = p.contracts.find(c => (c.status || '').toLowerCase() === 'active');
+    p.contractValue = activeContract ? (activeContract.monthlyPayment || 0) : 0;
+    // Get lot size from most recent bid
+    const recentBid = p.bids.length > 0 ? p.bids[p.bids.length - 1] : null;
+    p.lotSizeSF = recentBid ? (recentBid.lotSizeSF || 0) : 0;
+    p.propertyType = recentBid ? (recentBid.propertyType || 'Residential') : 'Residential';
+    // Contact name for display
+    const contact = p.contacts.length > 0 ? p.contacts[0] : null;
+    p.contactName = contact ? getContactDisplayName(contact) : '';
+    return p;
+  }).sort((a, b) => a.address.localeCompare(b.address));
+}
+
+function loadProperties() {
+  properties = aggregateProperties();
+  if (currentView === 'properties') {
+    renderPropertiesList();
+  }
+}
+
+function filterProperties() {
+  let filtered = properties;
+  if (propertyFilter === 'active') {
+    filtered = filtered.filter(p => p.hasActiveContract);
+  } else if (propertyFilter === 'none') {
+    filtered = filtered.filter(p => !p.hasActiveContract);
+  }
+  if (propertySearchQuery) {
+    const q = propertySearchQuery.toLowerCase();
+    filtered = filtered.filter(p =>
+      p.address.toLowerCase().includes(q) ||
+      p.contactName.toLowerCase().includes(q)
+    );
+  }
+  return filtered;
+}
+
+function renderPropertiesList() {
+  const filtered = filterProperties();
+  const grid = document.getElementById('properties-grid');
+  const countEl = document.getElementById('properties-count');
+
+  countEl.textContent = filtered.length + ' propert' + (filtered.length !== 1 ? 'ies' : 'y') +
+    (propertyFilter !== 'all' ? ' (' + (propertyFilter === 'active' ? 'Active Contract' : 'No Contract') + ')' : '') +
+    (propertySearchQuery ? ' matching "' + propertySearchQuery + '"' : '');
+
+  if (filtered.length === 0) {
+    grid.innerHTML = '<div style="text-align: center; padding: 40px 20px; color: var(--gw-text-disabled);">' +
+      (properties.length === 0 ? 'No properties found. Properties are derived from contacts, estimates, and contracts.' : 'No properties match your search.') +
+      '</div>';
+    return;
+  }
+
+  grid.innerHTML = filtered.map(p => {
+    const statusBadge = p.hasActiveContract
+      ? '<span class="property-contract-badge active">Active Contract</span>'
+      : '<span class="property-contract-badge none">No Contract</span>';
+    const valueStr = p.contractValue > 0 ? formatCurrency(p.contractValue) + '/mo' : '';
+    return `<div class="contact-card" onclick="openPropertyProfile('${p.normalizedAddress.replace(/'/g, "\\'")}')">
+      <div class="contact-avatar" style="background: var(--gw-green-surface, rgba(30,142,62,0.12)); color: var(--gw-green);">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="18" height="18">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z"/>
+        </svg>
+      </div>
+      <div class="contact-card-info">
+        <div class="contact-card-name">${p.address}</div>
+        <div class="contact-card-detail">${p.contactName || 'No linked contact'}</div>
+      </div>
+      <div class="contact-card-right">
+        ${valueStr ? '<span class="contact-card-estimates-count">' + valueStr + '</span>' : ''}
+        ${statusBadge}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openPropertyProfile(normalizedAddr) {
+  const prop = properties.find(p => p.normalizedAddress === normalizedAddr);
+  if (!prop) return;
+  currentProperty = prop;
+
+  document.getElementById('properties-list-view').style.display = 'none';
+  document.getElementById('property-profile-view').style.display = 'block';
+
+  // Header
+  document.getElementById('property-profile-address').textContent = prop.address;
+  document.getElementById('property-profile-type').textContent = prop.propertyType || 'Residential';
+  document.getElementById('property-profile-status').textContent = prop.hasActiveContract ? 'Active Contract' : 'No Active Contract';
+
+  // Measurements from most recent bid takeoffs
+  const measurementsGrid = document.getElementById('property-measurements-grid');
+  const recentBid = prop.bids.length > 0 ? prop.bids[prop.bids.length - 1] : null;
+  if (recentBid && recentBid.takeoffs) {
+    const t = recentBid.takeoffs;
+    const measurements = [];
+    if (recentBid.lotSizeSF) measurements.push({ label: 'Lot Size', value: Number(recentBid.lotSizeSF).toLocaleString() + ' SF' });
+    if (t.lawn && t.lawn.rawSF) measurements.push({ label: 'Lawn Area', value: Number(t.lawn.rawSF).toLocaleString() + ' SF' });
+    if (t.edge) {
+      if (t.edge.rawHardLF) measurements.push({ label: 'Hard Edge', value: Number(t.edge.rawHardLF).toLocaleString() + ' LF' });
+      if (t.edge.rawSoftLF) measurements.push({ label: 'Soft Edge', value: Number(t.edge.rawSoftLF).toLocaleString() + ' LF' });
+    }
+    if (measurements.length > 0) {
+      measurementsGrid.innerHTML = measurements.map(m =>
+        `<div class="property-measurement-card">
+          <div class="property-measurement-value">${m.value}</div>
+          <div class="property-measurement-label">${m.label}</div>
+        </div>`
+      ).join('');
+    } else {
+      measurementsGrid.innerHTML = '<p style="color: var(--gw-text-disabled);">No measurements available.</p>';
+    }
+  } else {
+    measurementsGrid.innerHTML = '<p style="color: var(--gw-text-disabled);">No measurements available.</p>';
+  }
+
+  // Linked Contacts
+  const contactsList = document.getElementById('property-contacts-list');
+  if (prop.contacts.length > 0) {
+    contactsList.innerHTML = prop.contacts.map(c => {
+      const name = getContactDisplayName(c);
+      const initials = getContactInitials(c);
+      const stageClass = 'stage-' + (c.stage || 'lead').toLowerCase();
+      return `<div class="contact-card" onclick="openContactProfile('${c.contactId}')" style="padding: 12px 16px;">
+        <div class="contact-avatar" style="width:32px; height:32px; font-size:12px;">${initials}</div>
+        <div class="contact-card-info">
+          <div class="contact-card-name">${name}</div>
+          <div class="contact-card-detail">${c.email || c.phone || ''}</div>
+        </div>
+        <span class="contact-stage-badge ${stageClass}">${c.stage || 'Lead'}</span>
+      </div>`;
+    }).join('');
+  } else {
+    contactsList.innerHTML = '<p class="contact-no-estimates">No contacts linked to this property.</p>';
+  }
+
+  // Estimates
+  const estimatesList = document.getElementById('property-estimates-list');
+  if (prop.bids.length > 0) {
+    estimatesList.innerHTML = prop.bids.map(b => {
+      const statusClass = 'status-' + (b.status || 'draft').toLowerCase();
+      return `<div class="contact-estimate-card" onclick="openSavedEstimate('${b.bidId}')">
+        <div>
+          <div style="font-size: 14px; font-weight: 500;">${b.bidId}</div>
+          <div style="font-size: 12px; color: var(--gw-text-secondary);">${b.date || ''}</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-feature-settings: 'tnum';">${formatCurrency(b.bidTotal || 0)}</span>
+          <span class="status-badge ${statusClass}">${b.status || 'Draft'}</span>
+        </div>
+      </div>`;
+    }).join('');
+  } else {
+    estimatesList.innerHTML = '<p class="contact-no-estimates">No estimates for this property.</p>';
+  }
+
+  // Contracts
+  const contractsList = document.getElementById('property-contracts-list');
+  if (prop.contracts.length > 0) {
+    contractsList.innerHTML = prop.contracts.map(c => {
+      const statusClass = 'status-' + (c.status || 'active').toLowerCase();
+      const statusLabel = c.status ? c.status.charAt(0).toUpperCase() + c.status.slice(1) : 'Active';
+      return `<div class="contact-estimate-card" onclick="openContractDetail('${c.contractId}', '${(c.propertyAddress || '').replace(/'/g, "\\'")}')">
+        <div>
+          <div style="font-size: 14px; font-weight: 500;">${c.contractId}</div>
+          <div style="font-size: 12px; color: var(--gw-text-secondary);">${c.startDate || ''} - ${c.endDate || ''}</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-feature-settings: 'tnum';">${formatCurrency(c.monthlyPayment || 0)}/mo</span>
+          <span class="status-badge ${statusClass}">${statusLabel}</span>
+        </div>
+      </div>`;
+    }).join('');
+  } else {
+    contractsList.innerHTML = '<p class="contact-no-estimates">No contracts for this property.</p>';
+  }
+
+  // Service History — fetch tickets for this address
+  const historyEl = document.getElementById('property-service-history');
+  historyEl.innerHTML = '<p style="color: var(--gw-text-disabled); text-align: center; padding: 16px;">Loading service history...</p>';
+  fetchPropertyServiceHistory(prop.address, historyEl);
+}
+
+async function fetchPropertyServiceHistory(address, container) {
+  try {
+    const response = await fetch(GOOGLE_SHEETS_URL + '?action=getScheduleView&startDate=2020-01-01&endDate=2099-12-31&scope=all');
+    const data = await response.json();
+    if (data.success) {
+      const normalizedAddr = normalizeAddress(address);
+      const tickets = (data.tickets || []).filter(t =>
+        normalizeAddress(t.propertyAddress) === normalizedAddr &&
+        (t.status === 'completed' || t.status === 'done')
+      );
+      if (tickets.length > 0) {
+        const recent = tickets.slice(-20).reverse();
+        container.innerHTML = recent.map(t =>
+          `<div class="contact-estimate-card">
+            <div>
+              <div style="font-size: 14px; font-weight: 500;">${t.services || t.ticketId || 'Service'}</div>
+              <div style="font-size: 12px; color: var(--gw-text-secondary);">${t.scheduledDate || ''}</div>
+            </div>
+            <span class="status-badge status-completed">Completed</span>
+          </div>`
+        ).join('');
+      } else {
+        container.innerHTML = '<p class="contact-no-estimates">No completed services yet.</p>';
+      }
+    }
+  } catch (err) {
+    container.innerHTML = '<p class="contact-no-estimates">Could not load service history.</p>';
+  }
+}
+
+function showPropertiesList() {
+  currentProperty = null;
+  document.getElementById('property-profile-view').style.display = 'none';
+  document.getElementById('properties-list-view').style.display = 'block';
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  INVOICES VIEW
+// ═══════════════════════════════════════════════════════════════
+
+async function loadInvoices() {
+  try {
+    const response = await fetch(GOOGLE_SHEETS_URL + '?action=getInvoices');
+    const data = await response.json();
+    if (data.success) {
+      invoices = data.invoices || [];
+      if (currentView === 'invoices') {
+        renderInvoiceSummaryCards();
+        renderInvoicesList();
+      }
+    }
+  } catch (err) {
+    console.error('Error loading invoices:', err);
+  }
+}
+
+function filterInvoices() {
+  let filtered = invoices;
+  if (invoiceFilter !== 'all') {
+    filtered = filtered.filter(inv => inv.status === invoiceFilter);
+  }
+  if (invoiceSearchQuery) {
+    const q = invoiceSearchQuery.toLowerCase();
+    filtered = filtered.filter(inv =>
+      (inv.invoiceId || '').toLowerCase().includes(q) ||
+      (inv.propertyAddress || '').toLowerCase().includes(q) ||
+      (inv.contactName || '').toLowerCase().includes(q)
+    );
+  }
+  return filtered;
+}
+
+function renderInvoiceSummaryCards() {
+  const container = document.getElementById('invoices-summary-cards');
+  const outstanding = invoices.filter(i => ['sent', 'partial', 'overdue'].includes(i.status)).reduce((s, i) => s + (parseFloat(i.balanceDue) || 0), 0);
+  const overdue = invoices.filter(i => i.status === 'overdue').reduce((s, i) => s + (parseFloat(i.balanceDue) || 0), 0);
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+  const collected = invoices.filter(i => i.status === 'paid' && (i.updatedAt || '') >= monthStart).reduce((s, i) => s + (parseFloat(i.total) || 0), 0);
+  const drafts = invoices.filter(i => i.status === 'draft').length;
+
+  container.innerHTML = `
+    <div class="fin-card">
+      <div class="fin-card-label">Outstanding</div>
+      <div class="fin-card-value">${formatCurrency(outstanding)}</div>
+    </div>
+    <div class="fin-card">
+      <div class="fin-card-label">Overdue</div>
+      <div class="fin-card-value" style="color: ${overdue > 0 ? '#dc2626' : 'inherit'}">${formatCurrency(overdue)}</div>
+    </div>
+    <div class="fin-card">
+      <div class="fin-card-label">Collected This Month</div>
+      <div class="fin-card-value" style="color: var(--gw-green)">${formatCurrency(collected)}</div>
+    </div>
+    <div class="fin-card">
+      <div class="fin-card-label">Drafts</div>
+      <div class="fin-card-value">${drafts}</div>
+    </div>
+  `;
+}
+
+function renderInvoicesList() {
+  const filtered = filterInvoices();
+  const grid = document.getElementById('invoices-grid');
+  const countEl = document.getElementById('invoices-count');
+
+  countEl.textContent = filtered.length + ' invoice' + (filtered.length !== 1 ? 's' : '') +
+    (invoiceFilter !== 'all' ? ' (' + invoiceFilter + ')' : '') +
+    (invoiceSearchQuery ? ' matching "' + invoiceSearchQuery + '"' : '');
+
+  if (filtered.length === 0) {
+    grid.innerHTML = '<div style="text-align: center; padding: 40px 20px; color: var(--gw-text-disabled);">' +
+      (invoices.length === 0 ? 'No invoices yet. Click "Generate Invoices" to create a batch.' : 'No invoices match your filters.') +
+      '</div>';
+    return;
+  }
+
+  grid.innerHTML = filtered.map(inv => {
+    const statusClass = 'status-' + (inv.status || 'draft');
+    return `<div class="contact-card" onclick="openInvoiceDetail('${inv.invoiceId}')">
+      <div class="contact-avatar" style="background: var(--gw-blue-surface); color: var(--gw-blue); font-size: 11px; font-weight: 600;">
+        ${(inv.invoiceId || '').replace('INV-', '')}
+      </div>
+      <div class="contact-card-info">
+        <div class="contact-card-name">${inv.propertyAddress || 'No Address'}</div>
+        <div class="contact-card-detail">${inv.contactName || ''} &middot; Due ${inv.dueDate || '—'}</div>
+      </div>
+      <div class="contact-card-right">
+        <span class="contact-card-estimates-count" style="font-feature-settings: 'tnum';">${formatCurrency(parseFloat(inv.total) || 0)}</span>
+        <span class="invoice-status-badge ${statusClass}">${inv.status || 'draft'}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openInvoiceDetail(invoiceId) {
+  const inv = invoices.find(i => i.invoiceId === invoiceId);
+  if (!inv) return;
+  currentInvoice = inv;
+
+  document.getElementById('invoices-list-view').style.display = 'none';
+  document.getElementById('invoice-detail-view').style.display = 'block';
+
+  const lineItems = typeof inv.lineItemsJson === 'string' ? JSON.parse(inv.lineItemsJson || '[]') : (inv.lineItemsJson || []);
+  const statusClass = 'status-' + (inv.status || 'draft');
+  const subtotal = parseFloat(inv.subtotal) || 0;
+  const taxRate = parseFloat(inv.taxRate) || 0;
+  const taxAmount = parseFloat(inv.taxAmount) || 0;
+  const total = parseFloat(inv.total) || 0;
+  const paidAmount = parseFloat(inv.paidAmount) || 0;
+  const balanceDue = parseFloat(inv.balanceDue) || 0;
+
+  // Action buttons based on status
+  let actions = '';
+  switch (inv.status) {
+    case 'draft':
+      actions = '<button class="btn btn-primary" onclick="finalizeCurrentInvoice()">Finalize</button>' +
+        '<button class="btn btn-secondary" style="color:var(--gw-red);border-color:var(--gw-red);" onclick="voidCurrentInvoice()">Void</button>';
+      break;
+    case 'finalized':
+      actions = '<button class="btn btn-primary" onclick="sendCurrentInvoice()">Send Invoice</button>' +
+        '<button class="btn btn-secondary" style="color:var(--gw-red);border-color:var(--gw-red);" onclick="voidCurrentInvoice()">Void</button>';
+      break;
+    case 'sent':
+      actions = '<button class="btn btn-primary" onclick="openRecordPaymentModal()">Record Payment</button>' +
+        '<button class="btn btn-secondary" onclick="checkCurrentPaymentStatus()">Check Payment</button>' +
+        '<button class="btn btn-secondary" style="color:var(--gw-red);border-color:var(--gw-red);" onclick="voidCurrentInvoice()">Void</button>';
+      break;
+    case 'partial':
+      actions = '<button class="btn btn-primary" onclick="openRecordPaymentModal()">Record Payment</button>' +
+        '<button class="btn btn-secondary" style="color:var(--gw-red);border-color:var(--gw-red);" onclick="voidCurrentInvoice()">Void</button>';
+      break;
+    case 'overdue':
+      actions = '<button class="btn btn-primary" onclick="openRecordPaymentModal()">Record Payment</button>' +
+        '<button class="btn btn-secondary" onclick="sendCurrentInvoice()">Resend</button>' +
+        '<button class="btn btn-secondary" style="color:var(--gw-red);border-color:var(--gw-red);" onclick="voidCurrentInvoice()">Void</button>';
+      break;
+  }
+
+  document.getElementById('invoice-detail-content').innerHTML = `
+    <div class="invoice-detail-header">
+      <div>
+        <h2 style="margin: 0;">${inv.invoiceId}</h2>
+        <div style="color: var(--gw-text-secondary); font-size: 13px; margin-top: 4px;">${inv.propertyAddress || ''}</div>
+      </div>
+      <span class="invoice-status-badge ${statusClass}" style="font-size: 14px; padding: 4px 14px;">${inv.status || 'draft'}</span>
+    </div>
+
+    <dl class="invoice-detail-meta">
+      <dt>Contact</dt><dd>${inv.contactName || '—'}</dd>
+      <dt>Email</dt><dd>${inv.contactEmail || '—'}</dd>
+      <dt>Invoice Date</dt><dd>${inv.invoiceDate || '—'}</dd>
+      <dt>Due Date</dt><dd>${inv.dueDate || '—'}</dd>
+      <dt>Billing Period</dt><dd>${inv.billingPeriodStart || '—'} to ${inv.billingPeriodEnd || '—'}</dd>
+      <dt>Type</dt><dd>${(inv.invoiceType || '').replace(/_/g, ' ')}</dd>
+      <dt>Payment Terms</dt><dd>${inv.paymentTerms || '—'}</dd>
+      <dt>Contract</dt><dd>${inv.contractId || '—'}</dd>
+    </dl>
+
+    <div class="invoice-actions">${actions}</div>
+
+    <table class="invoice-line-items-table">
+      <thead>
+        <tr>
+          <th>Description</th>
+          <th class="text-right">Qty</th>
+          <th class="text-right">Rate</th>
+          <th class="text-right">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${lineItems.map(li => `
+          <tr>
+            <td>${li.description || ''}</td>
+            <td class="text-right">${li.quantity || 1}</td>
+            <td class="text-right">${formatCurrency(li.rate || 0)}</td>
+            <td class="text-right">${formatCurrency(li.amount || 0)}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+
+    <div class="invoice-totals">
+      <div class="total-row"><span class="total-label">Subtotal</span><span class="total-value">${formatCurrency(subtotal)}</span></div>
+      ${taxRate > 0 ? `<div class="total-row"><span class="total-label">Tax (${taxRate}%)</span><span class="total-value">${formatCurrency(taxAmount)}</span></div>` : ''}
+      <div class="total-row grand"><span class="total-label">Total</span><span class="total-value">${formatCurrency(total)}</span></div>
+      <div class="total-row"><span class="total-label">Paid</span><span class="total-value">${formatCurrency(paidAmount)}</span></div>
+      <div class="total-row grand"><span class="total-label">Balance Due</span><span class="total-value" style="color: ${balanceDue > 0 ? '#dc2626' : 'var(--gw-green)'}">${formatCurrency(balanceDue)}</span></div>
+    </div>
+
+    <div class="invoice-payment-history">
+      <h4>Payment History</h4>
+      <div id="invoice-payments-list">
+        <p class="contact-no-estimates">Loading payments...</p>
+      </div>
+    </div>
+  `;
+
+  // Load payments
+  loadInvoicePayments(invoiceId);
+}
+
+async function loadInvoicePayments(invoiceId) {
+  const container = document.getElementById('invoice-payments-list');
+  try {
+    const response = await fetch(GOOGLE_SHEETS_URL + '?action=getPayments&invoiceId=' + encodeURIComponent(invoiceId));
+    const data = await response.json();
+    if (data.success && data.payments && data.payments.length > 0) {
+      invoicePayments = data.payments;
+      container.innerHTML = data.payments.map(p =>
+        `<div class="invoice-payment-item">
+          <div>
+            <div style="font-weight: 500;">${p.paymentId}</div>
+            <div style="font-size: 12px; color: var(--gw-text-secondary);">${p.paymentDate || ''} &middot; ${p.paymentMethod || ''}</div>
+            ${p.notes ? '<div style="font-size: 12px; color: var(--gw-text-secondary);">' + p.notes + '</div>' : ''}
+          </div>
+          <span style="font-weight: 600; font-feature-settings: 'tnum';">${formatCurrency(parseFloat(p.amount) || 0)}</span>
+        </div>`
+      ).join('');
+    } else {
+      invoicePayments = [];
+      container.innerHTML = '<p class="contact-no-estimates">No payments recorded yet.</p>';
+    }
+  } catch (err) {
+    container.innerHTML = '<p class="contact-no-estimates">Could not load payments.</p>';
+  }
+}
+
+function showInvoicesList() {
+  currentInvoice = null;
+  document.getElementById('invoice-detail-view').style.display = 'none';
+  document.getElementById('invoices-list-view').style.display = 'block';
+}
+
+// Invoice batch generation
+async function generateInvoiceBatch() {
+  if (!confirm('Generate invoices for all active contracts this billing period?')) return;
+  showToast('Generating invoices...', 'info');
+  try {
+    const response = await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ generateInvoiceBatch: true })
+    });
+    const data = await response.json();
+    if (data.success) {
+      const batchInvoices = data.invoices || [];
+      const openTickets = data.openTickets || [];
+      const autoPayResults = data.autoPayResults || [];
+
+      if (batchInvoices.length === 0 && autoPayResults.length === 0) {
+        showToast('No new invoices to generate. All contracts already invoiced for this period.', 'info');
+        return;
+      }
+
+      // Show batch review modal
+      openInvoiceBatchModal(batchInvoices, openTickets, autoPayResults);
+      await loadInvoices();
+    } else {
+      showToast('Error: ' + (data.error || 'Unknown error'), 'error');
+    }
+  } catch (err) {
+    showToast('Error generating invoices: ' + err.message, 'error');
+  }
+}
+
+function openInvoiceBatchModal(batchInvoices, openTickets, autoPayResults) {
+  const content = document.getElementById('invoice-batch-content');
+  let html = '';
+
+  // Auto-pay results
+  if (autoPayResults.length > 0) {
+    const succeeded = autoPayResults.filter(r => r.success);
+    const failed = autoPayResults.filter(r => !r.success);
+    if (succeeded.length > 0) {
+      html += `<div style="background: rgba(30,142,62,0.08); border: 1px solid rgba(30,142,62,0.3); border-radius: var(--gw-radius-sm); padding: 12px 16px; margin-bottom: 16px; font-size: 13px; color: #166534;">
+        <strong>${succeeded.length} auto-pay invoice${succeeded.length !== 1 ? 's' : ''} charged successfully.</strong>
+      </div>`;
+    }
+    if (failed.length > 0) {
+      html += `<div class="invoice-batch-warning">
+        <strong>${failed.length} auto-pay charge${failed.length !== 1 ? 's' : ''} failed.</strong> These invoices have been sent for manual payment.
+      </div>`;
+    }
+  }
+
+  // Open tickets warning
+  if (openTickets.length > 0) {
+    html += `<div class="invoice-batch-warning">
+      <strong>${openTickets.length} open ticket${openTickets.length !== 1 ? 's' : ''} found.</strong> Consider completing these before finalizing invoices.
+      ${openTickets.map(t => `<div style="margin-top: 4px;">&bull; ${t.propertyAddress || ''} — ${t.services || t.ticketId}</div>`).join('')}
+    </div>`;
+  }
+
+  // Draft invoices to finalize
+  const drafts = batchInvoices.filter(i => i.status === 'draft');
+  if (drafts.length > 0) {
+    html += '<h4 style="margin: 16px 0 8px;">Draft Invoices Ready to Finalize</h4>';
+    html += '<div style="border: 1px solid var(--gw-border); border-radius: var(--gw-radius-sm);">';
+    drafts.forEach(inv => {
+      html += `<div class="invoice-batch-item">
+        <input type="checkbox" checked value="${inv.invoiceId}" class="batch-invoice-cb">
+        <div style="flex: 1;">
+          <div style="font-weight: 500;">${inv.invoiceId} — ${inv.propertyAddress || ''}</div>
+          <div style="font-size: 12px; color: var(--gw-text-secondary);">${inv.contactName || ''} &middot; ${formatCurrency(parseFloat(inv.total) || 0)}</div>
+        </div>
+      </div>`;
+    });
+    html += '</div>';
+  } else {
+    html += '<p style="color: var(--gw-text-secondary); text-align: center; padding: 20px;">No draft invoices to review.</p>';
+  }
+
+  content.innerHTML = html;
+  document.getElementById('invoice-batch-modal').style.display = 'flex';
+}
+
+function closeInvoiceBatchModal() {
+  document.getElementById('invoice-batch-modal').style.display = 'none';
+}
+
+async function finalizeBatchInvoices() {
+  const checkboxes = document.querySelectorAll('.batch-invoice-cb:checked');
+  const ids = Array.from(checkboxes).map(cb => cb.value);
+  if (ids.length === 0) {
+    showToast('No invoices selected.', 'info');
+    return;
+  }
+
+  let succeeded = 0;
+  for (const id of ids) {
+    try {
+      const response = await fetch(GOOGLE_SHEETS_URL, {
+        method: 'POST',
+        body: JSON.stringify({ finalizeInvoice: true, invoiceId: id })
+      });
+      const data = await response.json();
+      if (data.success) succeeded++;
+    } catch (err) {
+      console.error('Error finalizing', id, err);
+    }
+  }
+
+  showToast(succeeded + ' invoice' + (succeeded !== 1 ? 's' : '') + ' finalized.', 'success');
+  closeInvoiceBatchModal();
+  await loadInvoices();
+}
+
+async function finalizeCurrentInvoice() {
+  if (!currentInvoice) return;
+  try {
+    const response = await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ finalizeInvoice: true, invoiceId: currentInvoice.invoiceId })
+    });
+    const data = await response.json();
+    if (data.success) {
+      showToast('Invoice finalized.', 'success');
+      await loadInvoices();
+      openInvoiceDetail(currentInvoice.invoiceId);
+    } else {
+      showToast('Error: ' + (data.error || 'Unknown'), 'error');
+    }
+  } catch (err) {
+    showToast('Error finalizing invoice.', 'error');
+  }
+}
+
+async function voidCurrentInvoice() {
+  if (!currentInvoice) return;
+  if (!confirm('Void invoice ' + currentInvoice.invoiceId + '? This cannot be undone.')) return;
+  try {
+    const response = await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ voidInvoice: true, invoiceId: currentInvoice.invoiceId })
+    });
+    const data = await response.json();
+    if (data.success) {
+      showToast('Invoice voided.', 'success');
+      await loadInvoices();
+      openInvoiceDetail(currentInvoice.invoiceId);
+    } else {
+      showToast('Error: ' + (data.error || 'Unknown'), 'error');
+    }
+  } catch (err) {
+    showToast('Error voiding invoice.', 'error');
+  }
+}
+
+async function sendCurrentInvoice() {
+  if (!currentInvoice) return;
+  showToast('Sending invoice...', 'info');
+  try {
+    const response = await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ sendInvoice: true, invoiceId: currentInvoice.invoiceId })
+    });
+    const data = await response.json();
+    if (data.success) {
+      showToast('Invoice sent to ' + (currentInvoice.contactEmail || 'customer') + '.', 'success');
+      await loadInvoices();
+      openInvoiceDetail(currentInvoice.invoiceId);
+    } else {
+      showToast('Error: ' + (data.error || 'Unknown'), 'error');
+    }
+  } catch (err) {
+    showToast('Error sending invoice.', 'error');
+  }
+}
+
+async function checkCurrentPaymentStatus() {
+  if (!currentInvoice) return;
+  showToast('Checking payment status...', 'info');
+  try {
+    const response = await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ checkStripePayment: true, invoiceId: currentInvoice.invoiceId })
+    });
+    const data = await response.json();
+    if (data.success) {
+      if (data.paid) {
+        showToast('Payment confirmed!', 'success');
+        await loadInvoices();
+        openInvoiceDetail(currentInvoice.invoiceId);
+      } else {
+        showToast('Payment not yet received. Status: ' + (data.status || 'pending'), 'info');
+      }
+    } else {
+      showToast('Error: ' + (data.error || 'Unknown'), 'error');
+    }
+  } catch (err) {
+    showToast('Error checking payment.', 'error');
+  }
+}
+
+function openRecordPaymentModal() {
+  if (!currentInvoice) return;
+  document.getElementById('payment-amount').value = parseFloat(currentInvoice.balanceDue) || 0;
+  document.getElementById('payment-method').value = 'check';
+  document.getElementById('payment-date').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('payment-notes').value = '';
+  document.getElementById('record-payment-modal').style.display = 'flex';
+}
+
+function closeRecordPaymentModal() {
+  document.getElementById('record-payment-modal').style.display = 'none';
+}
+
+async function submitRecordPayment() {
+  if (!currentInvoice) return;
+  const amount = parseFloat(document.getElementById('payment-amount').value);
+  if (!amount || amount <= 0) {
+    showToast('Enter a valid amount.', 'error');
+    return;
+  }
+  const method = document.getElementById('payment-method').value;
+  const date = document.getElementById('payment-date').value;
+  const notes = document.getElementById('payment-notes').value;
+
+  try {
+    const response = await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        recordPayment: true,
+        invoiceId: currentInvoice.invoiceId,
+        amount,
+        paymentMethod: method,
+        paymentDate: date,
+        notes
+      })
+    });
+    const data = await response.json();
+    if (data.success) {
+      showToast('Payment recorded.', 'success');
+      closeRecordPaymentModal();
+      await loadInvoices();
+      openInvoiceDetail(currentInvoice.invoiceId);
+    } else {
+      showToast('Error: ' + (data.error || 'Unknown'), 'error');
+    }
+  } catch (err) {
+    showToast('Error recording payment.', 'error');
+  }
+}
+
+// Auto-Pay setup from contract detail
+async function setupAutoPayForContract(contractId) {
+  showToast('Setting up auto-pay...', 'info');
+  try {
+    const response = await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ setupAutoPay: true, contractId })
+    });
+    const data = await response.json();
+    if (data.success) {
+      showToast('Auto-pay setup email sent to customer.', 'success');
+    } else {
+      showToast('Error: ' + (data.error || 'Unknown'), 'error');
+    }
+  } catch (err) {
+    showToast('Error setting up auto-pay.', 'error');
+  }
+}
+
+async function checkAutoPaySetupStatus(contractId) {
+  showToast('Checking setup status...', 'info');
+  try {
+    const response = await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ checkAutoPaySetup: true, contractId })
+    });
+    const data = await response.json();
+    if (data.success && data.active) {
+      showToast('Auto-pay is active!', 'success');
+      await loadContractsList();
+    } else {
+      showToast('Auto-pay not yet set up. Customer needs to complete the setup.', 'info');
+    }
+  } catch (err) {
+    showToast('Error checking auto-pay status.', 'error');
+  }
+}
+
 async function saveBid(bidData) {
   try {
     const response = await fetch(GOOGLE_SHEETS_URL, {
@@ -10972,6 +12201,8 @@ function showView(viewId) {
     'reports': 'Weekly Reports',
     'financials': 'Financials',
     'contacts': 'Contacts',
+    'properties': 'Properties',
+    'invoices': 'Invoices',
     'settings': 'Settings'
   };
   document.getElementById('header-title').textContent = titles[viewId] || 'Estimates';
@@ -10991,6 +12222,10 @@ function showView(viewId) {
     subtitleEl.textContent = scheduleScope === 'contract' && scheduleContract ? scheduleContract.propertyAddress : '';
   } else if (viewId === 'contacts') {
     subtitleEl.textContent = contacts.length + ' contacts';
+  } else if (viewId === 'properties') {
+    subtitleEl.textContent = properties.length + ' properties';
+  } else if (viewId === 'invoices') {
+    subtitleEl.textContent = invoices.length + ' invoices';
   } else {
     subtitleEl.textContent = '';
   }
@@ -11029,6 +12264,16 @@ function showView(viewId) {
   // Render contacts list when contacts view is shown
   if (viewId === 'contacts') {
     renderContactsList();
+  }
+
+  // Load properties when properties view is shown
+  if (viewId === 'properties') {
+    loadProperties();
+  }
+
+  // Load invoices when invoices view is shown
+  if (viewId === 'invoices') {
+    loadInvoices();
   }
 
   // Populate contact picker when builder view is shown
@@ -15690,9 +16935,9 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   // Contacts stage filter buttons
-  document.querySelectorAll('.contacts-filter-btn').forEach(btn => {
+  document.querySelectorAll('[data-stage]').forEach(btn => {
     btn.addEventListener('click', function() {
-      document.querySelectorAll('.contacts-filter-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('[data-stage]').forEach(b => b.classList.remove('active'));
       this.classList.add('active');
       contactStageFilter = this.dataset.stage;
       renderContactsList();
@@ -15708,6 +16953,56 @@ document.addEventListener('DOMContentLoaded', function() {
       contactSearchQuery = val.trim();
       renderContactsList();
     }, 200);
+  });
+
+  // Properties filter buttons
+  document.querySelectorAll('[data-property-filter]').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('[data-property-filter]').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      propertyFilter = this.dataset.propertyFilter;
+      renderPropertiesList();
+    });
+  });
+
+  // Properties search with debounce
+  let propertySearchTimer = null;
+  document.getElementById('properties-search').addEventListener('input', function() {
+    clearTimeout(propertySearchTimer);
+    const val = this.value;
+    propertySearchTimer = setTimeout(() => {
+      propertySearchQuery = val.trim();
+      renderPropertiesList();
+    }, 200);
+  });
+
+  // Invoices filter buttons
+  document.querySelectorAll('[data-invoice-filter]').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('[data-invoice-filter]').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      invoiceFilter = this.dataset.invoiceFilter;
+      renderInvoicesList();
+    });
+  });
+
+  // Invoices search with debounce
+  let invoiceSearchTimer = null;
+  document.getElementById('invoices-search').addEventListener('input', function() {
+    clearTimeout(invoiceSearchTimer);
+    const val = this.value;
+    invoiceSearchTimer = setTimeout(() => {
+      invoiceSearchQuery = val.trim();
+      renderInvoicesList();
+    }, 200);
+  });
+
+  // Invoice modals - close on overlay click
+  document.getElementById('invoice-batch-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeInvoiceBatchModal();
+  });
+  document.getElementById('record-payment-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeRecordPaymentModal();
   });
 
   // Contact phone field formatting

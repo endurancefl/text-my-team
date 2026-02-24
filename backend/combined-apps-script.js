@@ -68,6 +68,12 @@ function doGet(e) {
       case 'getContacts':
         return jsonResponse(getContacts());
 
+      // ─── Invoicing ───
+      case 'getInvoices':
+        return jsonResponse(getInvoices(e));
+      case 'getPayments':
+        return jsonResponse(getPayments(e.parameter.invoiceId));
+
       default:
         return jsonResponse({ success: false, error: 'Unknown action: ' + action });
     }
@@ -151,6 +157,17 @@ function doPost(e) {
     if (data.saveContact) return jsonResponse(saveContact(data));
     if (data.updateContact) return jsonResponse(updateContact(data));
     if (data.deleteContact) return jsonResponse(deleteContact(data));
+
+    // ─── Invoicing POST handlers ───
+    if (data.generateInvoiceBatch) return jsonResponse(generateInvoiceBatch(data));
+    if (data.finalizeInvoice) return jsonResponse(finalizeInvoice(data));
+    if (data.voidInvoice) return jsonResponse(voidInvoice(data));
+    if (data.recordPayment) return jsonResponse(recordPayment(data));
+    if (data.sendInvoice) return jsonResponse(sendInvoice(data));
+    if (data.createStripeCheckoutSession) return jsonResponse(createStripeCheckoutSession(data));
+    if (data.setupAutoPay) return jsonResponse(setupAutoPay(data));
+    if (data.checkAutoPaySetup) return jsonResponse(checkAutoPaySetup(data));
+    if (data.checkStripePayment) return jsonResponse(checkStripePayment(data));
 
     // ─── Text My Team POST handlers ───
     if (data.photoOnly) {
@@ -3515,4 +3532,670 @@ function getProductionAnalysis(e) {
     services: servicesResult,
     items: itemsResult
   };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  INVOICING
+// ═══════════════════════════════════════════════════════════════
+
+var INVOICES_HEADERS = [
+  'invoiceId', 'contractId', 'propertyAddress', 'contactName', 'contactEmail',
+  'billingAddress', 'invoiceDate', 'dueDate', 'billingPeriodStart',
+  'billingPeriodEnd', 'invoiceType', 'status', 'subtotal', 'taxRate',
+  'taxAmount', 'total', 'paidAmount', 'balanceDue', 'paymentTerms',
+  'payLinkToken', 'stripeSessionId', 'stripePaymentUrl', 'pdfUrl',
+  'pdfFileId', 'lineItemsJson', 'createdAt', 'updatedAt'
+];
+
+var PAYMENTS_HEADERS = [
+  'paymentId', 'invoiceId', 'paymentDate', 'paymentMethod', 'amount',
+  'stripePaymentIntentId', 'stripeSessionId', 'status', 'notes', 'createdAt'
+];
+
+function getOrCreateInvoicesSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Invoices');
+  if (!sheet) {
+    sheet = ss.insertSheet('Invoices');
+    sheet.getRange(1, 1, 1, INVOICES_HEADERS.length).setValues([INVOICES_HEADERS]);
+  }
+  return sheet;
+}
+
+function getOrCreatePaymentsSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Payments');
+  if (!sheet) {
+    sheet = ss.insertSheet('Payments');
+    sheet.getRange(1, 1, 1, PAYMENTS_HEADERS.length).setValues([PAYMENTS_HEADERS]);
+  }
+  return sheet;
+}
+
+function getNextInvoiceId(sheet) {
+  var data = sheet.getDataRange().getValues();
+  var maxNum = 0;
+  for (var i = 1; i < data.length; i++) {
+    var id = data[i][0] || '';
+    var match = id.toString().match(/INV-(\d+)/);
+    if (match) {
+      var num = parseInt(match[1], 10);
+      if (num > maxNum) maxNum = num;
+    }
+  }
+  return 'INV-' + String(maxNum + 1).padStart(4, '0');
+}
+
+function getNextPaymentId(sheet) {
+  var data = sheet.getDataRange().getValues();
+  var maxNum = 0;
+  for (var i = 1; i < data.length; i++) {
+    var id = data[i][0] || '';
+    var match = id.toString().match(/PAY-(\d+)/);
+    if (match) {
+      var num = parseInt(match[1], 10);
+      if (num > maxNum) maxNum = num;
+    }
+  }
+  return 'PAY-' + String(maxNum + 1).padStart(4, '0');
+}
+
+function sheetToObjects(sheet) {
+  var data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return [];
+  var headers = data[0];
+  var result = [];
+  for (var i = 1; i < data.length; i++) {
+    var obj = {};
+    for (var j = 0; j < headers.length; j++) {
+      obj[headers[j]] = data[i][j];
+    }
+    result.push(obj);
+  }
+  return result;
+}
+
+function getInvoices(e) {
+  var sheet = getOrCreateInvoicesSheet();
+  var invoices = sheetToObjects(sheet);
+  var status = e && e.parameter ? e.parameter.status : null;
+  var contractId = e && e.parameter ? e.parameter.contractId : null;
+  if (status) {
+    invoices = invoices.filter(function(inv) { return inv.status === status; });
+  }
+  if (contractId) {
+    invoices = invoices.filter(function(inv) { return inv.contractId === contractId; });
+  }
+  return { success: true, invoices: invoices };
+}
+
+function getPayments(invoiceId) {
+  var sheet = getOrCreatePaymentsSheet();
+  var payments = sheetToObjects(sheet);
+  if (invoiceId) {
+    payments = payments.filter(function(p) { return p.invoiceId === invoiceId; });
+  }
+  return { success: true, payments: payments };
+}
+
+// ─── Generate Invoice Batch ─────────────────────────────────
+
+function generateInvoiceBatch(data) {
+  var invoiceSheet = getOrCreateInvoicesSheet();
+  var paymentSheet = getOrCreatePaymentsSheet();
+  var existingInvoices = sheetToObjects(invoiceSheet);
+
+  // Get all active contracts
+  var contractSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Contracts');
+  if (!contractSheet) return { success: true, invoices: [], openTickets: [], autoPayResults: [] };
+  var contracts = sheetToObjects(contractSheet);
+  var activeContracts = contracts.filter(function(c) { return (c.status || '').toLowerCase() === 'active'; });
+
+  // Determine billing period (current month)
+  var now = new Date();
+  var billingStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  var billingEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  var billingStartStr = Utilities.formatDate(billingStart, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  var billingEndStr = Utilities.formatDate(billingEnd, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+
+  // Get tickets for this period
+  var ticketSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Scheduled Tickets');
+  var allTickets = ticketSheet ? sheetToObjects(ticketSheet) : [];
+  var periodTickets = allTickets.filter(function(t) {
+    return t.scheduledDate >= billingStartStr && t.scheduledDate <= billingEndStr;
+  });
+
+  var newInvoices = [];
+  var openTickets = [];
+  var autoPayResults = [];
+
+  activeContracts.forEach(function(contract) {
+    // Dedup: skip if already invoiced for this period
+    var alreadyInvoiced = existingInvoices.some(function(inv) {
+      return inv.contractId === contract.contractId &&
+             inv.billingPeriodStart === billingStartStr &&
+             inv.status !== 'void';
+    });
+    if (alreadyInvoiced) return;
+
+    // Find tickets for this contract's property
+    var contractTickets = periodTickets.filter(function(t) {
+      return t.propertyAddress === contract.propertyAddress;
+    });
+    var openContractTickets = contractTickets.filter(function(t) {
+      return t.status !== 'completed' && t.status !== 'done' && t.status !== 'skipped';
+    });
+
+    // Flag open tickets
+    openContractTickets.forEach(function(t) { openTickets.push(t); });
+
+    // Build line items
+    var lineItems = [];
+    var monthly = parseFloat(contract.monthlyPayment) || 0;
+    lineItems.push({
+      description: 'Monthly Maintenance — ' + (contract.propertyAddress || ''),
+      quantity: 1,
+      rate: monthly,
+      amount: monthly
+    });
+
+    var invoiceId = getNextInvoiceId(invoiceSheet);
+    var nowStr = new Date().toISOString();
+    var dueDate = new Date(now.getFullYear(), now.getMonth() + 1, 30);
+    var dueDateStr = Utilities.formatDate(dueDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+
+    // Look up contact info
+    var contactName = contract.contactName || contract.customerName || '';
+    var contactEmail = contract.contactEmail || contract.customerEmail || '';
+    var billingAddress = contract.billingAddress || contract.propertyAddress || '';
+    var paymentTerms = contract.paymentTerms || 'Net 30';
+
+    var invoiceStatus = 'draft';
+
+    // Auto-pay: charge immediately if enabled
+    var isAutoPay = (contract.autoPay || '').toUpperCase() === 'YES' &&
+                    contract.stripeCustomerId && contract.stripePaymentMethodId;
+
+    if (isAutoPay) {
+      try {
+        var chargeResult = chargeAutoPayInvoice(contract, monthly, invoiceId);
+        if (chargeResult.success) {
+          invoiceStatus = 'paid';
+          // Record payment
+          var paymentId = getNextPaymentId(paymentSheet);
+          paymentSheet.appendRow([
+            paymentId, invoiceId, Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy-MM-dd'),
+            'card', monthly, chargeResult.paymentIntentId, '', 'succeeded', 'Auto-pay charge', nowStr
+          ]);
+          autoPayResults.push({ contractId: contract.contractId, success: true, invoiceId: invoiceId });
+        } else {
+          invoiceStatus = 'sent';
+          autoPayResults.push({ contractId: contract.contractId, success: false, error: chargeResult.error });
+        }
+      } catch (err) {
+        invoiceStatus = 'sent';
+        autoPayResults.push({ contractId: contract.contractId, success: false, error: err.toString() });
+      }
+    }
+
+    var paidAmount = invoiceStatus === 'paid' ? monthly : 0;
+    var balanceDue = monthly - paidAmount;
+
+    var row = [
+      invoiceId, contract.contractId, contract.propertyAddress, contactName, contactEmail,
+      billingAddress, Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy-MM-dd'),
+      dueDateStr, billingStartStr, billingEndStr,
+      'fixed_monthly', invoiceStatus, monthly, 0, 0, monthly, paidAmount, balanceDue,
+      paymentTerms, '', '', '', '', '', JSON.stringify(lineItems), nowStr, nowStr
+    ];
+    invoiceSheet.appendRow(row);
+
+    var newInv = {};
+    for (var i = 0; i < INVOICES_HEADERS.length; i++) {
+      newInv[INVOICES_HEADERS[i]] = row[i];
+    }
+    newInvoices.push(newInv);
+  });
+
+  return { success: true, invoices: newInvoices, openTickets: openTickets, autoPayResults: autoPayResults };
+}
+
+// ─── Finalize / Void / Record Payment ───────────────────────
+
+function findInvoiceRow(sheet, invoiceId) {
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][0] === invoiceId) return i + 1; // 1-indexed row
+  }
+  return -1;
+}
+
+function updateInvoiceField(sheet, row, fieldName, value) {
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var col = headers.indexOf(fieldName);
+  if (col >= 0) {
+    sheet.getRange(row, col + 1).setValue(value);
+  }
+}
+
+function finalizeInvoice(data) {
+  var sheet = getOrCreateInvoicesSheet();
+  var row = findInvoiceRow(sheet, data.invoiceId);
+  if (row < 0) return { success: false, error: 'Invoice not found' };
+
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var statusCol = headers.indexOf('status');
+  var currentStatus = sheet.getRange(row, statusCol + 1).getValue();
+  if (currentStatus !== 'draft') return { success: false, error: 'Only draft invoices can be finalized' };
+
+  updateInvoiceField(sheet, row, 'status', 'finalized');
+  updateInvoiceField(sheet, row, 'updatedAt', new Date().toISOString());
+  return { success: true };
+}
+
+function voidInvoice(data) {
+  var sheet = getOrCreateInvoicesSheet();
+  var row = findInvoiceRow(sheet, data.invoiceId);
+  if (row < 0) return { success: false, error: 'Invoice not found' };
+
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var statusCol = headers.indexOf('status');
+  var currentStatus = sheet.getRange(row, statusCol + 1).getValue();
+  if (currentStatus === 'paid') return { success: false, error: 'Cannot void a paid invoice' };
+
+  updateInvoiceField(sheet, row, 'status', 'void');
+  updateInvoiceField(sheet, row, 'updatedAt', new Date().toISOString());
+  return { success: true };
+}
+
+function recordPayment(data) {
+  var invoiceSheet = getOrCreateInvoicesSheet();
+  var paymentSheet = getOrCreatePaymentsSheet();
+  var row = findInvoiceRow(invoiceSheet, data.invoiceId);
+  if (row < 0) return { success: false, error: 'Invoice not found' };
+
+  var headers = invoiceSheet.getRange(1, 1, 1, invoiceSheet.getLastColumn()).getValues()[0];
+  var amount = parseFloat(data.amount) || 0;
+  if (amount <= 0) return { success: false, error: 'Invalid amount' };
+
+  // Get current paid amount and total
+  var paidAmountCol = headers.indexOf('paidAmount');
+  var balanceDueCol = headers.indexOf('balanceDue');
+  var totalCol = headers.indexOf('total');
+  var currentPaid = parseFloat(invoiceSheet.getRange(row, paidAmountCol + 1).getValue()) || 0;
+  var total = parseFloat(invoiceSheet.getRange(row, totalCol + 1).getValue()) || 0;
+
+  var newPaid = currentPaid + amount;
+  var newBalance = total - newPaid;
+  var newStatus = newBalance <= 0 ? 'paid' : 'partial';
+
+  updateInvoiceField(invoiceSheet, row, 'paidAmount', newPaid);
+  updateInvoiceField(invoiceSheet, row, 'balanceDue', Math.max(0, newBalance));
+  updateInvoiceField(invoiceSheet, row, 'status', newStatus);
+  updateInvoiceField(invoiceSheet, row, 'updatedAt', new Date().toISOString());
+
+  // Record payment
+  var paymentId = getNextPaymentId(paymentSheet);
+  var nowStr = new Date().toISOString();
+  paymentSheet.appendRow([
+    paymentId, data.invoiceId, data.paymentDate || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd'),
+    data.paymentMethod || 'check', amount, '', '', 'succeeded', data.notes || '', nowStr
+  ]);
+
+  return { success: true, paymentId: paymentId };
+}
+
+// ─── Stripe Integration ─────────────────────────────────────
+
+function getStripeSecretKey() {
+  return PropertiesService.getScriptProperties().getProperty('STRIPE_SECRET_KEY') || '';
+}
+
+function stripeRequest(endpoint, params) {
+  var key = getStripeSecretKey();
+  if (!key) throw new Error('Stripe secret key not configured. Set STRIPE_SECRET_KEY in Script Properties.');
+
+  var options = {
+    method: 'post',
+    headers: {
+      'Authorization': 'Bearer ' + key
+    },
+    payload: params,
+    muteHttpExceptions: true
+  };
+
+  var response = UrlFetchApp.fetch('https://api.stripe.com/v1/' + endpoint, options);
+  var json = JSON.parse(response.getContentText());
+  if (json.error) {
+    throw new Error('Stripe error: ' + json.error.message);
+  }
+  return json;
+}
+
+function stripeGet(endpoint) {
+  var key = getStripeSecretKey();
+  if (!key) throw new Error('Stripe secret key not configured.');
+
+  var response = UrlFetchApp.fetch('https://api.stripe.com/v1/' + endpoint, {
+    method: 'get',
+    headers: { 'Authorization': 'Bearer ' + key },
+    muteHttpExceptions: true
+  });
+  return JSON.parse(response.getContentText());
+}
+
+function createStripeCheckoutSession(data) {
+  var params = {
+    'mode': 'payment',
+    'line_items[0][price_data][currency]': 'usd',
+    'line_items[0][price_data][product_data][name]': data.description || 'Invoice Payment',
+    'line_items[0][price_data][unit_amount]': Math.round((parseFloat(data.amount) || 0) * 100),
+    'line_items[0][quantity]': '1',
+    'success_url': 'https://endurancefl.github.io/text-my-team/payment-success.html?session_id={CHECKOUT_SESSION_ID}',
+    'cancel_url': 'https://endurancefl.github.io/text-my-team/payment-cancel.html',
+    'metadata[invoiceId]': data.invoiceId || '',
+    'customer_email': data.customerEmail || ''
+  };
+
+  var session = stripeRequest('checkout/sessions', params);
+  return { success: true, sessionId: session.id, url: session.url };
+}
+
+function setupAutoPay(data) {
+  var contractSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Contracts');
+  if (!contractSheet) return { success: false, error: 'Contracts sheet not found' };
+
+  var contracts = sheetToObjects(contractSheet);
+  var contract = null;
+  for (var i = 0; i < contracts.length; i++) {
+    if (contracts[i].contractId === data.contractId) { contract = contracts[i]; break; }
+  }
+  if (!contract) return { success: false, error: 'Contract not found' };
+
+  // Create or reuse Stripe customer
+  var customerId = contract.stripeCustomerId;
+  if (!customerId) {
+    var customer = stripeRequest('customers', {
+      'email': contract.contactEmail || contract.customerEmail || '',
+      'name': contract.contactName || contract.customerName || '',
+      'metadata[contractId]': contract.contractId
+    });
+    customerId = customer.id;
+  }
+
+  // Create setup session
+  var params = {
+    'mode': 'setup',
+    'customer': customerId,
+    'success_url': 'https://endurancefl.github.io/text-my-team/payment-success.html?setup=true&session_id={CHECKOUT_SESSION_ID}',
+    'cancel_url': 'https://endurancefl.github.io/text-my-team/payment-cancel.html',
+    'metadata[contractId]': data.contractId
+  };
+
+  var session = stripeRequest('checkout/sessions', params);
+
+  // Store session ID on contract for polling
+  var contractData = contractSheet.getDataRange().getValues();
+  var contractHeaders = contractData[0];
+  for (var r = 1; r < contractData.length; r++) {
+    if (contractData[r][0] === data.contractId) {
+      // Ensure columns exist
+      ensureContractAutoPayColumns(contractSheet, contractHeaders);
+      var updatedHeaders = contractSheet.getRange(1, 1, 1, contractSheet.getLastColumn()).getValues()[0];
+      var custCol = updatedHeaders.indexOf('stripeCustomerId');
+      var sessCol = updatedHeaders.indexOf('stripeSetupSessionId');
+      if (custCol >= 0) contractSheet.getRange(r + 1, custCol + 1).setValue(customerId);
+      if (sessCol >= 0) contractSheet.getRange(r + 1, sessCol + 1).setValue(session.id);
+      break;
+    }
+  }
+
+  // Email customer
+  var email = contract.contactEmail || contract.customerEmail;
+  if (email) {
+    MailApp.sendEmail({
+      to: email,
+      subject: 'Set Up Auto-Pay — Endurance Services',
+      htmlBody: '<h2>Set Up Auto-Pay</h2>' +
+        '<p>Hi ' + (contract.contactName || contract.customerName || '') + ',</p>' +
+        '<p>Click the button below to securely save your payment method for automatic monthly billing.</p>' +
+        '<p><a href="' + session.url + '" style="display:inline-block;padding:12px 24px;background:#1a73e8;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;">Set Up Auto-Pay</a></p>' +
+        '<p>Your card information is handled securely by Stripe. We never see or store your card numbers.</p>' +
+        '<p>— Endurance Services</p>'
+    });
+  }
+
+  return { success: true, sessionId: session.id, url: session.url };
+}
+
+function ensureContractAutoPayColumns(sheet, headers) {
+  var needed = ['autoPay', 'stripeCustomerId', 'stripePaymentMethodId', 'stripeSetupSessionId'];
+  needed.forEach(function(col) {
+    if (headers.indexOf(col) < 0) {
+      var lastCol = sheet.getLastColumn();
+      sheet.getRange(1, lastCol + 1).setValue(col);
+      headers.push(col);
+    }
+  });
+}
+
+function checkAutoPaySetup(data) {
+  var contractSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Contracts');
+  if (!contractSheet) return { success: false, error: 'Contracts sheet not found' };
+
+  var contractData = contractSheet.getDataRange().getValues();
+  var headers = contractData[0];
+  var sessCol = headers.indexOf('stripeSetupSessionId');
+  if (sessCol < 0) return { success: false, error: 'No setup session found' };
+
+  var contractRow = -1;
+  var sessionId = '';
+  for (var r = 1; r < contractData.length; r++) {
+    if (contractData[r][0] === data.contractId) {
+      contractRow = r + 1;
+      sessionId = contractData[r][sessCol];
+      break;
+    }
+  }
+  if (!sessionId) return { success: false, error: 'No setup session found for this contract' };
+
+  // Poll Stripe
+  var session = stripeGet('checkout/sessions/' + sessionId);
+  if (session.status === 'complete' && session.setup_intent) {
+    // Get setup intent to find payment method
+    var setupIntent = stripeGet('setup_intents/' + session.setup_intent);
+    var paymentMethodId = setupIntent.payment_method;
+    var customerId = session.customer;
+
+    // Store on contract
+    var custCol = headers.indexOf('stripeCustomerId');
+    var pmCol = headers.indexOf('stripePaymentMethodId');
+    var apCol = headers.indexOf('autoPay');
+    if (custCol >= 0) contractSheet.getRange(contractRow, custCol + 1).setValue(customerId);
+    if (pmCol >= 0) contractSheet.getRange(contractRow, pmCol + 1).setValue(paymentMethodId);
+    if (apCol >= 0) contractSheet.getRange(contractRow, apCol + 1).setValue('YES');
+
+    return { success: true, active: true };
+  }
+
+  return { success: true, active: false, status: session.status };
+}
+
+function chargeAutoPayInvoice(contract, amount, invoiceId) {
+  try {
+    var result = stripeRequest('payment_intents', {
+      'amount': Math.round(amount * 100),
+      'currency': 'usd',
+      'customer': contract.stripeCustomerId,
+      'payment_method': contract.stripePaymentMethodId,
+      'off_session': 'true',
+      'confirm': 'true',
+      'metadata[invoiceId]': invoiceId,
+      'metadata[contractId]': contract.contractId
+    });
+    return { success: true, paymentIntentId: result.id };
+  } catch (err) {
+    return { success: false, error: err.toString() };
+  }
+}
+
+function sendInvoice(data) {
+  var invoiceSheet = getOrCreateInvoicesSheet();
+  var row = findInvoiceRow(invoiceSheet, data.invoiceId);
+  if (row < 0) return { success: false, error: 'Invoice not found' };
+
+  var headers = invoiceSheet.getRange(1, 1, 1, invoiceSheet.getLastColumn()).getValues()[0];
+  var invoiceData = invoiceSheet.getRange(row, 1, 1, headers.length).getValues()[0];
+  var inv = {};
+  for (var j = 0; j < headers.length; j++) {
+    inv[headers[j]] = invoiceData[j];
+  }
+
+  var total = parseFloat(inv.total) || 0;
+  var email = inv.contactEmail;
+
+  // Create Stripe Checkout session for Pay Now link
+  var stripeSessionId = '';
+  var stripeUrl = '';
+  try {
+    var sessionResult = createStripeCheckoutSession({
+      amount: total,
+      description: 'Invoice ' + inv.invoiceId + ' — ' + (inv.propertyAddress || ''),
+      invoiceId: inv.invoiceId,
+      customerEmail: email
+    });
+    if (sessionResult.success) {
+      stripeSessionId = sessionResult.sessionId;
+      stripeUrl = sessionResult.url;
+    }
+  } catch (err) {
+    // Continue without Stripe if key not configured
+    Logger.log('Stripe session creation failed: ' + err);
+  }
+
+  // Generate invoice PDF via HtmlService (fallback — doesn't require Lambda)
+  var pdfUrl = '';
+  var pdfFileId = '';
+  try {
+    var lineItems = typeof inv.lineItemsJson === 'string' ? JSON.parse(inv.lineItemsJson || '[]') : (inv.lineItemsJson || []);
+    var htmlContent = buildInvoiceHtml(inv, lineItems);
+    var blob = HtmlService.createHtmlOutput(htmlContent).getBlob().setName(inv.invoiceId + '.pdf');
+    var folder = DriveApp.getFolderById(ESTIMATE_DRIVE_FOLDER_ID);
+    var file = folder.createFile(blob);
+    pdfUrl = file.getUrl();
+    pdfFileId = file.getId();
+  } catch (err) {
+    Logger.log('PDF generation failed: ' + err);
+  }
+
+  // Send email
+  if (email) {
+    var subject = 'Invoice ' + inv.invoiceId + ' from Endurance Services';
+    var body = '<h2>Invoice ' + inv.invoiceId + '</h2>' +
+      '<p>Hi ' + (inv.contactName || '') + ',</p>' +
+      '<p>Please find your invoice for <strong>' + (inv.propertyAddress || '') + '</strong>.</p>' +
+      '<table style="margin:16px 0;font-size:14px;">' +
+      '<tr><td style="padding:4px 12px 4px 0;color:#666;">Invoice Date:</td><td>' + (inv.invoiceDate || '') + '</td></tr>' +
+      '<tr><td style="padding:4px 12px 4px 0;color:#666;">Due Date:</td><td>' + (inv.dueDate || '') + '</td></tr>' +
+      '<tr><td style="padding:4px 12px 4px 0;color:#666;">Amount Due:</td><td style="font-weight:600;font-size:18px;">$' + total.toFixed(2) + '</td></tr>' +
+      '</table>';
+    if (stripeUrl) {
+      body += '<p><a href="' + stripeUrl + '" style="display:inline-block;padding:14px 28px;background:#1a73e8;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;font-size:16px;">Pay Now</a></p>';
+    }
+    body += '<p style="color:#666;font-size:13px;">Payment terms: ' + (inv.paymentTerms || 'Net 30') + '</p>' +
+      '<p>Thank you for your business!</p><p>— Endurance Services</p>';
+
+    var emailOptions = {
+      to: email,
+      subject: subject,
+      htmlBody: body
+    };
+    if (pdfFileId) {
+      emailOptions.attachments = [DriveApp.getFileById(pdfFileId).getBlob()];
+    }
+    MailApp.sendEmail(emailOptions);
+  }
+
+  // Update invoice
+  updateInvoiceField(invoiceSheet, row, 'status', 'sent');
+  updateInvoiceField(invoiceSheet, row, 'stripeSessionId', stripeSessionId);
+  updateInvoiceField(invoiceSheet, row, 'stripePaymentUrl', stripeUrl);
+  updateInvoiceField(invoiceSheet, row, 'pdfUrl', pdfUrl);
+  updateInvoiceField(invoiceSheet, row, 'pdfFileId', pdfFileId);
+  updateInvoiceField(invoiceSheet, row, 'updatedAt', new Date().toISOString());
+
+  return { success: true };
+}
+
+function checkStripePayment(data) {
+  var invoiceSheet = getOrCreateInvoicesSheet();
+  var row = findInvoiceRow(invoiceSheet, data.invoiceId);
+  if (row < 0) return { success: false, error: 'Invoice not found' };
+
+  var headers = invoiceSheet.getRange(1, 1, 1, invoiceSheet.getLastColumn()).getValues()[0];
+  var sessionIdCol = headers.indexOf('stripeSessionId');
+  var sessionId = sessionIdCol >= 0 ? invoiceSheet.getRange(row, sessionIdCol + 1).getValue() : '';
+  if (!sessionId) return { success: false, error: 'No Stripe session for this invoice' };
+
+  var session = stripeGet('checkout/sessions/' + sessionId);
+  if (session.payment_status === 'paid') {
+    // Auto-record payment
+    var totalCol = headers.indexOf('total');
+    var total = parseFloat(invoiceSheet.getRange(row, totalCol + 1).getValue()) || 0;
+
+    var paymentSheet = getOrCreatePaymentsSheet();
+    var paymentId = getNextPaymentId(paymentSheet);
+    var nowStr = new Date().toISOString();
+    paymentSheet.appendRow([
+      paymentId, data.invoiceId, Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd'),
+      'card', total, session.payment_intent || '', sessionId, 'succeeded', 'Stripe Checkout', nowStr
+    ]);
+
+    updateInvoiceField(invoiceSheet, row, 'status', 'paid');
+    updateInvoiceField(invoiceSheet, row, 'paidAmount', total);
+    updateInvoiceField(invoiceSheet, row, 'balanceDue', 0);
+    updateInvoiceField(invoiceSheet, row, 'updatedAt', nowStr);
+
+    return { success: true, paid: true };
+  }
+
+  return { success: true, paid: false, status: session.payment_status || 'unpaid' };
+}
+
+// ─── Invoice HTML (for PDF fallback via HtmlService) ────────
+
+function buildInvoiceHtml(inv, lineItems) {
+  var subtotal = parseFloat(inv.subtotal) || 0;
+  var taxRate = parseFloat(inv.taxRate) || 0;
+  var taxAmount = parseFloat(inv.taxAmount) || 0;
+  var total = parseFloat(inv.total) || 0;
+
+  var rows = lineItems.map(function(li) {
+    return '<tr>' +
+      '<td style="padding:8px 12px;border-bottom:1px solid #eee;">' + (li.description || '') + '</td>' +
+      '<td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;">' + (li.quantity || 1) + '</td>' +
+      '<td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;">$' + (li.rate || 0).toFixed(2) + '</td>' +
+      '<td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;">$' + (li.amount || 0).toFixed(2) + '</td>' +
+      '</tr>';
+  }).join('');
+
+  return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Invoice ' + inv.invoiceId + '</title>' +
+    '<style>body{font-family:Helvetica,Arial,sans-serif;margin:40px;color:#333;} table{width:100%;border-collapse:collapse;} ' +
+    'th{text-align:left;padding:8px 12px;border-bottom:2px solid #333;font-size:12px;text-transform:uppercase;color:#666;}</style></head>' +
+    '<body>' +
+    '<div style="display:flex;justify-content:space-between;margin-bottom:40px;">' +
+    '<div><h1 style="margin:0;font-size:28px;">INVOICE</h1><p style="color:#666;margin:4px 0;">' + inv.invoiceId + '</p></div>' +
+    '<div style="text-align:right;"><strong>Endurance Services</strong><br><span style="color:#666;">endurancefl.github.io</span></div></div>' +
+    '<div style="display:flex;justify-content:space-between;margin-bottom:30px;">' +
+    '<div><strong>Bill To:</strong><br>' + (inv.contactName || '') + '<br>' + (inv.billingAddress || inv.propertyAddress || '') + '<br>' + (inv.contactEmail || '') + '</div>' +
+    '<div style="text-align:right;"><strong>Invoice Date:</strong> ' + (inv.invoiceDate || '') + '<br><strong>Due Date:</strong> ' + (inv.dueDate || '') +
+    '<br><strong>Terms:</strong> ' + (inv.paymentTerms || 'Net 30') + '</div></div>' +
+    '<table><thead><tr><th>Description</th><th style="text-align:right;">Qty</th><th style="text-align:right;">Rate</th><th style="text-align:right;">Amount</th></tr></thead>' +
+    '<tbody>' + rows + '</tbody></table>' +
+    '<div style="text-align:right;margin-top:20px;">' +
+    '<div style="margin:4px 0;"><span style="color:#666;margin-right:24px;">Subtotal:</span> $' + subtotal.toFixed(2) + '</div>' +
+    (taxRate > 0 ? '<div style="margin:4px 0;"><span style="color:#666;margin-right:24px;">Tax (' + taxRate + '%):</span> $' + taxAmount.toFixed(2) + '</div>' : '') +
+    '<div style="margin:8px 0;font-size:20px;font-weight:600;border-top:2px solid #333;padding-top:8px;">' +
+    '<span style="color:#666;margin-right:24px;">Total Due:</span> $' + total.toFixed(2) + '</div></div>' +
+    '</body></html>';
 }

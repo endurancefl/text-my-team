@@ -108,7 +108,7 @@ The platform supports four divisions, each representing a distinct revenue strea
 - iOS design system: SF Pro typography, exact system colors, dark mode, frosted glass tab bar with `backdrop-filter`, iOS spring animations, 44px touch targets, `prefers-reduced-motion` support
 - Bottom tab bar: Schedule (home) | Requests | Report Issue | Reports
 
-**estimate.html — Bidding & Estimating Tool (~17,170 lines)**
+**estimate.html — Bidding & Estimating Tool (~18,400 lines)**
 - **Division: Maintenance (MNT) fully built** — Irrigation, Construction, and Enhancement divisions planned, will reuse the same engine with division-specific catalogs and takeoffs
 - **Division & Job Type Selection**: When creating a new estimate, the user selects two things upfront:
   1. **Division** — Maintenance (MNT), Irrigation (IRR), Construction (CON), or Enhancement (ENH). This determines which item catalog, service catalog, and takeoff measurements are available. Stored as `division` on the estimate/bid.
@@ -214,19 +214,34 @@ The platform supports four divisions, each representing a distinct revenue strea
 - **Production Rates View**: Compares catalog production rates against actual field data from completed tickets. Nav item between Item Catalog and Schedule. Date range + crew filter. Two tabs: **Services tab** shows service-level comparison table sorted by worst efficiency — per-service visit count, avg est vs actual man-hours, variance badges (green/yellow/red), expandable rows with per-ticket breakdown and item-level implied rates. **Item Rates tab** shows item catalog with field rate columns — measured rates (from single-item services, direct qty/hours), inferred rates (from multi-item services, proportional via efficiency ratio), delta vs catalog rates, data point counts. Summary cards: tickets analyzed, overall efficiency, services over budget, reopened count. Ticket Services JSON enriched with per-item `quantities` (easy/medium/hard), `unit`, and `complexityFactor` during ticket generation for rate calculation. Functions: `initProductionView()`, `loadProductionAnalysis()`, `setProdTab()`, `renderProductionView()`, `renderProdServicesTable()`, `renderProdItemsTable()`, `renderProdTicketDetail()`, `toggleProdDetail()`, `populateProdCrewFilter()`. CSS: `.prod-variance-badge`, `.prod-confidence-tag`, `.prod-detail-row`, `.prod-detail-content`, `.prod-item-table`, `.prod-reopened-badge`, `.prod-empty-state`.
 - **Schedule View (Route Management)**: Three display modes — day view with property stop cards and drag-drop reordering (`schedDrop()` + `saveRouteOrder()`), week calendar grid with drag-to-reschedule between dates, month calendar with ticket dots. Crew filter dropdown. Stop detail panel with earned value, margin, services. Functions: `loadScheduleView()`, `renderSchedDay()`, `renderSchedWeek()`, `renderSchedMonth()`, `showSchedTicketDetail()`, `rescheduleFromDetail()`, `skipFromDetail()`.
 - **Financials Dashboard (Earned Revenue)**: Summary cards (contract value, collected, earned, deferred revenue, completion %). Monthly bar chart comparing earned vs collected with pagination. Contract table with per-contract breakdown. Deferred revenue = collected - earned (orange if positive/deferred, green if ahead of schedule). Functions: `loadFinancials()`, `renderFinancials()`, `calcCollectedToDate()`, `calcMonthlyData()`, `renderMonthlyChart()`, `renderContractTable()`.
+- **Properties View**: Aggregated view of all unique service addresses derived client-side from contacts, savedBids, and allContracts arrays matched on normalized `propertyAddress`. No dedicated backend sheet — properties are virtual entities computed by `aggregateProperties()`. Nav item between Contacts and Invoices with house icon. List view with search + filter (All / Active Contract / No Contract). Each property card shows address, primary contact name, contract status badge, and monthly value. Click to open property profile showing: **Measurements** (from most recent bid's takeoffs — lot SF, lawn SF, hard/soft edge LF), **Linked Contacts** (clickable cards), **Estimates** (all bids for this address), **Contracts** (all contracts with status badges), **Service History** (lazy-fetched completed tickets via getScheduleView). State: `properties[]`, `currentProperty`, `propertySearchQuery`, `propertyFilter`. Functions: `normalizeAddress()`, `aggregateProperties()`, `loadProperties()`, `filterProperties()`, `renderPropertiesList()`, `openPropertyProfile()`, `fetchPropertyServiceHistory()`, `showPropertiesList()`. CSS: `.property-measurements-grid`, `.property-measurement-card`, `.property-measurement-value`, `.property-measurement-label`, `.property-contract-badge`.
+- **Invoices View**: Full invoicing system with Stripe Checkout integration. Nav item between Properties and Settings with receipt icon. **Invoice Lifecycle**: `draft → finalized → sent → partial/paid` (any non-paid status can be voided). **Summary Cards**: Outstanding, Overdue, Collected This Month, Drafts. **List View**: Searchable + filterable (All / Draft / Sent / Overdue / Paid) invoice cards showing ID, property, contact, due date, total, status badge (color-coded per status). **Batch Generation**: "Generate Invoices" button calls `generateInvoiceBatch` which scans all active contracts, checks for existing invoices in the billing period (dedup), creates draft invoices, auto-charges auto-pay contracts via Stripe PaymentIntents API. Batch review modal shows auto-pay results, open ticket warnings, and draft invoices with checkboxes for batch finalization. **Invoice Detail**: Full invoice display with header/dates/line items table/totals/payment history. Action buttons change by status: Draft→Finalize, Finalized→Send, Sent→Record Payment + Check Payment + Void, Partial→Record Payment, Overdue→Record Payment + Resend. **Record Payment Modal**: Amount (pre-filled with balance due), method (check/cash/card/ACH), date, notes. **Send Invoice**: Creates Stripe Checkout Session (payment mode) for Pay Now link, generates invoice PDF via HtmlService (fallback) or Lambda, uploads to Drive, emails customer with PDF attachment + Pay Now button. **Payment Status Polling**: Checks Stripe session status, auto-records payment if paid. **Auto-Pay**: Contract-level auto-pay setup via Stripe Checkout (setup mode) — saves `stripeCustomerId` + `stripePaymentMethodId` on contract. During batch generation, auto-pay contracts are charged immediately. State: `invoices[]`, `currentInvoice`, `invoiceSearchQuery`, `invoiceFilter`, `invoicePayments[]`. Functions: `loadInvoices()`, `filterInvoices()`, `renderInvoiceSummaryCards()`, `renderInvoicesList()`, `openInvoiceDetail()`, `loadInvoicePayments()`, `showInvoicesList()`, `generateInvoiceBatch()`, `openInvoiceBatchModal()`, `closeInvoiceBatchModal()`, `finalizeBatchInvoices()`, `finalizeCurrentInvoice()`, `voidCurrentInvoice()`, `sendCurrentInvoice()`, `checkCurrentPaymentStatus()`, `openRecordPaymentModal()`, `closeRecordPaymentModal()`, `submitRecordPayment()`, `setupAutoPayForContract()`, `checkAutoPaySetupStatus()`. CSS: `.invoice-status-badge` (7 status colors), `.invoice-detail-header`, `.invoice-detail-meta`, `.invoice-line-items-table`, `.invoice-totals`, `.invoice-actions`, `.invoice-payment-history`, `.invoice-payment-item`, `.invoice-batch-item`, `.invoice-batch-warning`.
 - **Ticket Scheduling Engine**: Three date distribution strategies dispatched by visit count in `getDatesForVisitCount()`: `generateSeasonalMowingDates()` (weekly Apr–Oct, biweekly Nov–Mar; fills dormant gaps for higher targets (e.g. 52), trims dormant dates for lower targets — visits === seasonalAnchor), `generateWeeklyDates()` (every week, 50-54 visits), `generateSimpleScheduleDates()` (even distribution, all others). Item-level visit override via `lineItem.itemVisits`. Tickets bundled by date with earned value proportionally distributed and penny reconciliation. `previewTickets()` shows breakdown before committing.
 - Material Design styling with Google Sans/Roboto fonts
+
+**payment-success.html — Stripe Payment Success Redirect**
+- Receives `session_id` from Stripe Checkout redirect, shows success confirmation
+- Also handles auto-pay setup success (`?setup=true`) with different messaging
+- Minimal standalone page, no framework dependency
+
+**payment-cancel.html — Stripe Payment Cancel Redirect**
+- Simple "payment not completed" message when user cancels Stripe Checkout
+- No backend calls needed
 
 ### Backend & Infrastructure
 - **Backend** — Single consolidated Google Apps Script (Code.gs) serving both Estimating and Crew endpoints from one "Estimating" spreadsheet
 - **PDF Generation** — AWS Lambda + API Gateway (Python/WeasyPrint container image, ReportLab fallback). Rich text HTML from Quill.js editors rendered natively by WeasyPrint via `.rich-text-content` CSS class. Template variable resolution via `_resolve_template_vars()` for T&C placeholders.
 - **Hosting** — GitHub Pages (endurancefl.github.io)
 - **Auth** — Crew leaders: phone number against Crew Members sheet (Role = "Leader"). Customers: 4-digit PIN against Properties sheet.
-- **Data storage** — Google Sheets as database, Google Drive for files (estimates JSON, photos, site reports), localStorage for auto-save
+- **Data storage** — Google Sheets as database, Google Drive for files (estimates JSON, photos, site reports, invoice PDFs), localStorage for auto-save
+- **Invoices Sheet** — Auto-provisioned. Columns: invoiceId (INV-0001), contractId, propertyAddress, contactName, contactEmail, billingAddress, invoiceDate, dueDate, billingPeriodStart, billingPeriodEnd, invoiceType (fixed_monthly/work_ticket/deposit), status (draft/finalized/sent/partial/paid/overdue/void), subtotal, taxRate, taxAmount, total, paidAmount, balanceDue, paymentTerms, payLinkToken, stripeSessionId, stripePaymentUrl, pdfUrl, pdfFileId, lineItemsJson (JSON column), createdAt, updatedAt
+- **Payments Sheet** — Auto-provisioned. Columns: paymentId (PAY-0001), invoiceId, paymentDate, paymentMethod (card/ach/check/cash), amount, stripePaymentIntentId, stripeSessionId, status, notes, createdAt
+- **Contracts Sheet (new columns for auto-pay)**: autoPay (YES/NO), stripeCustomerId, stripePaymentMethodId, stripeSetupSessionId — added dynamically by `ensureContractAutoPayColumns()`
+- **Stripe Integration** — API calls via `UrlFetchApp.fetch()`, secret key in Script Properties (`STRIPE_SECRET_KEY`). No webhooks (Apps Script limitation) — uses polling from frontend + redirect pages. Zero card data touches our system (SAQ A PCI). Checkout flows: payment mode (one-time Pay Now) and setup mode (save card for auto-pay)
 
 #### Combined Apps Script Endpoints
 
-**GET endpoints (22):**
+**GET endpoints (24):**
 | Endpoint | Source | Description |
 |----------|--------|-------------|
 | `getItemCatalog` | Estimating | Returns item catalog with production rates |
@@ -251,8 +266,10 @@ The platform supports four divisions, each representing a distinct revenue strea
 | `getRouteOrder` | Crew | Returns stop order for a crew on a given date |
 | `getWeeklyReportData` | Estimating | Returns weekly property visit summaries for report emails |
 | `getServiceOffers` | Estimating | Loads offers for a property or report |
+| `getInvoices` | Invoicing | Returns all invoices, optional filters (status, contractId). Auto-creates Invoices sheet if missing |
+| `getPayments` | Invoicing | Returns payments for a specific invoiceId. Auto-creates Payments sheet if missing |
 
-**POST endpoints (36):**
+**POST endpoints (44):**
 | Endpoint | Source | Description |
 |----------|--------|-------------|
 | `saveContact` | Estimating | Creates a new contact in the Contacts sheet with auto-generated C-{timestamp} ID |
@@ -292,6 +309,15 @@ The platform supports four divisions, each representing a distinct revenue strea
 | `uploadSiteReportPhoto` | Crew | Uploads individual site report photo to Drive |
 | `submitRequest` | Text My Team | Submits customer service request with photo |
 | `saveServiceOfferResponse` | Estimating | Records customer approval/decline of service offer |
+| `generateInvoiceBatch` | Invoicing | Scans active contracts, creates draft invoices for current billing period (dedup by contractId + period), auto-charges auto-pay contracts via Stripe PaymentIntents, flags open tickets. Returns `{ invoices, openTickets, autoPayResults }` |
+| `finalizeInvoice` | Invoicing | Updates invoice status from `draft` → `finalized` |
+| `voidInvoice` | Invoicing | Updates invoice status to `void` (any non-paid status) |
+| `recordPayment` | Invoicing | Appends to Payments sheet, updates invoice paidAmount/balanceDue/status (→ `partial` or `paid`) |
+| `sendInvoice` | Invoicing | Creates Stripe Checkout Session (payment mode), generates PDF via HtmlService, uploads to Drive, emails customer with PDF + Pay Now link, updates invoice status → `sent` |
+| `createStripeCheckoutSession` | Invoicing | Creates Stripe Checkout Session in `payment` mode. Returns `{ sessionId, url }` |
+| `setupAutoPay` | Invoicing | Creates Stripe Customer + Checkout Session in `setup` mode, emails customer setup link. Adds `autoPay`, `stripeCustomerId`, `stripePaymentMethodId`, `stripeSetupSessionId` columns to Contracts sheet |
+| `checkAutoPaySetup` | Invoicing | Polls Stripe setup session, stores payment method + customer ID on contract when complete |
+| `checkStripePayment` | Invoicing | Polls Stripe payment session, auto-records payment if paid. Returns `{ paid, status }` |
 
 ### What Works Well
 - The UX patterns and workflows are production-quality — crew uses them daily
@@ -410,7 +436,7 @@ Both apps live in the same monorepo, share the component library (`packages/ui`)
 - **Rendering engines**: Two engines coexist during migration. The `renderer` field in metadata JSON selects the engine (`"weasyprint"` default, `"reportlab"` fallback). `DEFAULT_RENDERER` in `lambda_function.py` controls the global default.
 - **WeasyPrint engine** (`pdf_generator.py`): Jinja2 HTML/CSS templates rendered to PDF via WeasyPrint. Photos embedded as base64 data URIs. Templates live in `cloud-function/templates/`. CSS edits are previewable in a browser via `test_local.py --html`.
 - **ReportLab engine** (`main.py`): Original coordinate-based PDF generation (~2,193 lines). Kept as fallback during migration. Will be deleted after all 4 PDF types are validated in production.
-- `lambda_function.py` — Lambda handler: parses multipart boundary from API Gateway event, extracts metadata JSON + photo blobs, selects rendering engine, routes by `metadata.type`: `standard` → `generate_standard_report()`, `before_after` → `generate_before_after_report()`, `contract` → `generate_contract_pdf()`
+- `lambda_function.py` — Lambda handler: parses multipart boundary from API Gateway event, extracts metadata JSON + photo blobs, selects rendering engine, routes by `metadata.type`: `invoice` → `generate_invoice_pdf()` (WeasyPrint only), `contract` → `generate_contract_pdf()`, `before_after` → `generate_before_after_report()`, `standard` → `generate_standard_report()`
 - Lambda config: Python 3.11, **1024MB memory** (WeasyPrint needs more than ReportLab), 60s timeout
 - **Deployment**: **Docker container image** (not zip). `Dockerfile` in `cloud-function/` uses `public.ecr.aws/lambda/python:3.11` base with system deps (pango, cairo, gdk-pixbuf2, libffi, fontconfig, freetype, harfbuzz). SAM template uses `PackageType: Image`. ECR repo created on first `sam deploy --guided`. Deploy via `cloud-function/deploy/deploy.sh`.
 - **Template structure**:
@@ -421,11 +447,13 @@ Both apps live in the same monorepo, share the component library (`packages/ui`)
     before_after.html           # Comparison report
     contract_residential.html   # 3-page residential contract
     contract_commercial.html    # 5-6 page commercial contract
+    invoice.html                # Invoice PDF template with line items, totals, pay link
     styles/
       common.css                # Shared print CSS (header, info box, category bars)
       site_report.css           # 2-column CSS grid, photo frames, note boxes
       before_after.css          # BEFORE/AFTER paired layout
       contract.css              # Tables, signatures, terms, payment schedule
+      invoice.css               # Invoice table, totals, bill-to, details box
   ```
 - **Color palette** (CSS variables in `base.html`): `--green: #3A5F4B`, `--dark: #1A2E24`, `--gray-header: #666666`, `--light-gray: #CCCCCC`, `--contract-light-gray: #F5F5F5`, `--contract-red: #C62828`, `--before-red: #DC2626`, `--after-green: #16A34A`
 - Handles Site Report, Before & After, and Contract PDF types (distinguished by `metadata.type` field)
@@ -1573,7 +1601,7 @@ The platform doesn't care which path was taken — the outcome is the same: a si
 - Invoice lines reference the estimate/contract for the project
 
 #### Invoice Generation & Delivery
-- [ ] "Generate Invoice" action in estimate.html — creates invoice record, triggers PDF + email
+- [x] "Generate Invoices" batch action in estimate.html — scans contracts, creates invoice records, generates PDFs, sends emails with Stripe Pay Now links
 - [ ] Bulk monthly invoice generation — one click to generate invoices for all active maintenance contracts
 - [ ] Invoice PDF generation via AWS Lambda (ReportLab) — same pipeline as site reports, new invoice template
 - [ ] Invoice PDF includes: company logo, customer info, invoice number, date, due date, line items, total, and a **"Pay Now" link**
@@ -1602,14 +1630,16 @@ The platform doesn't care which path was taken — the outcome is the same: a si
 
 > **Why Stripe Payments, not Stripe Invoicing:** Stripe Invoicing charges $0.50/invoice on top of processing fees and generates its own PDFs/emails. Since the platform already has PDF generation (Lambda/ReportLab) and email delivery (Apps Script), using the core Payments product avoids the per-invoice fee and gives full control over invoice design and delivery.
 
-- [ ] Stripe account setup
-- [ ] Stripe Checkout Sessions via API — card + ACH payment methods enabled
-- [ ] Credit card payments (2.9% + $0.30 per transaction)
-- [ ] ACH bank transfer payments (0.8% capped at $5)
-- [ ] Stripe webhook endpoint via Apps Script `doPost()` — receives `checkout.session.completed` events
-- [ ] Auto-mark invoices as paid when webhook confirms payment
-- [ ] Invoice metadata attached to Checkout Session for webhook routing
-- [ ] **No sensitive payment data touches the platform** — Stripe Checkout hosted page handles all card/bank input (SAQ A PCI compliance)
+- [ ] Stripe account setup (set `STRIPE_SECRET_KEY` in Script Properties)
+- [x] Stripe Checkout Sessions via API — `createStripeCheckoutSession()` in Apps Script, payment mode for one-time + setup mode for auto-pay
+- [x] Credit card payments via Stripe Checkout (payment mode)
+- [ ] ACH bank transfer payments (0.8% capped at $5) — future Stripe Checkout configuration
+- [x] Stripe payment polling via `checkStripePayment()` — no webhooks needed (Apps Script limitation), uses redirect pages + frontend polling instead
+- [x] Auto-mark invoices as paid when polling confirms payment
+- [x] Invoice metadata attached to Checkout Session for routing
+- [x] **No sensitive payment data touches the platform** — Stripe Checkout hosted page handles all card/bank input (SAQ A PCI compliance)
+- [x] Auto-pay setup via Stripe Checkout (setup mode) — `setupAutoPay()` creates customer + saves payment method
+- [x] Auto-pay charging via Stripe PaymentIntents API — `chargeAutoPayInvoice()` in `generateInvoiceBatch()`
 
 #### Credit Card Fee Strategy (Decided: Gross Up Contract Price)
 
@@ -1622,17 +1652,20 @@ The platform doesn't care which path was taken — the outcome is the same: a si
 - [ ] `cc_gross_up` boolean already exists in the `bids` table schema
 
 #### Manual Payment Recording (Check, Cash)
-- [ ] "Record Payment" button on invoice in dashboard (admin/manager only)
-- [ ] Payment method selector: Check, Cash, Other
-- [ ] Check-specific fields: check number, date received
-- [ ] Partial payment support — multiple payments against one invoice, track remaining balance
+- [x] "Record Payment" button on invoice detail view
+- [x] Payment method selector: Check, Cash, Card, ACH
+- [x] Payment fields: amount (pre-filled with balance), date, notes (check #, reference)
+- [x] Partial payment support — multiple payments against one invoice, tracks remaining balance, auto-updates status to `partial` or `paid`
 - [ ] Invoice status auto-updates: sent → partial → paid based on total payments vs amount due
 
-#### Invoice Dashboard (estimate.html)
-- [ ] Invoice list view with status filters: All, Unpaid, Overdue, Paid
-- [ ] Color-coded status badges: draft (gray), sent (blue), overdue (red), partial (orange), paid (green)
-- [ ] Quick stats: total outstanding, total overdue, collected this month
-- [ ] Individual invoice detail with payment history
+#### Invoice Dashboard (estimate.html) — ✅ Built
+- [x] Invoice list view with status filters: All, Draft, Sent, Overdue, Paid
+- [x] Color-coded status badges: draft (gray), finalized (blue), sent (blue), partial (orange), paid (green), overdue (red), void (gray strikethrough)
+- [x] Quick stats: Total Outstanding, Overdue, Collected This Month, Drafts
+- [x] Individual invoice detail with line items table, totals, payment history
+- [x] Batch invoice generation — scans active contracts, dedup by period, creates drafts, auto-charges auto-pay
+- [x] Invoice lifecycle actions: Finalize, Send (email + PDF + Stripe Pay Now link), Record Payment, Check Payment Status, Void
+- [x] Invoice PDF generation via HtmlService (Apps Script fallback) and WeasyPrint (Lambda)
 - [ ] Aging report: 0-30, 31-60, 61-90, 90+ days outstanding
 
 #### QuickBooks Integration (Accounting & Financials)

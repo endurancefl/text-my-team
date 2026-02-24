@@ -387,3 +387,42 @@ def _generate_commercial_contract(metadata, service_map_buffer=None):
     pdf_bytes = _render_pdf("contract_commercial.html", context)
     contract_id_clean = contract_id.replace(" ", "-") if contract_id else "contract"
     return (pdf_bytes, f"{contract_id_clean}-contract.pdf")
+
+
+# ── Invoice PDF ──────────────────────────────────────────────
+
+def generate_invoice_pdf(metadata):
+    """Generate an invoice PDF from metadata.
+
+    Expected metadata keys:
+      invoiceId, contactName, contactEmail, billingAddress, propertyAddress,
+      invoiceDate, dueDate, billingPeriodStart, billingPeriodEnd,
+      paymentTerms, subtotal, taxRate, taxAmount, total,
+      lineItems (list of {description, quantity, rate, amount}),
+      payUrl (optional Stripe payment link)
+    """
+    line_items = metadata.get("lineItems", [])
+
+    context = {
+        "logo_data_uri": _logo_data_uri(),
+        "invoice_id": metadata.get("invoiceId", ""),
+        "contact_name": metadata.get("contactName", ""),
+        "contact_email": metadata.get("contactEmail", ""),
+        "billing_address": metadata.get("billingAddress", ""),
+        "property_address": metadata.get("propertyAddress", ""),
+        "invoice_date": metadata.get("invoiceDate", ""),
+        "due_date": metadata.get("dueDate", ""),
+        "billing_period_start": metadata.get("billingPeriodStart", ""),
+        "billing_period_end": metadata.get("billingPeriodEnd", ""),
+        "payment_terms": metadata.get("paymentTerms", "Net 30"),
+        "subtotal": float(metadata.get("subtotal", 0)),
+        "tax_rate": float(metadata.get("taxRate", 0)),
+        "tax_amount": float(metadata.get("taxAmount", 0)),
+        "total": float(metadata.get("total", 0)),
+        "line_items": line_items,
+        "pay_url": metadata.get("payUrl", ""),
+    }
+
+    pdf_bytes = _render_pdf("invoice.html", context)
+    inv_id = metadata.get("invoiceId", "invoice").replace(" ", "-")
+    return (pdf_bytes, f"{inv_id}.pdf")

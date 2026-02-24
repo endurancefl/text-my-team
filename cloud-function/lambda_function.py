@@ -31,6 +31,7 @@ try:
         generate_standard_report as wp_generate_standard_report,
         generate_before_after_report as wp_generate_before_after_report,
         generate_contract_pdf as wp_generate_contract_pdf,
+        generate_invoice_pdf as wp_generate_invoice_pdf,
     )
     WEASYPRINT_AVAILABLE = True
 except ImportError:
@@ -91,7 +92,13 @@ def lambda_handler(event, context):
             renderer = "reportlab"
         use_wp = renderer == "weasyprint"
 
-        if report_type == "contract":
+        if report_type == "invoice":
+            # Invoice PDF — WeasyPrint only (no ReportLab fallback)
+            if not WEASYPRINT_AVAILABLE:
+                return _error_response("WeasyPrint not available for invoice PDF", 500, allowed)
+            pdf_bytes, filename = wp_generate_invoice_pdf(metadata)
+
+        elif report_type == "contract":
             # Parse optional service map photo (commercial only)
             service_map_files = parts.get("files", {}).get("service_map", [])
             service_map_buffer = None
