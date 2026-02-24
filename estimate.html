@@ -1629,10 +1629,7 @@
     }
 
     .view.active {
-      display: flex !important;
-      flex-direction: column;
-      align-items: stretch;
-      justify-content: flex-start;
+      display: block !important;
     }
 
     /* ESTIMATES LIST VIEW - Google Drive style cards */
@@ -4705,13 +4702,14 @@
     .contacts-grid {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 10px;
+      padding: 0 8px;
     }
 
     /* Contact card in list */
     .contact-card {
       background: var(--gw-surface);
-      padding: 16px 24px;
+      padding: 18px 28px;
       border: 1px solid var(--gw-border);
       border-radius: var(--gw-radius-md);
       cursor: pointer;
