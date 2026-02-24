@@ -7129,6 +7129,94 @@
       compositedPhotos: []
     };
 
+    // --- Site Report localStorage persistence ---
+    var SR_DRAFT_KEY = 'srDraft';
+
+    function srSaveDraft() {
+      try {
+        var draft = {
+          currentStep: srState.currentStep,
+          selectedProp: srState.selectedProp,
+          inspectorName: srState.inspectorName,
+          reportDate: srState.reportDate,
+          photoMode: srState.photoMode,
+          currentPhotoIndex: srState.currentPhotoIndex,
+          photos: srState.photos.map(function(p) {
+            return {
+              originalBase64: p.originalBase64,
+              thumbBase64: p.thumbBase64,
+              imgWidth: p.imgWidth,
+              imgHeight: p.imgHeight,
+              rects: p.rects,
+              note: p.note,
+              category: p.category
+            };
+          }),
+          savedAt: Date.now()
+        };
+        localStorage.setItem(SR_DRAFT_KEY, JSON.stringify(draft));
+      } catch (e) {
+        // localStorage full or unavailable — silently ignore
+      }
+    }
+
+    function srClearDraft() {
+      try { localStorage.removeItem(SR_DRAFT_KEY); } catch (e) {}
+    }
+
+    function srGetDraft() {
+      try {
+        var raw = localStorage.getItem(SR_DRAFT_KEY);
+        if (!raw) return null;
+        var draft = JSON.parse(raw);
+        // Expire drafts older than 24 hours
+        if (Date.now() - draft.savedAt > 24 * 60 * 60 * 1000) {
+          srClearDraft();
+          return null;
+        }
+        return draft;
+      } catch (e) { return null; }
+    }
+
+    function srRestoreDraft(draft) {
+      srState.selectedProp = draft.selectedProp;
+      srState.inspectorName = draft.inspectorName;
+      srState.reportDate = draft.reportDate;
+      srState.photoMode = draft.photoMode;
+      srState.currentPhotoIndex = draft.currentPhotoIndex || 0;
+      srState.photos = (draft.photos || []).map(function(p) {
+        return {
+          originalBase64: p.originalBase64,
+          thumbBase64: p.thumbBase64,
+          imgWidth: p.imgWidth,
+          imgHeight: p.imgHeight,
+          rects: p.rects || [],
+          note: p.note || '',
+          category: p.category || '',
+          uploaded: false,
+          failed: false
+        };
+      });
+
+      // Restore UI fields
+      if (srState.selectedProp) {
+        srPropertyInput.value = srState.selectedProp.address;
+        srCardAddress.textContent = srState.selectedProp.address;
+        srCardCrew.textContent = srState.selectedProp.crew || 'N/A';
+        srPropertyCard.style.display = 'block';
+        srPropertyInput.style.display = 'none';
+        srPropertyInput.closest('.search-container').querySelector('.search-icon').style.display = 'none';
+      }
+      srInspector.value = srState.inspectorName;
+      srDate.value = srState.reportDate;
+      srStep1Next.disabled = !(srState.selectedProp && srState.inspectorName && srState.reportDate);
+
+      // Go to saved step
+      var step = draft.currentStep || 1;
+      if (step > 3 && srState.photos.length > 0) step = 3;
+      srGoToStep(step);
+    }
+
     // Tab switching event handlers
     document.getElementById('schedule-tab-btn').addEventListener('click', function() {
       switchTab('schedule');
@@ -7158,6 +7246,40 @@
     // Open / close wizard
     document.getElementById('site-report-btn').addEventListener('click', function() {
       reportsSheetOverlay.classList.remove('active');
+      if (propertiesList.length === 0) loadProperties();
+
+      // Check for saved draft
+      var draft = srGetDraft();
+      if (draft && draft.photos && draft.photos.length > 0) {
+        srState = {
+          currentStep: 1, selectedProp: null, inspectorName: '', reportDate: '',
+          photos: [], currentPhotoIndex: 0, isDrawing: false, drawStart: null, drawCurrent: null, generatedPdfBlob: null,
+          photoMode: null, compositedPhotos: []
+        };
+        srProgressWrap.style.display = 'none';
+        srUploadDriveBtn.style.display = 'none';
+        srGenerateBtn.disabled = false;
+        srGenerateBtn.textContent = 'Generate Report';
+        srWizard.classList.add('active');
+        iosConfirm('Resume your saved report? (' + draft.photos.length + ' photos)', 'Resume', function(yes) {
+          if (yes) {
+            srRestoreDraft(draft);
+          } else {
+            srClearDraft();
+            srPropertyInput.value = '';
+            srPropertyInput.style.display = '';
+            srPropertyInput.closest('.search-container').querySelector('.search-icon').style.display = '';
+            srPropertyCard.style.display = 'none';
+            srInspector.value = currentCrewName || '';
+            var today = new Date();
+            srDate.value = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+            srGoToStep(1);
+          }
+        }, true);
+        return;
+      }
+
+      // No draft — start fresh
       srState = {
         currentStep: 1, selectedProp: null, inspectorName: '', reportDate: '',
         photos: [], currentPhotoIndex: 0, isDrawing: false, drawStart: null, drawCurrent: null, generatedPdfBlob: null,
@@ -7176,13 +7298,12 @@
       srGenerateBtn.textContent = 'Generate Report';
       srGoToStep(1);
       srWizard.classList.add('active');
-      if (propertiesList.length === 0) loadProperties();
     });
 
     srCloseBtn.addEventListener('click', function() {
       if (srState.photos.length > 0) {
         iosConfirm('Discard this site report?', 'Discard', function(yes) {
-          if (yes) srWizard.classList.remove('active');
+          if (yes) { srClearDraft(); srWizard.classList.remove('active'); }
         }, true);
         return;
       }
@@ -7221,6 +7342,7 @@
         if (srState.photos.length > 0) srRenderAnnotation();
       }
       if (step === 4) srRenderSummary();
+      srSaveDraft();
     }
 
     // Step 1: Property autocomplete (reuse pattern)
@@ -7281,6 +7403,7 @@
       srState.inspectorName = srInspector.value.trim();
       srState.reportDate = srDate.value;
       srStep1Next.disabled = !(srState.selectedProp && srState.inspectorName && srState.reportDate);
+      srSaveDraft();
     }
 
     srStep1Next.addEventListener('click', function() {
@@ -7379,6 +7502,7 @@
           uploaded: false,
           failed: false
         });
+        srSaveDraft();
         if (callback) callback();
       });
     }
@@ -7492,6 +7616,7 @@
             srState.currentPhotoIndex--;
           }
           srUpdateStep3Visibility();
+          srSaveDraft();
           if (srState.photos.length > 0) {
             srRenderAnnotation();
           }
@@ -7508,6 +7633,7 @@
         p.note = srPhotoNote.value;
         p.category = srCategoryInput.value.trim();
         srRebuildCategoryDatalist();
+        srSaveDraft();
       }
     }
 
@@ -7623,6 +7749,7 @@
         srSaveCurrentNote();
         photo.rects = [];
         srRenderAnnotation();
+        srSaveDraft();
       }
     });
 
@@ -7648,6 +7775,7 @@
         // Clear rects since they won't match the rotated image
         photo.rects = [];
         srRenderAnnotation();
+        srSaveDraft();
       };
       img.src = photo.originalBase64;
     });
@@ -8124,6 +8252,7 @@
               .then(function() {
                 srProgressBar.style.width = '100%';
                 srProgressLabel.textContent = 'Success! Saved to Drive.';
+                srClearDraft();
 
                 // Now auto-download the PDF
                 var url = URL.createObjectURL(srState.generatedPdfBlob);
