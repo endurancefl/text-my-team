@@ -2167,7 +2167,9 @@
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px;">
           <div class="form-group">
             <label class="form-label">Assigned Crew</label>
-            <input type="text" class="form-input" id="property-crew" placeholder="Crew name">
+            <select class="form-select" id="property-crew">
+              <option value="">-- Select Crew --</option>
+            </select>
           </div>
           <div class="form-group">
             <label class="form-label">Crew Phone</label>
@@ -5670,10 +5672,28 @@ function showPropertiesList() {
 //  PROPERTY MODAL (Add/Edit)
 // ═══════════════════════════════════════════════════════════════
 
-function openPropertyModal(mode) {
+async function openPropertyModal(mode) {
   const modal = document.getElementById('property-modal');
   const title = document.getElementById('property-modal-title');
   const saveBtn = document.getElementById('property-save-btn');
+
+  // Populate crew dropdown
+  const crewSelect = document.getElementById('property-crew');
+  crewSelect.innerHTML = '<option value="">-- Select Crew --</option>';
+  try {
+    const resp = await fetch(GOOGLE_SHEETS_URL + '?action=getCrews');
+    const data = await resp.json();
+    if (data.success && data.crews) {
+      [...new Set(data.crews)].forEach(crew => {
+        const opt = document.createElement('option');
+        opt.value = crew;
+        opt.textContent = crew;
+        crewSelect.appendChild(opt);
+      });
+    }
+  } catch (err) {
+    console.error('Failed to load crews for property modal:', err);
+  }
 
   if (mode === 'edit' && currentProperty) {
     title.textContent = 'Edit Property';
