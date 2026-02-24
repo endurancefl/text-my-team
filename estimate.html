@@ -6556,14 +6556,23 @@ function onEstimatePropertySelect(propertyId) {
   buildServicesFromTakeoffs();
   markEstimateDirty();
 
-  // Filter contact picker to show contacts linked to this property
-  const propLinks = (propertyContacts || []).filter(l => l.propertyId === propertyId);
-  if (propLinks.length > 0) {
-    const firstLink = propLinks[0];
-    const contactPicker = document.getElementById('estimate-contact-picker');
-    if (contactPicker && !currentEstimate.contactId) {
-      contactPicker.value = firstLink.contactId;
-      onEstimateContactChange(firstLink.contactId);
+  // Auto-select linked contact for this property
+  populateEstimateContactPicker(); // Ensure picker is populated first
+  const contactPicker = document.getElementById('estimate-contact-picker');
+  if (contactPicker && !currentEstimate.contactId) {
+    // Try junction links first
+    const propLinks = (propertyContacts || []).filter(l => l.propertyId === propertyId);
+    if (propLinks.length > 0) {
+      contactPicker.value = propLinks[0].contactId;
+      onEstimateContactChange(propLinks[0].contactId);
+    } else {
+      // Fallback: match contact by address
+      const normAddr = normalizeAddress(prop.address);
+      const addrContact = contacts.find(c => normalizeAddress(c.propertyAddress) === normAddr);
+      if (addrContact) {
+        contactPicker.value = addrContact.contactId;
+        onEstimateContactChange(addrContact.contactId);
+      }
     }
   }
 }
