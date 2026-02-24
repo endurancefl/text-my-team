@@ -149,10 +149,14 @@ The platform supports four divisions, each representing a distinct revenue strea
   - **Week view**: Multi-day and milestone tickets render a colored bar spanning the date range (Gantt-style), with individual day markers inside the bar. Single-visit work tickets show as a single dot like recurring tickets.
   - **Month view**: Spanning bar across the date range with the project name. Distinct from recurring ticket dots.
 
+  **Same man-hour engine, same crew app experience:** Work tickets use the exact same estimation pipeline as recurring services — items × production rates ÷ difficulty → man-hours. The estimated hours flow into each generated ticket identically to recurring tickets. In the crew app, work ticket stop cards show the same per-service progress bars, remaining wall-clock time, crew assignment overlays, and time entry tracking. The crew leader starts services, assigns members, splits time entries on crew changes, and completes services the same way. All time data feeds back into production rate analysis. The only difference is the project badge and progress label — the underlying time tracking is identical.
+
   **Crew app rendering:**
   - Stop card shows project name, phase/day label, and overall progress: "Mulch Install — Day 2 of 3" or "Patio Build — Phase: Base Prep (2/4)".
+  - Same per-service clocking, progress bars, remaining time labels, and reassignment wizard as recurring tickets.
   - Completing the final visit/milestone marks the entire work ticket as complete.
   - If a multi-day job finishes early (done in 2 days instead of 3), crew leader can mark remaining day tickets as "Not Needed" which removes them from the schedule without counting as skipped.
+  - Actual vs estimated comparison at completion feeds into production rate analysis — building the same data loop for work ticket service types (mulch spreading, paver install, grading) as exists for recurring services (mowing, edging, hedge trimming).
 
   **Data model**: Work ticket schedule type stored as `scheduleType` on the bid (`'single'`, `'multi_day'`, `'milestone'`). Multi-day tickets store `plannedDays` (integer). Milestone tickets store an ordered array of `milestones` — each with `name`, `sortOrder`, `estimatedHours`, `scheduledDate`, and associated `lineItems`. All generated tickets reference the parent work ticket via `workTicketId` and carry `sequenceIndex` (day number or milestone order) and `sequenceTotal`.
 
