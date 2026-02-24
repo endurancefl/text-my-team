@@ -4705,13 +4705,13 @@
     /* Contact card in list */
     .contact-card {
       background: var(--gw-surface);
-      padding: 12px 16px;
+      padding: 14px 20px;
       border-bottom: 1px solid var(--gw-border);
       cursor: pointer;
       transition: background 0.1s;
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 16px;
     }
 
     .contact-card:last-child {
@@ -9739,6 +9739,7 @@ async function openContactProfile(contactId) {
 
   document.getElementById('contacts-list-view').style.display = 'none';
   document.getElementById('contact-profile-view').style.display = '';
+  document.getElementById('main-body').scrollTop = 0;
 
   document.getElementById('contact-profile-avatar').textContent = getContactInitials(contact);
   document.getElementById('contact-profile-name').textContent = getContactDisplayName(contact);
@@ -9811,6 +9812,7 @@ function showContactsList() {
   document.getElementById('header-title').textContent = 'Contacts';
   document.getElementById('header-subtitle').textContent = contacts.length + ' contacts';
   renderContactsList();
+  document.getElementById('main-body').scrollTop = 0;
 }
 
 async function updateContactStage(newStage) {
