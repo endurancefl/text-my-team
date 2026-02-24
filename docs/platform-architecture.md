@@ -136,6 +136,26 @@ The platform supports four divisions, each representing a distinct revenue strea
 
   The division and job type selection appears as the first step when clicking "New Estimate" — before the builder loads. The builder UI adapts: Work Tickets hide the payment schedule card and replace "Contract Duration" with "Project Timeline", and the billing tier picker is replaced with a simpler total/milestone pricing structure.
 
+  **Work Ticket Scheduling (Hybrid Model)**: When a work ticket is created, the estimator picks a schedule type that controls how the job appears on the calendar and in the crew app:
+
+  | Schedule Type | When to Use | What Gets Generated |
+  |---------------|-------------|-------------------|
+  | **Single Visit** | Small jobs done in one trip | One ticket, one date |
+  | **Multi-Day** | Simple labor spanning consecutive days | N consecutive day tickets, same scope. Estimator picks start date and number of days. Hours split evenly or manually allocated per day. |
+  | **Milestone** | Complex projects with distinct phases | Named phases, each independently scheduled with its own date, estimated hours, crew needs, and line items. Estimator defines the phases during estimation (e.g., "Demo → Grade & Base → Paver Install → Cleanup"). |
+
+  **Schedule view rendering:**
+  - **Day view**: Work ticket visits show like normal stop cards but with a project badge (division color) and progress indicator ("Day 2 of 4" or "Phase: Paver Install — 2/4").
+  - **Week view**: Multi-day and milestone tickets render a colored bar spanning the date range (Gantt-style), with individual day markers inside the bar. Single-visit work tickets show as a single dot like recurring tickets.
+  - **Month view**: Spanning bar across the date range with the project name. Distinct from recurring ticket dots.
+
+  **Crew app rendering:**
+  - Stop card shows project name, phase/day label, and overall progress: "Mulch Install — Day 2 of 3" or "Patio Build — Phase: Base Prep (2/4)".
+  - Completing the final visit/milestone marks the entire work ticket as complete.
+  - If a multi-day job finishes early (done in 2 days instead of 3), crew leader can mark remaining day tickets as "Not Needed" which removes them from the schedule without counting as skipped.
+
+  **Data model**: Work ticket schedule type stored as `scheduleType` on the bid (`'single'`, `'multi_day'`, `'milestone'`). Multi-day tickets store `plannedDays` (integer). Milestone tickets store an ordered array of `milestones` — each with `name`, `sortOrder`, `estimatedHours`, `scheduledDate`, and associated `lineItems`. All generated tickets reference the parent work ticket via `workTicketId` and carry `sequenceIndex` (day number or milestone order) and `sequenceTotal`.
+
 - Three-panel Google Workspace layout (sidebar, main content, summary panel)
 - **Bid Builder**: Spreadsheet-style table with columns: Item, OCC, QTY, Unit, P/H, AH, TH, P/P, TP, GM%
 - **Real-time calculation engine**: labor hours from quantities ÷ production rates, material costs from coverage rates, travel time percentage, separate markups for labor/materials/subcontractors
