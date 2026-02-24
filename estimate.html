@@ -362,6 +362,8 @@
       align-items: center;
       padding: 0 24px;
       gap: 16px;
+      flex-shrink: 0;
+      z-index: 1;
     }
 
     .header-title {
@@ -553,6 +555,14 @@
     #view-schedule.active {
       display: flex !important;
       flex-direction: column;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      overflow-y: auto;
+      padding: 24px;
+      -webkit-overflow-scrolling: touch;
     }
 
     .sched-toolbar {
