@@ -5886,6 +5886,11 @@ async function deleteCurrentProperty() {
 // ═══════════════════════════════════════════════════════════════
 
 async function loadPropertiesFromBackend() {
+  let backendProps = [];
+  let linksLoaded = false;
+  let subsLoaded = false;
+
+  // Try new estimating properties endpoint
   try {
     const [propResp, linksResp, subsResp] = await Promise.all([
       fetch(GOOGLE_SHEETS_URL + '?action=getEstimatingProperties'),
@@ -5895,28 +5900,41 @@ async function loadPropertiesFromBackend() {
     const [propData, linksData, subsData] = await Promise.all([
       propResp.json(), linksResp.json(), subsResp.json()
     ]);
-
-    if (propData.success) {
-      const backendProps = propData.properties || [];
-      if (backendProps.length > 0) {
-        // Enrich backend properties with associated bids/contracts from aggregation
-        properties = enrichPropertiesWithBidsContracts(backendProps);
-      } else {
-        // Fallback: no backend properties yet, use aggregation
-        properties = aggregateProperties();
-      }
-    } else {
-      properties = aggregateProperties();
-    }
-
-    if (linksData.success) propertyContacts = linksData.links || [];
-    if (subsData.success) propertySubContractors = subsData.subContractors || [];
-
+    if (propData.success) backendProps = propData.properties || [];
+    if (linksData.success) { propertyContacts = linksData.links || []; linksLoaded = true; }
+    if (subsData.success) { propertySubContractors = subsData.subContractors || []; subsLoaded = true; }
   } catch (err) {
-    console.error('Error loading properties from backend:', err);
-    // Fallback to aggregation
+    console.error('Error loading estimating properties:', err);
+  }
+
+  // If new endpoint returned nothing, try the old getProperties endpoint (crew Properties sheet)
+  if (backendProps.length === 0) {
+    try {
+      const oldResp = await fetch(GOOGLE_SHEETS_URL + '?action=getProperties');
+      const oldData = await oldResp.json();
+      if (oldData.success && oldData.properties && oldData.properties.length > 0) {
+        backendProps = oldData.properties.map(p => ({
+          address: p.address || p.Address || '',
+          crew: p.crew || p.Crew || '',
+          crewPhone: p.crewPhone || p.Phone || '',
+          pin: p.pin || p.Pin || p.PIN || '',
+          normalizedAddress: normalizeAddress(p.address || p.Address || ''),
+          propertyType: 'Residential'
+        })).filter(p => p.address);
+      }
+    } catch (err2) {
+      console.error('Error loading old properties:', err2);
+    }
+  }
+
+  if (backendProps.length > 0) {
+    properties = enrichPropertiesWithBidsContracts(backendProps);
+  } else {
     properties = aggregateProperties();
   }
+
+  if (!linksLoaded) propertyContacts = propertyContacts || [];
+  if (!subsLoaded) propertySubContractors = propertySubContractors || [];
 
   if (currentView === 'properties') {
     renderPropertiesList();
