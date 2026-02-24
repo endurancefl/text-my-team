@@ -110,6 +110,32 @@ The platform supports four divisions, each representing a distinct revenue strea
 
 **estimate.html — Bidding & Estimating Tool (~17,170 lines)**
 - **Division: Maintenance (MNT) fully built** — Irrigation, Construction, and Enhancement divisions planned, will reuse the same engine with division-specific catalogs and takeoffs
+- **Division & Job Type Selection**: When creating a new estimate, the user selects two things upfront:
+  1. **Division** — Maintenance (MNT), Irrigation (IRR), Construction (CON), or Enhancement (ENH). This determines which item catalog, service catalog, and takeoff measurements are available. Stored as `division` on the estimate/bid.
+  2. **Job Type** — **Recurring Service** or **Work Ticket**. Recurring services generate a contract with scheduled tickets over the contract duration (weekly mowing, monthly irrigation inspections). Work Tickets are one-off jobs with a defined scope and completion date — no recurring schedule, no monthly amortization (large mulch install, irrigation repair, retaining wall build, seasonal color rotation). Stored as `jobType` on the estimate (`'recurring'` or `'work_ticket'`).
+
+  **How job type affects the pipeline:**
+  | Aspect | Recurring Service | Work Ticket |
+  |--------|------------------|-------------|
+  | Billing tier | Fixed / Billed Separately / Recommended | Single total or milestone-based |
+  | Payment schedule | Monthly amortization over contract months | Upon completion, 50/50 split, or milestone draws |
+  | Ticket generation | `getDatesForVisitCount()` across contract duration | Single ticket or milestone tickets (e.g., "Demolition", "Install", "Cleanup") |
+  | Contract PDF | Full contract with payment schedule + T&Cs | Proposal/work order with scope, price, timeline |
+  | Schedule view | Recurring dots on calendar | One-time block on calendar |
+  | Finalization | Creates contract row + recurring scheduled tickets | Creates work order + work ticket(s) |
+
+  **Division × Job Type combinations** — All four divisions support both types:
+  - MNT Recurring: weekly mowing contract, monthly hedge program
+  - MNT Work Ticket: one-time leaf cleanup, storm damage cleanup
+  - IRR Recurring: monthly irrigation inspection contract
+  - IRR Work Ticket: sprinkler head repair, zone addition, backflow replacement
+  - CON Recurring: rare (ongoing drainage maintenance)
+  - CON Work Ticket: patio install, retaining wall, grading project
+  - ENH Recurring: quarterly seasonal color rotation
+  - ENH Work Ticket: large mulch job, landscape renovation, planting project
+
+  The division and job type selection appears as the first step when clicking "New Estimate" — before the builder loads. The builder UI adapts: Work Tickets hide the payment schedule card and replace "Contract Duration" with "Project Timeline", and the billing tier picker is replaced with a simpler total/milestone pricing structure.
+
 - Three-panel Google Workspace layout (sidebar, main content, summary panel)
 - **Bid Builder**: Spreadsheet-style table with columns: Item, OCC, QTY, Unit, P/H, AH, TH, P/P, TP, GM%
 - **Real-time calculation engine**: labor hours from quantities ÷ production rates, material costs from coverage rates, travel time percentage, separate markups for labor/materials/subcontractors
@@ -600,6 +626,7 @@ kits (
 bids (
   id, tenant_id, property_id, customer_id, created_by,
   division,                       -- 'MNT', 'IRR', 'CON', 'ENH'
+  job_type,                       -- 'recurring' (contract with scheduled tickets) or 'work_ticket' (one-off job)
   bid_date, status, -- draft, sent, accepted, rejected, expired, finalized, revision
   property_type, -- residential, commercial
   contract_start_date, contract_end_date, contract_months,
