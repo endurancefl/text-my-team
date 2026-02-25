@@ -334,7 +334,8 @@ body {
 /* MAIN CONTENT AREA */
 .main-content {
   flex: 1;
-  position: relative;
+  display: grid;
+  grid-template-rows: var(--header-height) 1fr;
   overflow: hidden;
   background: var(--gw-surface);
 }
@@ -1505,13 +1506,9 @@ body {
 .save-status.unsaved { color: var(--gw-yellow); }
 
 .main-body {
-  position: absolute;
-  top: var(--header-height);
-  left: 0;
-  right: 0;
-  bottom: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  min-height: 0;
   padding: 24px;
   background: var(--gw-surface);
   -webkit-overflow-scrolling: touch;
