@@ -224,6 +224,9 @@ function doPost(e) {
     if (data.contractPdf) {
       return jsonResponse(uploadContractPdf(data));
     }
+    if (data.uploadSubContractPdf) {
+      return jsonResponse(uploadSubContractPdf(data));
+    }
     if (data.siteReportPhoto) {
       return jsonResponse(uploadSiteReportPhoto(data));
     }
@@ -1963,6 +1966,31 @@ function uploadContractPdf(data) {
   return {
     success: true,
     pdfUrl: file.getUrl(),
+    fileId: file.getId()
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SUB-CONTRACT PDF UPLOAD
+// ═══════════════════════════════════════════════════════════════
+
+function uploadSubContractPdf(data) {
+  var folder = getPropertyFolder(data.property, 'Sub-Contracts');
+  var filename = (data.filename || 'Sub-Contract') + '.pdf';
+
+  // Strip data URL prefix if present
+  var pdfData = data.pdfBase64;
+  if (pdfData && pdfData.indexOf(',') !== -1) {
+    pdfData = pdfData.split(',')[1];
+  }
+
+  var blob = Utilities.newBlob(Utilities.base64Decode(pdfData), 'application/pdf', filename);
+  var file = folder.createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+  return {
+    success: true,
+    fileUrl: file.getUrl(),
     fileId: file.getId()
   };
 }
@@ -4508,7 +4536,8 @@ function deletePropertyContactLinks(propertyId) {
 
 var SUB_CONTRACTORS_HEADERS = [
   'subContractorId', 'propertyId', 'companyName', 'serviceType',
-  'contractNotes', 'phone', 'email', 'createdAt', 'updatedAt'
+  'contractNotes', 'phone', 'email', 'createdAt', 'updatedAt',
+  'monthlyCost', 'contractFileUrl', 'contractFileId'
 ];
 
 function ensureSubContractorsSheet() {
@@ -4518,6 +4547,15 @@ function ensureSubContractorsSheet() {
     sheet = ss.insertSheet('SubContractors');
     sheet.getRange(1, 1, 1, SUB_CONTRACTORS_HEADERS.length).setValues([SUB_CONTRACTORS_HEADERS]);
     sheet.getRange(1, 1, 1, SUB_CONTRACTORS_HEADERS.length).setFontWeight('bold');
+  } else {
+    // Migration: add new columns if missing
+    var existingHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var newCols = SUB_CONTRACTORS_HEADERS.filter(function(h) { return existingHeaders.indexOf(h) === -1; });
+    if (newCols.length > 0) {
+      var startCol = existingHeaders.length + 1;
+      sheet.getRange(1, startCol, 1, newCols.length).setValues([newCols]);
+      sheet.getRange(1, startCol, 1, newCols.length).setFontWeight('bold');
+    }
   }
   return sheet;
 }
@@ -4567,7 +4605,10 @@ function saveSubContractor(data) {
     data.phone || '',
     data.email || '',
     now,
-    now
+    now,
+    data.monthlyCost || '',
+    data.contractFileUrl || '',
+    data.contractFileId || ''
   ]);
   return { success: true, subContractorId: subId };
 }

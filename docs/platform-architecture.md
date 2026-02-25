@@ -202,7 +202,8 @@ text-my-team/
 
 - Three-panel Google Workspace layout (sidebar, main content, summary panel). **CSS layout chain**: `.app-container` (flex row, 100vh) → `.sidebar` (fixed width) + `.main-content` (flex: 1, **CSS Grid** with `grid-template-rows: var(--header-height) 1fr`) + `.summary-panel` (280px). Grid row 1 = `.main-header` (56px, flex-shrink: 0, z-index: 1), Grid row 2 = `.main-body` (1fr, overflow-y: auto, padding: 24px — the scroll container). Views inside `.main-body` are plain `display: block/none` toggled by `.view.active`. CSS Grid's definite `1fr` row sizing avoids Safari/WebKit flex miscalculation issues with 15+ hidden view siblings.
 - **Bid Builder**: Spreadsheet-style table with columns: Item, OCC, QTY, Unit, P/H, AH, TH, P/P, TP, GM%
-- **Real-time calculation engine**: labor hours from quantities ÷ production rates, material costs from coverage rates, travel time percentage, separate markups for labor/materials/subcontractors
+- **Real-time calculation engine**: labor hours from quantities ÷ production rates, material costs from coverage rates, travel time percentage, separate markups for labor/materials/subcontractors. Per-service sub-contractor markup override (`subMarkupOverride`) allows individual services to use 0% or custom markup instead of the estimate-level default — applied in `calculateBidTotals()`, `calculateTierTotals()`, proposal preview, and finalization payload
+- **Sub-Contractor Billing**: Property-level subs (with monthlyCost and contract PDF) flow into estimates via "From Subs" tab in the Add Service modal. Creates service with `isSubcontractor: true`, `subCost: monthlyCost * 12`, `billingTier: 'billed'`, `subContractorId` link. Default 10% markup from bid settings; per-service `subMarkupOverride` allows 0% or custom markup. Sub services render in the bid table as a single row showing cost/markup/billed/margin (no line items). Contract PDF upload via `uploadSubContractPdf` to Drive Sub-Contracts folder. Adding a sub to a finalized contract uses existing revision flow. Functions: `renderServicePickerSubs()`, `addSubFromProperty()`, `handleSubContractFileSelect()`, `clearSubContractFile()`
 - **Three-tier billing structure**: Fixed Payment Services (monthly amortized), Services Billed Separately (upon completion), Recommended/Optional (customer opt-in with accepted/pending toggle)
 - **Property Takeoff System** with Attentive.ai Excel import (SheetJS):
   - Lawn: equipment splits (48" Mower, 21" Mower, String Trimmer) with percentage allocation + difficulty splits (Easy/Med/Hard must sum to 100%)
@@ -250,7 +251,7 @@ text-my-team/
 
   **Data model (IMPLEMENTED)**: Properties are first-class entities stored in the Properties sheet with PROP-0001 format IDs. Each property has full address fields, crew assignment, measurements (lot size, lawn, edges, mulch beds, hedge, driveway, sidewalk, trees, irrigation zones), measurement source tracking (attentive/manual/polygon/gps_trace/drone), Attentive report URL, gate code, and notes. Difficulty splits are stored on the estimate, not the property. Contacts link to properties via many-to-many PropertyContacts junction sheet with role designations (Owner/Property Manager/Billing Contact/Tenant/Other). Sub-contractors tracked per property in SubContractors sheet. Properties loaded from backend via `getEstimatingProperties` with fallback to aggregation from contacts/bids/contracts when backend sheet is empty. Property picker in estimate builder auto-fills address, measurements, and difficulty splits into new estimates.
 
-  **State**: `properties[]`, `currentProperty`, `propertySearchQuery`, `propertyFilter`, `propertyContacts[]` (junction links), `propertySubContractors[]`, `selectedLinkerContactId`. Functions: `normalizeAddress()`, `aggregateProperties()`, `loadProperties()`, `loadPropertiesFromBackend()`, `enrichPropertiesWithBidsContracts()`, `filterProperties()`, `renderPropertiesList()`, `openPropertyProfile()`, `showPropertiesList()`, `openPropertyModal()`, `closePropertyModal()`, `savePropertyFromModal()`, `deleteCurrentProperty()`, `getPropertyDataFromModal()`, `togglePropertySection()`, `openContactLinker()`, `closeContactLinker()`, `renderContactLinkerResults()`, `selectLinkerContact()`, `saveLinkFromLinker()`, `unlinkContact()`, `renderPropertyLinkedContacts()`, `renderPropertySubContractors()`, `openSubContractorModal()`, `closeSubContractorModal()`, `saveSubContractorFromModal()`, `deleteSubContractor()`, `renderPropertyProjectHistory()`, `populateEstimatePropertyPicker()`, `onEstimatePropertySelect()`, `getLinkedPropertiesForContact()`. CSS: `.property-measurements-grid`, `.property-source-badge` (with source-specific color classes), `.property-modal-section-header`, `.sub-contractor-card`, `.contact-linker-item`, `.property-linked-contact`, `.property-picker-wrapper`, `.division-badge`, `.btn-danger-text`, `.pm-grid-input` (blue editable inputs matching mower-table style).
+  **State**: `properties[]`, `currentProperty`, `propertySearchQuery`, `propertyFilter`, `propertyContacts[]` (junction links), `propertySubContractors[]`, `selectedLinkerContactId`, `pendingSubContractFile`. Functions: `normalizeAddress()`, `aggregateProperties()`, `loadProperties()`, `loadPropertiesFromBackend()`, `enrichPropertiesWithBidsContracts()`, `filterProperties()`, `renderPropertiesList()`, `openPropertyProfile()`, `showPropertiesList()`, `openPropertyModal()`, `closePropertyModal()`, `savePropertyFromModal()`, `deleteCurrentProperty()`, `getPropertyDataFromModal()`, `togglePropertySection()`, `openContactLinker()`, `closeContactLinker()`, `renderContactLinkerResults()`, `selectLinkerContact()`, `saveLinkFromLinker()`, `unlinkContact()`, `renderPropertyLinkedContacts()`, `renderPropertySubContractors()`, `openSubContractorModal()`, `closeSubContractorModal()`, `saveSubContractorFromModal()`, `deleteSubContractor()`, `handleSubContractFileSelect()`, `clearSubContractFile()`, `renderPropertyProjectHistory()`, `populateEstimatePropertyPicker()`, `onEstimatePropertySelect()`, `getLinkedPropertiesForContact()`. CSS: `.property-measurements-grid`, `.property-source-badge` (with source-specific color classes), `.property-modal-section-header`, `.sub-contractor-card`, `.contact-linker-item`, `.property-linked-contact`, `.property-picker-wrapper`, `.division-badge`, `.btn-danger-text`, `.pm-grid-input` (blue editable inputs matching mower-table style).
 
   **Nav placement**: Between Contacts and Production Rates in the sidebar. Icon: map pin or building.
 
@@ -331,6 +332,7 @@ text-my-team/
 | `saveSubContractor` | Estimating | Creates sub-contractor in SubContractors sheet, returns SUB-0001 format ID |
 | `updateSubContractor` | Estimating | Updates sub-contractor by subContractorId |
 | `deleteSubContractor` | Estimating | Removes sub-contractor row |
+| `uploadSubContractPdf` | Estimating | Uploads sub-contractor contract PDF to Drive (Sub-Contracts folder), returns fileUrl + fileId |
 | `uploadEstimateJson` | Estimating | Saves estimate JSON to Drive |
 | `createContract` | Estimating | Creates contract row with fields: bidId, propertyAddress, assignedCrew, preferredDay, startDate, endDate, contractMonths, monthlyPayment, paymentTerms, contractValue, ccFeePercent, ccGrossUp, contactName, contactEmail, billingAddress, pdfUrl, pdfFileId. Auto-creates new columns on existing sheets |
 | `updateContract` | Estimating | Updates existing contract row by contractId — all fields including paymentTerms, contractValue, ccFeePercent, ccGrossUp, contactName, contactEmail, billingAddress, pdfUrl, pdfFileId |
@@ -2425,7 +2427,7 @@ All sheets live in one spreadsheet with one Code.gs serving both estimate.html a
 | Templates | Reusable estimate structures |
 | Properties | First-class property records: propertyId (PROP-0001), address, city, state, zip, propertyType, pin, crew, crewPhone, measurementSource, attentiveReportUrl, lotSizeSF, lawnRawSF, lawnPerimeterLF, hardEdgeLF, softEdgeLF, mulchBedSF, mulchBedPerimeterLF, hedgeSF, hedgeLF, drivewayPavementSF, sidewalkSF, treeCount, irrigationZones, difficultyJson, gateCode, notes, createdAt, updatedAt. Merges and replaces the old simple crew Properties sheet (Address, Crew, Phone, PIN) |
 | PropertyContacts | Junction table for many-to-many property↔contact links: linkId (LINK-timestamp), propertyId, contactId, role (Owner/Property Manager/Billing Contact/Tenant/Other), createdAt |
-| SubContractors | Per-property sub-contractor records: subContractorId (SUB-0001), propertyId, companyName, serviceType, contractNotes, phone, email, createdAt, updatedAt |
+| SubContractors | Per-property sub-contractor records: subContractorId (SUB-0001), propertyId, companyName, serviceType, contractNotes, phone, email, createdAt, updatedAt, monthlyCost, contractFileUrl, contractFileId |
 | Requests | Customer requests and internal tickets |
 
 **New Sheets (Built):**
@@ -2443,10 +2445,12 @@ Estimating Drive Folder (estimates JSON)
       └── Estimates/
           └── BID-xxxxx.json
 
-Text My Team Drive Folder (photos, reports)
+Text My Team Drive Folder (photos, reports, sub-contracts)
   └── [Street Address]/
       ├── Photos/
       │   └── [Report Name]/
+      ├── Sub-Contracts/
+      │   └── [Company Name] Contract.pdf
       └── Site Reports/
           ├── Report Data.json
           └── [Report Name]/

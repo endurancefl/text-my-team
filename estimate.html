@@ -1726,6 +1726,7 @@
         <div class="service-picker-tabs">
           <div class="service-picker-tab active" data-tab="catalog" onclick="switchServicePickerTab('catalog')">From Catalog</div>
           <div class="service-picker-tab" data-tab="custom" onclick="switchServicePickerTab('custom')">Custom</div>
+          <div class="service-picker-tab" data-tab="subs" onclick="switchServicePickerTab('subs')">From Subs</div>
         </div>
         <div style="padding: 16px;">
           <!-- From Catalog Tab -->
@@ -1739,6 +1740,13 @@
               <label>Visits per year:</label>
               <input type="number" id="service-visits" value="42" min="1">
             </div>
+          </div>
+          <!-- From Subs Tab -->
+          <div class="service-picker-content" id="service-picker-subs">
+            <div id="subs-finalized-banner" style="display: none; background: #FFF8E1; border: 1px solid #FFE082; border-radius: var(--radius); padding: 10px 12px; margin-bottom: 12px; font-size: 12px; color: #795548;">
+              Adding a service to a finalized contract will require re-finalizing to update tickets.
+            </div>
+            <div id="service-picker-subs-list"></div>
           </div>
         </div>
       </div>
@@ -1796,6 +1804,17 @@
                 <div class="color-dot orange" data-color="orange" title="Orange"></div>
                 <div class="color-dot none" data-color="none" title="No Color"></div>
               </div>
+            </div>
+          </div>
+          <div class="service-details-row" id="sub-override-options" style="display: none;">
+            <div class="form-group">
+              <label class="form-label">Sub Markup Override %</label>
+              <input type="number" class="form-input" id="service-sub-markup-override" placeholder="Use estimate default" min="0" step="1">
+              <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">Leave blank to use estimate default. Set to 0 for no markup.</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Sub Cost (Annual)</label>
+              <input type="number" class="form-input" id="service-sub-cost" min="0" step="0.01">
             </div>
           </div>
           <div class="service-details-row" id="recommended-options" style="display: none;">
@@ -2280,8 +2299,37 @@
           </div>
         </div>
         <div class="form-group" style="margin-top: 16px;">
+          <label class="form-label">Monthly Cost</label>
+          <div style="position: relative;">
+            <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-secondary); font-weight: 500;">$</span>
+            <input type="number" class="form-input" id="sub-monthly-cost" placeholder="0.00" min="0" step="0.01" style="padding-left: 24px;">
+          </div>
+          <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">What the sub-contractor charges per month</div>
+        </div>
+        <div class="form-group" style="margin-top: 16px;">
           <label class="form-label">Contract Notes</label>
           <textarea class="form-input" id="sub-contract-notes" rows="3" style="height: auto; padding: 8px 12px; resize: vertical;" placeholder="Contract details, renewal dates..."></textarea>
+        </div>
+        <div class="form-group" style="margin-top: 16px;">
+          <label class="form-label">Contract PDF</label>
+          <div id="sub-contract-file-area">
+            <div id="sub-contract-file-display" style="display: none; align-items: center; gap: 8px; padding: 8px 12px; background: var(--bg); border-radius: var(--radius); border: 1px solid var(--gw-divider);">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16" style="color: var(--primary); flex-shrink: 0;"><path stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+              <span id="sub-contract-file-name" style="font-size: 13px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
+              <button type="button" onclick="clearSubContractFile()" style="background: none; border: none; cursor: pointer; color: var(--text-secondary); padding: 2px;">&times;</button>
+            </div>
+            <div id="sub-contract-existing-link" style="display: none; margin-bottom: 8px;">
+              <a id="sub-contract-existing-url" href="#" target="_blank" style="font-size: 13px; color: var(--primary); text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                View Current Contract PDF
+              </a>
+            </div>
+            <label id="sub-contract-upload-btn" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; background: var(--bg); border: 1px solid var(--gw-divider); border-radius: var(--radius); cursor: pointer; font-size: 13px; color: var(--text-secondary);">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+              Upload PDF
+              <input type="file" accept=".pdf" style="display: none;" onchange="handleSubContractFileSelect(this)">
+            </label>
+          </div>
         </div>
       </div>
       <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; padding: 16px 24px; border-top: 1px solid var(--gw-divider);">
@@ -4747,11 +4795,15 @@ function calculateBidTotals() {
   let totalTravelHours = 0;
   let totalMaterialCost = 0;
   let totalSubCost = 0;
+  let totalSubBilled = 0;
   let totalVisits = 0;
 
   currentEstimate.services.forEach(service => {
     if (service.isSubcontractor) {
-      totalSubCost += service.subCost || 0;
+      const subCost = service.subCost || 0;
+      totalSubCost += subCost;
+      const effectiveSubMarkup = service.subMarkupOverride != null ? service.subMarkupOverride : rates.subMarkup;
+      totalSubBilled += calcWithMarkup(subCost, effectiveSubMarkup);
     } else {
       const serviceLaborHours = calcServiceHours(service);
       const serviceTravelPercent = service.travelPercent != null ? service.travelPercent : rates.travelPercent;
@@ -4778,7 +4830,7 @@ function calculateBidTotals() {
   const laborBilled = calcWithMarkup(laborCost, rates.laborMarkup);
 
   const materialBilled = calcWithMarkup(totalMaterialCost, rates.materialMarkup);
-  const subBilled = calcWithMarkup(totalSubCost, rates.subMarkup);
+  const subBilled = totalSubBilled;
 
   const bidTotal = laborBilled + materialBilled + subBilled;
   const internalCost = laborCost + totalMaterialCost + totalSubCost;
@@ -4823,9 +4875,10 @@ function calculateTierTotals() {
     let serviceBilled = 0;
 
     if (service.isSubcontractor) {
-      // Subcontractor services: just apply sub markup
+      // Subcontractor services: apply per-service or estimate-level sub markup
       const subCost = service.subCost || 0;
-      serviceBilled = calcWithMarkup(subCost, rates.subMarkup);
+      const effectiveSubMarkup = service.subMarkupOverride != null ? service.subMarkupOverride : rates.subMarkup;
+      serviceBilled = calcWithMarkup(subCost, effectiveSubMarkup);
     } else {
       // Labor costs
       const serviceAnnualHours = calcServiceHours(service);
@@ -6404,12 +6457,18 @@ function renderPropertySubContractors() {
 
   if (subs.length > 0) {
     listEl.innerHTML = subs.map(s => {
+      const costStr = s.monthlyCost ? `<div class="sub-contractor-detail" style="font-weight: 600; color: var(--primary);">$${parseFloat(s.monthlyCost).toFixed(2)}/mo</div>` : '';
+      const pdfLink = s.contractFileUrl ? `<a href="${s.contractFileUrl}" target="_blank" onclick="event.stopPropagation()" style="font-size: 12px; color: var(--primary); text-decoration: none; display: inline-flex; align-items: center; gap: 3px;">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+        View Contract</a>` : '';
       return `<div class="sub-contractor-card">
         <div class="sub-contractor-info">
           <div class="sub-contractor-name">${s.companyName || 'Unknown'}</div>
           ${s.serviceType ? `<div class="sub-contractor-service">${s.serviceType}</div>` : ''}
+          ${costStr}
           ${s.phone || s.email ? `<div class="sub-contractor-detail">${[s.phone, s.email].filter(Boolean).join(' | ')}</div>` : ''}
           ${s.contractNotes ? `<div class="sub-contractor-detail" style="margin-top: 4px;">${s.contractNotes}</div>` : ''}
+          ${pdfLink}
         </div>
         <div class="sub-contractor-actions">
           <button onclick="event.stopPropagation(); openSubContractorModal('edit', '${s.subContractorId}')" title="Edit">
@@ -6431,6 +6490,14 @@ function openSubContractorModal(mode, subId) {
   const title = document.getElementById('subcontractor-modal-title');
   const saveBtn = document.getElementById('sub-save-btn');
   editingSubContractorId = null;
+  pendingSubContractFile = null;
+
+  // Reset file UI
+  document.getElementById('sub-contract-file-display').style.display = 'none';
+  document.getElementById('sub-contract-upload-btn').style.display = 'inline-flex';
+  document.getElementById('sub-contract-existing-link').style.display = 'none';
+  const fileInput = document.querySelector('#sub-contract-upload-btn input[type="file"]');
+  if (fileInput) fileInput.value = '';
 
   if (mode === 'edit' && subId) {
     const sub = propertySubContractors.find(s => s.subContractorId === subId);
@@ -6443,6 +6510,13 @@ function openSubContractorModal(mode, subId) {
     document.getElementById('sub-phone').value = sub.phone || '';
     document.getElementById('sub-email').value = sub.email || '';
     document.getElementById('sub-contract-notes').value = sub.contractNotes || '';
+    document.getElementById('sub-monthly-cost').value = sub.monthlyCost || '';
+    // Show existing contract PDF link if available
+    if (sub.contractFileUrl) {
+      const linkEl = document.getElementById('sub-contract-existing-link');
+      document.getElementById('sub-contract-existing-url').href = sub.contractFileUrl;
+      linkEl.style.display = 'block';
+    }
   } else {
     title.textContent = 'Add Sub-Contractor';
     saveBtn.textContent = 'Save';
@@ -6451,6 +6525,7 @@ function openSubContractorModal(mode, subId) {
     document.getElementById('sub-phone').value = '';
     document.getElementById('sub-email').value = '';
     document.getElementById('sub-contract-notes').value = '';
+    document.getElementById('sub-monthly-cost').value = '';
   }
   modal.classList.add('active');
 }
@@ -6474,13 +6549,16 @@ async function saveSubContractorFromModal() {
   const saveBtn = document.getElementById('sub-save-btn');
   saveBtn.classList.add('btn--loading');
 
+  const monthlyCost = parseFloat(document.getElementById('sub-monthly-cost').value) || 0;
+
   const subData = {
     propertyId: currentProperty.propertyId,
     companyName,
     serviceType: document.getElementById('sub-service-type').value.trim(),
     phone: document.getElementById('sub-phone').value.trim(),
     email: document.getElementById('sub-email').value.trim(),
-    contractNotes: document.getElementById('sub-contract-notes').value.trim()
+    contractNotes: document.getElementById('sub-contract-notes').value.trim(),
+    monthlyCost
   };
 
   try {
@@ -6498,6 +6576,37 @@ async function saveSubContractorFromModal() {
     const result = await resp.json();
 
     if (result.success) {
+      // Upload contract PDF if pending
+      if (pendingSubContractFile) {
+        try {
+          const pdfResp = await fetch(GOOGLE_SHEETS_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+              uploadSubContractPdf: true,
+              property: currentProperty.address,
+              filename: companyName + ' Contract',
+              pdfBase64: pendingSubContractFile.base64
+            })
+          });
+          const pdfResult = await pdfResp.json();
+          if (pdfResult.success) {
+            // Update the sub-contractor record with file URL
+            const subId = editingSubContractorId || result.subContractorId;
+            await fetch(GOOGLE_SHEETS_URL, {
+              method: 'POST',
+              body: JSON.stringify({
+                updateSubContractor: true,
+                subContractorId: subId,
+                contractFileUrl: pdfResult.fileUrl,
+                contractFileId: pdfResult.fileId
+              })
+            });
+          }
+        } catch (pdfErr) {
+          console.error('Error uploading contract PDF:', pdfErr);
+          showToast('Sub saved, but PDF upload failed.', 'warning');
+        }
+      }
       // Refresh sub-contractors
       const subsResp = await fetch(GOOGLE_SHEETS_URL + '?action=getSubContractors');
       const subsData = await subsResp.json();
@@ -6533,6 +6642,30 @@ async function deleteSubContractor(subId) {
     console.error('Error deleting sub-contractor:', err);
     showToast('Error deleting sub-contractor.', 'error');
   }
+}
+
+let pendingSubContractFile = null;
+
+function handleSubContractFileSelect(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    pendingSubContractFile = { name: file.name, base64: e.target.result };
+    document.getElementById('sub-contract-file-name').textContent = file.name;
+    document.getElementById('sub-contract-file-display').style.display = 'flex';
+    document.getElementById('sub-contract-upload-btn').style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearSubContractFile() {
+  pendingSubContractFile = null;
+  document.getElementById('sub-contract-file-display').style.display = 'none';
+  document.getElementById('sub-contract-upload-btn').style.display = 'inline-flex';
+  // Reset file input
+  const fileInput = document.querySelector('#sub-contract-upload-btn input[type="file"]');
+  if (fileInput) fileInput.value = '';
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -7699,7 +7832,8 @@ function showPaymentScheduleModal() {
 
     if (service.isSubcontractor) {
       const subCost = service.subCost || 0;
-      serviceBilled = calcWithMarkup(subCost, rates.subMarkup);
+      const effectiveSubMarkup = service.subMarkupOverride != null ? service.subMarkupOverride : rates.subMarkup;
+      serviceBilled = calcWithMarkup(subCost, effectiveSubMarkup);
     } else {
       const serviceAnnualHours = calcServiceHours(service);
       const serviceTravelPercent = service.travelPercent != null ? service.travelPercent : rates.travelPercent;
@@ -8741,6 +8875,43 @@ function renderTableBody() {
   }
 
   currentEstimate.services.forEach((service, sIdx) => {
+    // Sub-contractor service row (no line items)
+    if (service.isSubcontractor) {
+      const subCost = service.subCost || 0;
+      const effectiveSubMarkup = service.subMarkupOverride != null ? service.subMarkupOverride : rates.subMarkup;
+      const subBilled = calcWithMarkup(subCost, effectiveSubMarkup);
+      const subMargin = subBilled > 0 ? ((subBilled - subCost) / subBilled) * 100 : 0;
+      const tierClass = service.billingTier || 'billed';
+      const tierLabel = tierClass === 'fixed' ? 'Fixed' : (tierClass === 'billed' ? 'Billed' : 'Rec');
+      const markupLabel = service.subMarkupOverride != null ? service.subMarkupOverride : rates.subMarkup;
+
+      html += `
+        <tr class="row-service-group" data-service="${sIdx}">
+          <td>
+            <div class="service-name">
+              <span class="tier-badge ${tierClass}">${tierLabel}</span>
+              <strong>${service.proposalName || service.name}</strong>
+              <span style="font-size: 10px; background: #E8F5E9; color: #2E7D32; padding: 2px 6px; border-radius: 3px; margin-left: 4px; font-weight: 600;">SUB +${markupLabel}%</span>
+              <button class="service-edit-btn" onclick="openServiceDetailsModal(${sIdx})" title="Edit details">Edit</button>
+              <button class="delete-service-btn" onclick="deleteService(${sIdx})" title="Delete service">×</button>
+            </div>
+          </td>
+          <td></td>
+          <td style="text-align: center; font-size: 12px; color: var(--text-secondary);">12</td>
+          <td></td>
+          <td></td>
+          <td style="text-align: center; font-size: 12px; color: var(--text-secondary);">—</td>
+          <td style="text-align: center; font-size: 12px; color: var(--text-secondary);">—</td>
+          <td style="text-align: center; font-size: 12px; color: var(--text-secondary);">—</td>
+          <td class="num" style="font-size: 12px;" title="Annual Sub Cost">${formatCurrency(subCost)}</td>
+          <td class="num">${formatCurrency(subBilled / 12)}</td>
+          <td class="num">${formatCurrency(subBilled)}</td>
+          <td class="num">${formatPercent(subMargin)}</td>
+        </tr>
+      `;
+      return; // Skip line items for sub-contractor services
+    }
+
     // Get service-specific travel percent (default to global setting)
     const serviceTravelPercent = service.travelPercent != null ? service.travelPercent : rates.travelPercent;
 
@@ -9779,7 +9950,8 @@ async function generateContractPdf() {
       let costPerOccurrence = 0;
 
       if (svc.isSubcontractor) {
-        annualTotal = calcWithMarkup(svc.subCost || 0, rates.subMarkup);
+        const effectiveSubMarkup = svc.subMarkupOverride != null ? svc.subMarkupOverride : rates.subMarkup;
+        annualTotal = calcWithMarkup(svc.subCost || 0, effectiveSubMarkup);
       } else {
         const serviceAnnualHours = calcServiceHours(svc);
         const serviceTotalHours = serviceAnnualHours * (1 + rates.travelPercent / 100);
@@ -11815,6 +11987,9 @@ function openServiceModal() {
   // Render catalog list
   renderServicePickerCatalog();
 
+  // Pre-render subs tab content
+  renderServicePickerSubs();
+
   // Render custom list (SERVICE_TEMPLATES)
   const customList = document.getElementById('service-picker-list');
   customList.innerHTML = SERVICE_TEMPLATES.map((svc, idx) => `
@@ -11848,13 +12023,19 @@ function switchServicePickerTab(tab) {
   });
   document.getElementById('service-picker-catalog').classList.toggle('active', tab === 'catalog');
   document.getElementById('service-picker-custom').classList.toggle('active', tab === 'custom');
+  document.getElementById('service-picker-subs').classList.toggle('active', tab === 'subs');
 
   // Update button text based on tab
   const btn = document.getElementById('add-services-btn');
   if (tab === 'catalog') {
     btn.textContent = selectedCatalogServices.length > 0 ? `Add ${selectedCatalogServices.length} Service${selectedCatalogServices.length > 1 ? 's' : ''}` : 'Add Services';
+    btn.style.display = '';
+  } else if (tab === 'subs') {
+    btn.style.display = 'none'; // Subs are added directly via card click
+    renderServicePickerSubs();
   } else {
     btn.textContent = 'Add Service';
+    btn.style.display = '';
   }
 }
 
@@ -11939,14 +12120,96 @@ function updateSelectedServicesCount() {
   const btn = document.getElementById('add-services-btn');
   const activeTab = document.querySelector('.service-picker-tab.active')?.dataset.tab;
 
-  if (activeTab === 'catalog' && selectedCatalogServices.length > 0) {
+  if (activeTab === 'subs') {
+    countEl.style.display = 'none';
+    btn.style.display = 'none';
+  } else if (activeTab === 'catalog' && selectedCatalogServices.length > 0) {
     countEl.textContent = selectedCatalogServices.length;
     countEl.style.display = 'inline';
     btn.textContent = `Add ${selectedCatalogServices.length} Service${selectedCatalogServices.length > 1 ? 's' : ''}`;
+    btn.style.display = '';
   } else {
     countEl.style.display = 'none';
     btn.textContent = activeTab === 'catalog' ? 'Add Services' : 'Add Service';
+    btn.style.display = '';
   }
+}
+
+function renderServicePickerSubs() {
+  const container = document.getElementById('service-picker-subs-list');
+  const banner = document.getElementById('subs-finalized-banner');
+
+  // Show finalized banner if estimate is finalized
+  if (currentEstimate.status === 'Finalized') {
+    banner.style.display = 'block';
+  } else {
+    banner.style.display = 'none';
+  }
+
+  const propId = currentEstimate.propertyId;
+  const subs = (propertySubContractors || []).filter(s => s.propertyId === propId);
+
+  if (subs.length === 0) {
+    container.innerHTML = `<div style="text-align: center; padding: 32px 16px; color: var(--text-secondary);">
+      <div style="font-size: 14px; margin-bottom: 8px;">No sub-contractors for this property</div>
+      <div style="font-size: 12px;">Add sub-contractors from the Property tab first.</div>
+    </div>`;
+    return;
+  }
+
+  // Check which subs are already added to this estimate
+  const addedSubIds = new Set(
+    currentEstimate.services.filter(s => s.isSubcontractor && s.subContractorId).map(s => s.subContractorId)
+  );
+
+  container.innerHTML = subs.map(sub => {
+    const isAdded = addedSubIds.has(sub.subContractorId);
+    const costStr = sub.monthlyCost ? `$${parseFloat(sub.monthlyCost).toFixed(2)}/mo` : 'No cost set';
+    const annualCost = sub.monthlyCost ? `$${(parseFloat(sub.monthlyCost) * 12).toFixed(2)}/yr` : '';
+    return `<div class="service-picker-catalog-item ${isAdded ? 'selected' : ''}" style="padding: 12px; border: 1px solid var(--gw-divider); border-radius: var(--radius); margin-bottom: 8px; cursor: ${isAdded ? 'default' : 'pointer'}; ${isAdded ? 'opacity: 0.6;' : ''}"
+      ${isAdded ? '' : `onclick="addSubFromProperty('${sub.subContractorId}')"`}>
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <div style="font-weight: 600; font-size: 14px;">${sub.companyName || 'Unknown'}</div>
+          ${sub.serviceType ? `<div style="font-size: 12px; color: var(--text-secondary);">${sub.serviceType}</div>` : ''}
+          <div style="font-size: 13px; margin-top: 4px; color: var(--primary); font-weight: 500;">${costStr}${annualCost ? ` (${annualCost})` : ''}</div>
+        </div>
+        <div>
+          ${isAdded ? '<span style="font-size: 12px; color: var(--text-secondary); background: var(--bg); padding: 4px 8px; border-radius: 4px;">Added</span>' : '<span style="font-size: 12px; color: var(--primary); font-weight: 500;">+ Add</span>'}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function addSubFromProperty(subContractorId) {
+  const sub = (propertySubContractors || []).find(s => s.subContractorId === subContractorId);
+  if (!sub) return;
+
+  const monthlyCost = parseFloat(sub.monthlyCost) || 0;
+  const annualCost = monthlyCost * 12;
+
+  const newService = {
+    name: sub.companyName + (sub.serviceType ? ' - ' + sub.serviceType : ''),
+    proposalName: sub.companyName + (sub.serviceType ? ' - ' + sub.serviceType : ''),
+    description: '',
+    category: 'Sub-Contractor',
+    billingTier: 'billed',
+    mapColor: 'none',
+    visits: 12,
+    isSubcontractor: true,
+    subContractorId: sub.subContractorId,
+    subCost: annualCost,
+    subMarkupOverride: null,
+    accepted: true,
+    lineItems: []
+  };
+
+  currentEstimate.services.push(newService);
+  markEstimateDirty();
+  renderServicePickerSubs(); // Re-render to grey out the added sub
+  renderTableBody();
+  showToast(`Added ${sub.companyName} as a service.`, 'success');
 }
 
 function addSelectedServices() {
@@ -12033,6 +12296,16 @@ function openServiceDetailsModal(sIdx) {
     dot.classList.toggle('selected', dot.dataset.color === selectedServiceColor);
   });
 
+  // Show/hide sub-contractor override options
+  const subOverrideOptions = document.getElementById('sub-override-options');
+  if (service.isSubcontractor) {
+    subOverrideOptions.style.display = 'block';
+    document.getElementById('service-sub-markup-override').value = service.subMarkupOverride != null ? service.subMarkupOverride : '';
+    document.getElementById('service-sub-cost').value = service.subCost || '';
+  } else {
+    subOverrideOptions.style.display = 'none';
+  }
+
   // Show/hide recommended options
   const recommendedOptions = document.getElementById('recommended-options');
   if (service.billingTier === 'recommended') {
@@ -12062,6 +12335,14 @@ function saveServiceDetails() {
   service.description = serviceDescQuill ? serviceDescQuill.root.innerHTML.trim() : '';
   service.billingTier = document.getElementById('service-billing-tier').value;
   service.mapColor = selectedServiceColor;
+
+  // For sub-contractor services, persist override fields
+  if (service.isSubcontractor) {
+    const overrideVal = document.getElementById('service-sub-markup-override').value;
+    service.subMarkupOverride = overrideVal !== '' ? parseFloat(overrideVal) : null;
+    const subCostVal = document.getElementById('service-sub-cost').value;
+    service.subCost = subCostVal !== '' ? parseFloat(subCostVal) : (service.subCost || 0);
+  }
 
   // For recommended services, check accepted status
   if (service.billingTier === 'recommended') {
