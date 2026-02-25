@@ -1509,6 +1509,7 @@ body {
   overflow-y: auto;
   overflow-x: hidden;
   min-height: 0;
+  max-height: calc(100vh - var(--header-height));
   padding: 24px;
   background: var(--gw-surface);
   -webkit-overflow-scrolling: touch;
