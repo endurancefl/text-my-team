@@ -11,10 +11,9 @@
   <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.js"></script>
-  <link rel="stylesheet" href="css/estimate.css?v=scroll5">
+  <link rel="stylesheet" href="css/estimate.css?v=abs1">
 </head>
 <body>
-<script>document.title='DEBUG BUILD v3';</script>
 
   <!-- LOGIN SCREEN -->
   <div class="login-screen" id="login-screen">
@@ -6145,35 +6144,6 @@ function openPropertyProfile(propIdOrNormAddr) {
 
   document.getElementById('properties-list-view').style.display = 'none';
   document.getElementById('property-profile-view').style.display = 'block';
-
-  // DEBUG: log height chain after render
-  setTimeout(() => {
-    const mb = document.querySelector('.main-body');
-    const mc = document.querySelector('.main-content');
-    const ppv = document.getElementById('property-profile-view');
-    const card = ppv ? ppv.querySelector('.contact-profile-card') : null;
-    const details = ppv ? ppv.querySelector('.contact-profile-details') : null;
-    let msg = 'SCROLL DEBUG v2:\n';
-    // Check grid tracks
-    if (mc) {
-      msg += 'main-content gridTemplateRows: ' + getComputedStyle(mc).gridTemplateRows + '\n';
-      msg += 'main-content children: ' + mc.children.length + '\n';
-      for (let i = 0; i < mc.children.length; i++) {
-        const c = mc.children[i];
-        msg += '  child[' + i + ']: ' + c.className.split(' ')[0] + ' clientH=' + c.clientHeight + ' tagName=' + c.tagName + '\n';
-      }
-    }
-    msg += '\nmain-body: clientH=' + (mb?mb.clientHeight:'?') + ' scrollH=' + (mb?mb.scrollHeight:'?') + ' offsetH=' + (mb?mb.offsetHeight:'?') + '\n';
-    msg += 'property-card: clientH=' + (card?card.clientHeight:'?') + ' children=' + (card?card.children.length:'?') + '\n';
-    if (card) {
-      for (let i = 0; i < card.children.length; i++) {
-        const c = card.children[i];
-        msg += '  card-child[' + i + ']: ' + c.className.split(' ')[0] + ' clientH=' + c.clientHeight + '\n';
-      }
-    }
-    msg += 'details: clientH=' + (details?details.clientHeight:'?') + ' children=' + (details?details.children.length:'?') + '\n';
-    alert(msg);
-  }, 300);
 
   // Header
   document.getElementById('property-profile-address').textContent = prop.address;
