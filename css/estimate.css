@@ -1506,9 +1506,9 @@ body {
 .save-status.unsaved { color: var(--gw-yellow); }
 
 .main-body {
+  height: calc(100% - var(--header-height));
   overflow-y: auto;
   overflow-x: hidden;
-  min-height: 0;
   padding: 24px;
   background: var(--gw-surface);
   -webkit-overflow-scrolling: touch;
