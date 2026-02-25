@@ -6448,6 +6448,7 @@ async function saveLinkFromLinker() {
 // ═══════════════════════════════════════════════════════════════
 
 let editingSubContractorId = null;
+let pendingSubContractFile = null;
 
 function renderPropertySubContractors() {
   const listEl = document.getElementById('property-subs-list');
@@ -6643,8 +6644,6 @@ async function deleteSubContractor(subId) {
     showToast('Error deleting sub-contractor.', 'error');
   }
 }
-
-let pendingSubContractFile = null;
 
 function handleSubContractFileSelect(input) {
   const file = input.files[0];
