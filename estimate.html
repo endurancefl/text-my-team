@@ -5687,26 +5687,6 @@ function openPropertyProfile(normalizedAddr) {
   document.getElementById('properties-list-view').style.display = 'none';
   document.getElementById('property-profile-view').style.display = 'block';
 
-  // DEBUG: log height chain after render
-  setTimeout(() => {
-    const els = [
-      document.querySelector('.app-container'),
-      document.querySelector('.main-content'),
-      document.querySelector('.main-body'),
-      document.getElementById('view-properties'),
-      document.getElementById('property-profile-view'),
-      document.querySelector('.contact-profile-card')
-    ];
-    const names = ['app-container','main-content','main-body','view-properties','property-profile-view','contact-profile-card'];
-    let msg = 'SCROLL DEBUG:\n';
-    els.forEach((el, i) => {
-      if (!el) { msg += names[i] + ': NOT FOUND\n'; return; }
-      const cs = getComputedStyle(el);
-      msg += names[i] + ': clientH=' + el.clientHeight + ' scrollH=' + el.scrollHeight + ' overflow=' + cs.overflow + '/' + cs.overflowY + ' display=' + cs.display + ' height=' + cs.height + ' maxH=' + cs.maxHeight + '\n';
-    });
-    alert(msg);
-  }, 300);
-
   // Header
   document.getElementById('property-profile-address').textContent = prop.address;
   document.getElementById('property-profile-type').textContent = prop.propertyType || 'Residential';
@@ -6164,6 +6144,26 @@ function openPropertyProfile(propIdOrNormAddr) {
 
   document.getElementById('properties-list-view').style.display = 'none';
   document.getElementById('property-profile-view').style.display = 'block';
+
+  // DEBUG: log height chain after render
+  setTimeout(() => {
+    const els = [
+      document.querySelector('.app-container'),
+      document.querySelector('.main-content'),
+      document.querySelector('.main-body'),
+      document.getElementById('view-properties'),
+      document.getElementById('property-profile-view'),
+      document.querySelector('.contact-profile-card')
+    ];
+    const names = ['app-container','main-content','main-body','view-properties','property-profile-view','contact-profile-card'];
+    let msg = 'SCROLL DEBUG:\n';
+    els.forEach((el, i) => {
+      if (!el) { msg += names[i] + ': NOT FOUND\n'; return; }
+      const cs = getComputedStyle(el);
+      msg += names[i] + ': clientH=' + el.clientHeight + ' scrollH=' + el.scrollHeight + ' overflow=' + cs.overflow + '/' + cs.overflowY + ' display=' + cs.display + ' height=' + cs.height + ' maxH=' + cs.maxHeight + '\n';
+    });
+    alert(msg);
+  }, 300);
 
   // Header
   document.getElementById('property-profile-address').textContent = prop.address;
