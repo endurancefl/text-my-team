@@ -48,12 +48,12 @@ The platform supports four divisions, each representing a distinct revenue strea
 text-my-team/
 ├── index.html                     # Customer service request portal (~3,100 lines)
 ├── crew.html                      # Crew leader app (~9,768 lines HTML/JS)
-├── estimate.html                  # Bidding & estimating tool (~16,294 lines HTML/JS)
+├── estimate.html                  # Bidding & estimating tool (~16,033 lines HTML/JS)
 ├── payment-success.html           # Stripe payment success redirect
 ├── payment-cancel.html            # Stripe payment cancel redirect
 ├── css/
 │   ├── crew.css                   # All CSS for crew.html (~4,511 lines)
-│   └── estimate.css               # All CSS for estimate.html (~5,662 lines)
+│   └── estimate.css               # All CSS for estimate.html (~5,533 lines)
 ├── assets/
 │   ├── manifest.json              # PWA manifest for index.html
 │   ├── manifest-crew.json         # PWA manifest for crew.html
@@ -150,7 +150,7 @@ text-my-team/
 - iOS design system: SF Pro typography, exact system colors, dark mode, frosted glass tab bar with `backdrop-filter`, iOS spring animations, 44px touch targets, `prefers-reduced-motion` support
 - Bottom tab bar: Schedule (home) | Requests | Report Issue | Reports
 
-**estimate.html + estimate.css — Bidding & Estimating Tool (~15,900+ lines HTML/JS + ~5,670+ lines CSS)**
+**estimate.html + estimate.css — Bidding & Estimating Tool (~16,030+ lines HTML/JS + ~5,530+ lines CSS)**
 - **Division: Maintenance (MNT) fully built** — Irrigation, Construction, and Enhancement divisions planned, will reuse the same engine with division-specific catalogs and takeoffs
 - **Job Type Selection** ✅ **BUILT**: When creating a new estimate, the user first picks a job type via the Job Type Picker modal:
   - **Recurring Service** — Ongoing contract with scheduled visits throughout the year (existing flow, unchanged)
@@ -166,7 +166,6 @@ text-my-team/
   | Payment schedule | Monthly amortization over contract months | Total project price + optional deposit/balance split |
   | Contract card | "Contract Settings" — start/end, duration, payment months, price increase, CC fee | "Project Settings" — project name, schedule type, date(s), deposit toggle |
   | Ticket generation | `generateAllTickets()` across contract duration | `generateWorkTickets()` — 1 ticket (single visit) or N tickets (multi-day) |
-  | Summary panel | Annual Contract Value + tier breakdown + monthly payment + payment schedule grid | Total Project Price + deposit/balance breakdown (if deposit enabled) |
   | Finalization | Creates contract + recurring scheduled tickets | Creates work order + work ticket(s) with jobType/dayNumber/totalDays metadata |
 
   **Work Ticket Schedule Types** ✅ **BUILT**:
@@ -180,7 +179,6 @@ text-my-team/
   **Work Ticket Deposit System** ✅ **BUILT**: Optional deposit/final payment split:
   - Checkbox: "Collect deposit upfront?"
   - Editable deposit percentage (default 25%)
-  - Summary panel shows deposit amount + balance due on completion
   - `depositPercent` and `depositAmount` stored on the contract row in Sheets
   - No auto-invoice generation — values stored for future invoicing system
 
@@ -198,8 +196,6 @@ text-my-team/
   - `setScheduleType(type)` — Toggles between single_visit and multi_day
   - `renderMultiDayAllocation()` — Per-day hour allocation table for multi-day
   - `getBusinessDays(startDate, count)` — Returns consecutive weekday dates
-  - `updateSummaryPanelForWorkTicket()` — Work ticket summary panel rendering
-  - `toggleSummaryForWorkTicket(isWT)` — Show/hide summary sections
   - `generateWorkTickets()` — Generates 1 or N tickets based on schedule type
   - `finalizeWorkTicket()` — Creates contract + tickets with work ticket metadata
   - `previewTickets()` — Branched for work ticket preview
@@ -228,7 +224,7 @@ text-my-team/
 
   **Sidebar Rename**: "Work Tickets" sidebar item renamed to "Reminders" to avoid confusion with the new Work Ticket job type.
 
-- Three-panel Google Workspace layout (sidebar, main content, summary panel). **CSS layout chain**: `.app-container` (flex row, 100vh) → `.sidebar` (fixed width) + `.main-content` (flex: 1, `position: relative`, `overflow: hidden`) + `.summary-panel` (280px). `.main-header` (56px, `position: relative`, z-index: 2) sits at top. `.main-body` (`position: relative; flex: 1; overflow: hidden`) contains all `.view` panels as direct children. `.view.active` has `height: 100%; overflow-y: auto; padding: 24px` — each view fills main-body and scrolls independently.
+- Two-panel Google Workspace layout (sidebar + main content). **CSS layout chain**: `.app-container` (flex row, 100vh) → `.sidebar` (fixed width) + `.main-content` (flex: 1, `display: flex; flex-direction: column`). `.main-header` (56px, `position: relative`, z-index: 2) sits at top. `.main-body` (`position: relative; flex: 1; overflow: hidden`) contains all `.view` panels as direct children. `.view.active` has `height: 100%; overflow-y: auto; padding: 24px` — each view fills main-body and scrolls independently. **Summary panel removed** (Feb 2026) — rate overrides (labor rate, labor markup, material markup, sub markup, travel %) integrated into the contract/project settings card as a collapsible `<details>` section, shared by both recurring and work ticket modes.
 - **Bid Builder**: Spreadsheet-style table with columns: Item, OCC, QTY, Unit, P/H, AH, TH, P/P, TP, GM%
 - **Real-time calculation engine**: labor hours from quantities ÷ production rates, material costs from coverage rates, travel time percentage, separate markups for labor/materials/subcontractors. Per-service sub-contractor markup override (`subMarkupOverride`) allows individual services to use 0% or custom markup instead of the estimate-level default — applied in `calculateBidTotals()`, `calculateTierTotals()`, proposal preview, and finalization payload
 - **Sub-Contractor Billing**: Property-level subs (with monthlyCost and contract PDF) flow into estimates via "From Subs" tab in the Add Service modal. Creates service with `isSubcontractor: true`, `subCost: monthlyCost * 12`, `billingTier: 'billed'`, `subContractorId` link. Default 10% markup from bid settings; per-service `subMarkupOverride` allows 0% or custom markup. Sub services render in the bid table as a single row showing cost/markup/billed/margin (no line items). Contract PDF upload via `uploadSubContractPdf` to Drive Sub-Contracts folder. Adding a sub to a finalized contract uses existing revision flow. Functions: `renderServicePickerSubs()`, `addSubFromProperty()`, `handleSubContractFileSelect()`, `clearSubContractFile()`
@@ -245,7 +241,7 @@ text-my-team/
 - **Service Catalog**: Pre-configured service templates with default visits, billing tiers, proposal names, descriptions (rich text via Quill.js editor), map colors, line item assignments, duration type (scalable or fixed)
 - **Template System**: Save/load estimate structures (services, tiers, visits, travel %, contract duration), excludes property-specific data
 - **Contract Settings**: Start/end dates, duration, payment months, price increase %, payment terms (Net 30, etc.), CC processing fee %, CC gross-up toggle, "Edit Terms & Conditions" button (opens Quill.js rich text editor modal)
-- **CC Gross-Up**: When enabled, monthly payment is adjusted: `grossedUpMonthly = baseMonthly / (1 - ccFeePercent/100)`. Applied in summary panel, payment schedule, and finalize calculations. Data model fields: `ccFeePercent` (number), `ccGrossUp` (boolean).
+- **CC Gross-Up**: When enabled, monthly payment is adjusted: `grossedUpMonthly = baseMonthly / (1 - ccFeePercent/100)`. Applied in payment schedule and finalize calculations. Data model fields: `ccFeePercent` (number), `ccGrossUp` (boolean).
 - **Payment Schedule Generator**: Monthly payment distribution with penny rounding algorithm
 - **Rich Text Editors (Quill.js v2)**: Three Quill.js rich text editors replace plain textareas for formatted content that flows into contract PDFs:
   - **Service Catalog Description**: Quill editor in the service catalog edit modal — stores HTML as `defaultDescription`

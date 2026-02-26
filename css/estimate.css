@@ -54,7 +54,6 @@
   /* Layout */
   --sidebar-width: 68px;
   --sidebar-expanded: 256px;
-  --summary-width: 280px;
   --header-height: 56px;
 
   /* Legacy mappings for compatibility */
@@ -1511,92 +1510,6 @@ body {
   position: relative;
   flex: 1;
   overflow: hidden;
-}
-
-/* RIGHT SUMMARY PANEL - Google Sheets Explore Panel Style */
-.summary-panel {
-  width: var(--summary-width);
-  background: var(--gw-surface);
-  border-left: 1px solid var(--gw-border);
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-}
-
-.summary-header {
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--gw-divider);
-  font-family: var(--gw-font-display);
-  font-weight: 500;
-  font-size: 14px;
-  color: var(--gw-text-primary);
-}
-
-.summary-total {
-  padding: 20px;
-  background: var(--gw-surface);
-  border-bottom: 1px solid var(--gw-divider);
-}
-
-.summary-total-label {
-  font-size: 12px;
-  color: var(--gw-text-secondary);
-  margin-bottom: 4px;
-  text-transform: uppercase;
-  font-weight: 500;
-}
-
-.summary-total-value {
-  font-family: var(--gw-font-display);
-  font-size: 28px;
-  font-weight: 400;
-  color: var(--gw-text-primary);
-  font-feature-settings: 'tnum';
-}
-
-.summary-section {
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--gw-divider);
-}
-
-.summary-section-title {
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--gw-text-secondary);
-  margin-bottom: 12px;
-}
-
-.summary-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 6px 0;
-  font-size: 13px;
-}
-
-.summary-row-label {
-  color: var(--gw-text-secondary);
-}
-
-.summary-row-value {
-  font-weight: 500;
-  color: var(--gw-text-primary);
-  font-feature-settings: 'tnum';
-}
-
-.summary-row-value.positive {
-  color: var(--gw-green);
-}
-
-.summary-row-value.warning {
-  color: var(--gw-yellow);
-}
-
-.summary-divider {
-  height: 1px;
-  background: var(--gw-divider);
-  margin: 8px 0;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -3774,43 +3687,6 @@ select option:checked {
   font-feature-settings: 'tnum';
 }
 
-.summary-service-item {
-  display: flex;
-  justify-content: space-between;
-  padding: 4px 0;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.summary-payment-section {
-  padding: 16px 20px;
-  background: rgba(59, 130, 246, 0.05);
-  border-bottom: 1px solid var(--border);
-}
-
-.payment-schedule-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.payment-item {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  padding: 4px 0;
-}
-
-.payment-item-month {
-  color: var(--text-secondary);
-}
-
-.payment-item-amount {
-  font-weight: 500;
-  font-feature-settings: 'tnum';
-}
-
 /* Service Config Row */
 .service-config-row {
   display: flex;
@@ -4570,7 +4446,8 @@ select option:checked {
   background: rgba(59, 130, 246, 0.03);
 }
 
-.rates-grid {
+.rates-grid,
+.rate-settings-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
@@ -5654,11 +5531,3 @@ select option:checked {
   color: var(--gw-text-primary);
 }
 
-/* Work Ticket Summary */
-#wt-summary-section .summary-total {
-  background: none;
-  padding: 12px 16px;
-}
-#wt-summary-section .summary-total-value {
-  font-size: 28px;
-}

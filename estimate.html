@@ -277,6 +277,37 @@
                     </select>
                   </div>
                 </div>
+                <!-- Rate Overrides (per-estimate) — shared by recurring & work ticket -->
+                <div style="padding: 0 16px 12px; border-top: 1px solid #eee; margin-top: 8px; padding-top: 12px;">
+                  <details class="rate-overrides-details">
+                    <summary style="font-size: 12px; font-weight: 500; color: var(--gw-text-secondary); cursor: pointer; user-select: none;">Rate Overrides</summary>
+                    <div class="rate-settings-grid" style="margin-top: 10px;">
+                      <div class="rate-row">
+                        <span class="rate-label">Labor Rate</span>
+                        <span style="display: flex; align-items: center; gap: 4px;">$<input type="number" class="rate-input" id="estimate-labor-rate" value="0" step="0.5" min="0"></span>
+                      </div>
+                      <div class="rate-row">
+                        <span class="rate-label">Labor Markup</span>
+                        <span style="display: flex; align-items: center; gap: 4px;"><input type="number" class="rate-input" id="estimate-labor-markup" value="0" step="1" min="0">%</span>
+                      </div>
+                      <div class="rate-row">
+                        <span class="rate-label">Material Markup</span>
+                        <span style="display: flex; align-items: center; gap: 4px;"><input type="number" class="rate-input" id="estimate-material-markup" value="0" step="1" min="0">%</span>
+                      </div>
+                      <div class="rate-row">
+                        <span class="rate-label">Sub Markup</span>
+                        <span style="display: flex; align-items: center; gap: 4px;"><input type="number" class="rate-input" id="estimate-sub-markup" value="0" step="1" min="0">%</span>
+                      </div>
+                      <div class="rate-row full-width">
+                        <span class="rate-label">Travel %</span>
+                        <span style="display: flex; align-items: center; gap: 4px;"><input type="number" class="rate-input" id="estimate-travel-percent" value="30" step="1" min="0">%</span>
+                      </div>
+                      <div class="rate-row full-width" style="justify-content: flex-end; color: var(--gw-text-secondary); font-style: italic;">
+                        <span>Billed: <span id="estimate-billed-rate">$0.00/hr</span></span>
+                      </div>
+                    </div>
+                  </details>
+                </div>
               </div>
             </div>
 
@@ -1690,142 +1721,7 @@
     </div>
 
     <!-- RIGHT SUMMARY PANEL -->
-    <div class="summary-panel" id="summary-panel" style="display:none;">
-      <div class="summary-header">Proposal Summary</div>
-      <div class="summary-total">
-        <div class="summary-total-label">Annual Contract Value</div>
-        <div class="summary-total-value" id="sum-total">$0.00</div>
-      </div>
-
-      <!-- Fixed Payment Services -->
-      <div class="summary-tier-section" id="tier-fixed-section">
-        <div class="summary-tier-header">
-          <span class="summary-tier-title fixed">Fixed Payment</span>
-          <span class="summary-tier-total" id="tier-fixed-total">$0.00</span>
-        </div>
-        <div id="tier-fixed-services"></div>
-      </div>
-
-      <!-- Billed Separately Services -->
-      <div class="summary-tier-section" id="tier-billed-section">
-        <div class="summary-tier-header">
-          <span class="summary-tier-title billed">Billed Separately</span>
-          <span class="summary-tier-total" id="tier-billed-total">$0.00</span>
-        </div>
-        <div id="tier-billed-services"></div>
-      </div>
-
-      <!-- Recommended Services -->
-      <div class="summary-tier-section" id="tier-recommended-section">
-        <div class="summary-tier-header">
-          <span class="summary-tier-title recommended">Recommended</span>
-          <span class="summary-tier-total" id="tier-recommended-total">$0.00</span>
-        </div>
-        <div id="tier-recommended-services"></div>
-      </div>
-
-      <!-- Estimate Rate Settings -->
-      <div class="rates-section">
-        <div class="summary-section-title">Rate Settings</div>
-        <div class="rates-grid">
-          <div class="rate-row">
-            <span class="rate-label">Labor Rate/Hour</span>
-            <input type="number" class="rate-input" id="estimate-labor-rate" step="0.01">
-          </div>
-          <div class="rate-row">
-            <span class="rate-label">Billed Rate</span>
-            <span class="rate-calculated" id="estimate-billed-rate">$0.00</span>
-          </div>
-          <div class="rate-row">
-            <span class="rate-label">Labor Markup %</span>
-            <input type="number" class="rate-input" id="estimate-labor-markup" step="0.01">
-          </div>
-          <div class="rate-row">
-            <span class="rate-label">Travel Time %</span>
-            <input type="number" class="rate-input" id="estimate-travel-percent" step="1" min="0" max="100">
-          </div>
-          <div class="rate-row">
-            <span class="rate-label">Material Markup %</span>
-            <input type="number" class="rate-input" id="estimate-material-markup" step="0.01">
-          </div>
-          <div class="rate-row">
-            <span class="rate-label">Sub Markup %</span>
-            <input type="number" class="rate-input" id="estimate-sub-markup" step="0.01">
-          </div>
-        </div>
-      </div>
-
-      <!-- Payment Schedule -->
-      <div class="summary-payment-section">
-        <div class="summary-section-title">Payment Schedule</div>
-        <div class="summary-row">
-          <span class="summary-row-label">Monthly Payment</span>
-          <span class="summary-row-value" id="sum-monthly">$0.00</span>
-        </div>
-        <div class="summary-row">
-          <span class="summary-row-label">Cost Per Occurrence</span>
-          <span class="summary-row-value" id="sum-per-visit">$0.00</span>
-        </div>
-        <div class="payment-schedule-grid" id="payment-schedule-grid"></div>
-        <button class="btn btn-primary" onclick="showPaymentScheduleModal()" style="margin-top: 12px; width: 100%; font-size: 12px;">
-          Generate Payment Schedule
-        </button>
-        <button class="btn btn-secondary" id="btn-generate-contract-pdf" onclick="generateContractPdf()" style="margin-top: 8px; width: 100%; font-size: 12px; display: none;">
-          Generate Contract PDF
-        </button>
-      </div>
-
-      <div class="summary-section">
-        <div class="summary-section-title">Cost Breakdown</div>
-        <div class="summary-row">
-          <span class="summary-row-label">Labor Cost</span>
-          <span class="summary-row-value" id="sum-labor-cost">$0.00</span>
-        </div>
-        <div class="summary-row">
-          <span class="summary-row-label">Labor Billed</span>
-          <span class="summary-row-value" id="sum-labor-billed">$0.00</span>
-        </div>
-        <div class="summary-row">
-          <span class="summary-row-label">Material Cost</span>
-          <span class="summary-row-value" id="sum-material-cost">$0.00</span>
-        </div>
-        <div class="summary-row">
-          <span class="summary-row-label">Material Billed</span>
-          <span class="summary-row-value" id="sum-material-billed">$0.00</span>
-        </div>
-        <div class="summary-row">
-          <span class="summary-row-label">Sub Cost</span>
-          <span class="summary-row-value" id="sum-sub-cost">$0.00</span>
-        </div>
-        <div class="summary-row">
-          <span class="summary-row-label">Sub Billed</span>
-          <span class="summary-row-value" id="sum-sub-billed">$0.00</span>
-        </div>
-      </div>
-
-      <div class="summary-section">
-        <div class="summary-section-title">Profitability</div>
-        <div class="summary-row">
-          <span class="summary-row-label">Break Even</span>
-          <span class="summary-row-value" id="sum-break-even">$0.00</span>
-        </div>
-        <div class="summary-row">
-          <span class="summary-row-label">Net Profit</span>
-          <span class="summary-row-value positive" id="sum-profit">$0.00</span>
-        </div>
-        <div class="summary-row">
-          <span class="summary-row-label">Gross Margin</span>
-          <span class="summary-row-value" id="sum-margin">0.0%</span>
-        </div>
-      </div>
-      <div class="summary-section">
-        <div class="summary-section-title">Labor</div>
-        <div class="summary-row">
-          <span class="summary-row-label">Total Hours</span>
-          <span class="summary-row-value" id="sum-hours">0.00</span>
-        </div>
-      </div>
-    </div>
+    <!-- Summary panel removed — rate overrides integrated into contract/project settings -->
 
   </div>
 
@@ -8643,10 +8539,6 @@ function showView(viewId) {
     populateEstimateContactPicker();
   }
 
-  // Show/hide summary panel
-  const summaryPanel = document.getElementById('summary-panel');
-  summaryPanel.style.display = viewId === 'builder' ? 'flex' : 'none';
-
   // Show/hide property card in template mode
   const propertyCard = document.getElementById('property-card');
   const contractCard = document.getElementById('contract-card');
@@ -11913,79 +11805,6 @@ function getDefaultMeasurementSource(category) {
 }
 
 function updateSummaryPanel() {
-  if (currentEstimate.jobType === 'work_ticket') {
-    return updateSummaryPanelForWorkTicket();
-  }
-  const totals = calculateBidTotals();
-  const tierTotals = calculateTierTotals();
-  const paymentMonths = currentEstimate.contract.paymentMonths || 12;
-
-  // Calculate contract total (fixed + accepted recommended)
-  const contractTotal = tierTotals.fixed.total +
-    tierTotals.recommended.services.filter(s => s.accepted).reduce((sum, s) => sum + s.total, 0);
-
-  document.getElementById('sum-total').textContent = formatCurrency(totals.bidTotal);
-
-  // Fixed Payment tier
-  document.getElementById('tier-fixed-total').textContent = formatCurrency(tierTotals.fixed.total);
-  document.getElementById('tier-fixed-services').innerHTML = tierTotals.fixed.services.map(s =>
-    `<div class="summary-service-item"><span>${s.name}</span><span>${formatCurrency(s.total)}</span></div>`
-  ).join('') || '<div class="summary-service-item"><span style="font-style: italic;">No services</span></div>';
-
-  // Billed Separately tier
-  document.getElementById('tier-billed-total').textContent = formatCurrency(tierTotals.billed.total);
-  document.getElementById('tier-billed-services').innerHTML = tierTotals.billed.services.map(s =>
-    `<div class="summary-service-item"><span>${s.name}</span><span>${formatCurrency(s.total)}</span></div>`
-  ).join('') || '<div class="summary-service-item"><span style="font-style: italic;">No services</span></div>';
-
-  // Recommended tier
-  document.getElementById('tier-recommended-total').textContent = formatCurrency(
-    tierTotals.recommended.services.filter(s => s.accepted).reduce((sum, s) => sum + s.total, 0)
-  );
-  document.getElementById('tier-recommended-services').innerHTML = tierTotals.recommended.services.map(s =>
-    `<div class="summary-service-item">
-      <span>${s.name} ${s.accepted ? '✓' : '(pending)'}</span>
-      <span>${formatCurrency(s.total)}</span>
-    </div>`
-  ).join('') || '<div class="summary-service-item"><span style="font-style: italic;">No services</span></div>';
-
-  // Payment schedule — apply CC gross-up if enabled
-  let effectiveContractTotal = contractTotal;
-  if (currentEstimate.contract.ccGrossUp && currentEstimate.contract.ccFeePercent > 0) {
-    effectiveContractTotal = contractTotal / (1 - currentEstimate.contract.ccFeePercent / 100);
-  }
-  const monthlyPayment = effectiveContractTotal / paymentMonths;
-  document.getElementById('sum-monthly').textContent = formatCurrency(monthlyPayment);
-  if (currentEstimate.contract.ccGrossUp && currentEstimate.contract.ccFeePercent > 0) {
-    document.getElementById('sum-monthly').title = `Base: ${formatCurrency(contractTotal / paymentMonths)} + CC gross-up ${currentEstimate.contract.ccFeePercent}%`;
-  } else {
-    document.getElementById('sum-monthly').title = '';
-  }
-  document.getElementById('sum-per-visit').textContent = formatCurrency(totals.perVisitPrice);
-
-  // Payment schedule grid
-  const schedule = calculatePaymentSchedule(effectiveContractTotal, paymentMonths);
-  document.getElementById('payment-schedule-grid').innerHTML = schedule.map(p =>
-    `<div class="payment-item">
-      <span class="payment-item-month">${p.month}</span>
-      <span class="payment-item-amount">${formatCurrency(p.amount)}</span>
-    </div>`
-  ).join('');
-
-  // Cost breakdown
-  document.getElementById('sum-labor-cost').textContent = formatCurrency(totals.laborCost);
-  document.getElementById('sum-labor-billed').textContent = formatCurrency(totals.laborBilled);
-  document.getElementById('sum-material-cost').textContent = formatCurrency(totals.totalMaterialCost);
-  document.getElementById('sum-material-billed').textContent = formatCurrency(totals.materialBilled);
-  document.getElementById('sum-sub-cost').textContent = formatCurrency(totals.totalSubCost);
-  document.getElementById('sum-sub-billed').textContent = formatCurrency(totals.subBilled);
-
-  // Profitability and labor
-  document.getElementById('sum-break-even').textContent = formatCurrency(totals.internalCost);
-  document.getElementById('sum-profit').textContent = formatCurrency(totals.profit);
-  document.getElementById('sum-margin').textContent = formatPercent(totals.margin);
-  document.getElementById('sum-hours').textContent = formatNumber(totals.totalHours);
-
   // Update rate settings inputs (use effective rates)
   const rates = getEffectiveRates();
   document.getElementById('estimate-labor-rate').value = rates.laborRate;
@@ -11998,10 +11817,16 @@ function updateSummaryPanel() {
   const billedRatePerHour = rates.laborRate * (1 + rates.laborMarkup / 100);
   document.getElementById('estimate-billed-rate').textContent = formatCurrency(billedRatePerHour) + '/hr';
 
-  // Show/hide contract PDF button based on whether estimate has a contract
-  const pdfBtn = document.getElementById('btn-generate-contract-pdf');
-  if (pdfBtn) {
-    pdfBtn.style.display = currentEstimate.contractId ? 'block' : 'none';
+  // Update deposit display for work tickets
+  if (currentEstimate.jobType === 'work_ticket') {
+    const showDeposit = currentEstimate.workTicket.collectDeposit;
+    const depositSettings = document.getElementById('wt-deposit-settings');
+    if (depositSettings) depositSettings.style.display = showDeposit ? 'block' : 'none';
+
+    // Refresh multi-day allocation if visible
+    if (currentEstimate.workTicket.scheduleType === 'multi_day') {
+      renderMultiDayAllocation();
+    }
   }
 }
 
@@ -13100,8 +12925,6 @@ function adaptBuilderForJobType() {
       s.visits = 1;
     });
 
-    // Hide recurring summary sections, show work ticket summary
-    toggleSummaryForWorkTicket(true);
   } else {
     // Restore recurring mode
     if (cardTitle) {
@@ -13111,53 +12934,7 @@ function adaptBuilderForJobType() {
     }
     recurringFields.style.display = '';
     wtFields.style.display = 'none';
-    toggleSummaryForWorkTicket(false);
   }
-}
-
-function toggleSummaryForWorkTicket(isWT) {
-  // Hide/show recurring-specific summary sections
-  const tierSections = ['tier-fixed-section', 'tier-billed-section', 'tier-recommended-section'];
-  const paymentSection = document.querySelector('.summary-payment-section');
-
-  tierSections.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.style.display = isWT ? 'none' : '';
-  });
-  if (paymentSection) paymentSection.style.display = isWT ? 'none' : '';
-
-  // Show/hide work ticket summary
-  let wtSummary = document.getElementById('wt-summary-section');
-  if (isWT && !wtSummary) {
-    // Create work ticket summary section
-    const summaryTotal = document.querySelector('.summary-total');
-    if (summaryTotal) {
-      wtSummary = document.createElement('div');
-      wtSummary.id = 'wt-summary-section';
-      wtSummary.innerHTML = `
-        <div class="summary-total" style="margin-top: 0;">
-          <div class="summary-total-label">Total Project Price</div>
-          <div class="summary-total-value" id="wt-sum-total">$0.00</div>
-        </div>
-        <div id="wt-deposit-display" style="display: none; padding: 0 16px 12px;">
-          <div class="wt-deposit-row">
-            <span>Deposit (<span id="wt-dep-pct-display">25</span>%)</span>
-            <span id="wt-dep-amount">$0.00</span>
-          </div>
-          <div class="wt-deposit-row" style="font-weight: 600;">
-            <span>Balance Due on Completion</span>
-            <span id="wt-balance-amount">$0.00</span>
-          </div>
-        </div>
-      `;
-      summaryTotal.after(wtSummary);
-    }
-  }
-  if (wtSummary) wtSummary.style.display = isWT ? '' : 'none';
-
-  // Hide/show the main "Annual Contract Value" label
-  const mainTotal = document.querySelector('.summary-total');
-  if (mainTotal) mainTotal.style.display = isWT ? 'none' : '';
 }
 
 function setScheduleType(type) {
@@ -13235,57 +13012,8 @@ function formatDateShort(dateStr) {
 }
 
 function updateSummaryPanelForWorkTicket() {
-  const totals = calculateBidTotals();
-  const projectTotal = totals.bidTotal;
-
-  // Refresh multi-day allocation if visible
-  if (currentEstimate.workTicket.scheduleType === 'multi_day') {
-    renderMultiDayAllocation();
-  }
-
-  // Update total
-  const wtTotal = document.getElementById('wt-sum-total');
-  if (wtTotal) wtTotal.textContent = formatCurrency(projectTotal);
-
-  // Update deposit display
-  const depositDisplay = document.getElementById('wt-deposit-display');
-  const depositCheckbox = document.getElementById('wt-collect-deposit');
-  if (depositDisplay) {
-    const showDeposit = currentEstimate.workTicket.collectDeposit;
-    depositDisplay.style.display = showDeposit ? 'block' : 'none';
-    document.getElementById('wt-deposit-settings').style.display = showDeposit ? 'block' : 'none';
-
-    if (showDeposit) {
-      const pct = currentEstimate.workTicket.depositPercent || 25;
-      const depositAmt = projectTotal * (pct / 100);
-      const balance = projectTotal - depositAmt;
-      document.getElementById('wt-dep-pct-display').textContent = pct;
-      document.getElementById('wt-dep-amount').textContent = formatCurrency(depositAmt);
-      document.getElementById('wt-balance-amount').textContent = formatCurrency(balance);
-    }
-  }
-
-  // Still update cost breakdown and profitability
-  document.getElementById('sum-labor-cost').textContent = formatCurrency(totals.laborCost);
-  document.getElementById('sum-labor-billed').textContent = formatCurrency(totals.laborBilled);
-  document.getElementById('sum-material-cost').textContent = formatCurrency(totals.totalMaterialCost);
-  document.getElementById('sum-material-billed').textContent = formatCurrency(totals.materialBilled);
-  document.getElementById('sum-sub-cost').textContent = formatCurrency(totals.totalSubCost);
-  document.getElementById('sum-sub-billed').textContent = formatCurrency(totals.subBilled);
-  document.getElementById('sum-break-even').textContent = formatCurrency(totals.internalCost);
-  document.getElementById('sum-profit').textContent = formatCurrency(totals.profit);
-  document.getElementById('sum-margin').textContent = formatPercent(totals.margin);
-  document.getElementById('sum-hours').textContent = formatNumber(totals.totalHours);
-
-  // Update rate settings
-  const rates = getEffectiveRates();
-  document.getElementById('estimate-labor-rate').value = rates.laborRate;
-  document.getElementById('estimate-labor-markup').value = rates.laborMarkup;
-  document.getElementById('estimate-material-markup').value = rates.materialMarkup;
-  document.getElementById('estimate-sub-markup').value = rates.subMarkup;
-  document.getElementById('estimate-travel-percent').value = rates.travelPercent;
-  const billedRatePerHour = rates.laborRate * (1 + rates.laborMarkup / 100);
-  document.getElementById('estimate-billed-rate').textContent = formatCurrency(billedRatePerHour) + '/hr';
+  // Delegate to shared updateSummaryPanel
+  updateSummaryPanel();
 }
 
 function startBlankEstimate() {
