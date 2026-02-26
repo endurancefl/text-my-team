@@ -47,13 +47,13 @@ The platform supports four divisions, each representing a distinct revenue strea
 ```
 text-my-team/
 ├── index.html                     # Customer service request portal (~3,100 lines)
-├── crew.html                      # Crew leader app (~9,339 lines HTML/JS)
-├── estimate.html                  # Bidding & estimating tool (~14,947 lines HTML/JS)
+├── crew.html                      # Crew leader app (~9,768 lines HTML/JS)
+├── estimate.html                  # Bidding & estimating tool (~15,576 lines HTML/JS)
 ├── payment-success.html           # Stripe payment success redirect
 ├── payment-cancel.html            # Stripe payment cancel redirect
 ├── css/
-│   ├── crew.css                   # All CSS for crew.html (~4,419 lines)
-│   └── estimate.css               # All CSS for estimate.html (~5,444 lines)
+│   ├── crew.css                   # All CSS for crew.html (~4,511 lines)
+│   └── estimate.css               # All CSS for estimate.html (~5,574 lines)
 ├── assets/
 │   ├── manifest.json              # PWA manifest for index.html
 │   ├── manifest-crew.json         # PWA manifest for crew.html
@@ -63,7 +63,7 @@ text-my-team/
 │       ├── iceberg-icon.png
 │       └── 26__Endurace_Icon_Green_LightBackground.png
 ├── backend/
-│   └── combined-apps-script.js    # Google Apps Script backend (~4,625 lines)
+│   └── combined-apps-script.js    # Google Apps Script backend (~4,827 lines)
 ├── cloud-function/                # AWS Lambda PDF generation
 │   ├── pdf_generator.py           # PDF library (WeasyPrint + ReportLab)
 │   ├── lambda_function.py         # AWS Lambda handler
@@ -96,7 +96,7 @@ text-my-team/
 - Returning user personalization (remembers name, PIN, language preference)
 - PWA manifest with apple-mobile-web-app-capable
 
-**crew.html + crew.css — Crew Dashboard (~9,339 lines HTML/JS + ~4,419 lines CSS)**
+**crew.html + crew.css — Crew Dashboard (~9,768 lines HTML/JS + ~4,511 lines CSS)**
 - iOS 18-precision mobile app for crew leaders
 - **Full English/Spanish bilingual support** via `data-i18n` system — same `localStorage` key `preferredLang` shared with index.html so language choice persists across apps. Toggle pill-button on both login screen and dashboard header. `translations` object with ~160 keys (en/es), `t(key)` lookup function with English fallback, `updateLanguage()` traverses `[data-i18n]` and `[data-i18n-placeholder]` elements + rebuilds JS-generated UI via `renderStopCards()` and `renderRequests()`. All static HTML text tagged with `data-i18n` attributes. All JS-generated strings use `t()` calls with `{name}` template replacement for dynamic values. Date locales switch between `en-US` and `es-US`. Site Report and Before-After wizard internals deferred (large subsystems with ~50+ strings each).
 - Phone number authentication against Crew Members sheet (Role = "Leader")
@@ -115,6 +115,8 @@ text-my-team/
   - **Timer resume for partial tickets**: when resuming a partial ticket, `effectiveStart` is offset backward by `elapsedBeforePause` seconds so the UI timer shows cumulative time across sessions. Backend still gets separate time entries per session. `elapsedBeforePause` is in-memory only (lost on page reload, but backend totals are always correct).
   - **PIN entry overlay** (iOS bottom sheet): slides up from bottom with grabber handle, backdrop blur, tap-scrim-to-dismiss. Max-width 500px.
   - **Partial ticket carry-over**: tickets with status "partial" show orange styling, completed services listed, "Return" button resumes with remaining services and cumulative timer.
+  - **Reminders on stop cards**: Permanent reminders show as purple-bordered rows with bell icon at the top of property group cards (after request alerts, before tickets). One-off reminders for today show as blue-tinted rows. Properties with reminders but no tickets today get standalone mini stop cards with purple badge and bell icon, 0:00 estimated time. State: `todayReminders[]` (one-off for today), `permanentReminders[]` (every visit). Loaded from `getCrewSchedule` response.
+  - **Create Reminder (from crew app)**: "Report Issue" tab now shows a bottom action sheet with two options: "Report Issue" (existing ticket flow) and "Create Reminder" (new). Reminder modal has property search (autocomplete), description textarea, date picker (min=tomorrow), optional photo, submit. Creates with `isPermanent: false, createdBy: crewName + ' (Crew)'`. Action sheet: `showActionSheet()`, `hideActionSheet()`. Reminder: `openCreateReminder()`, `submitReminder()`, `updateReminderSaveBtn()`. HTML: `#action-sheet-overlay`, `#reminder-overlay`. CSS: `.action-sheet-overlay`, `.action-sheet-card`, `.action-sheet-item`, `.reminder-row`, `.reminder-row.permanent`, `.property-group-card.reminder-only`. Translation keys (en/es): `createReminder`, `reportIssue`, `reminderDate`, `reminderDescription`, `reminderSubmitted`, `permanentReminder`, `reminder`, `selectAction`.
   - **Request alerts**: Open requests appear as orange-tinted rows at the TOP of each property group card (above ticket rows) so crew leaders see them first. Each row shows warning icon, "Open Request" label, truncated message, customer name, date, an "Office" button, and a chevron. Tapping a request row opens the request detail modal via `openRequestFromCard()`. The "Office" button (`sendRequestToOffice()`) opens an SMS to the office pre-filled with request details so the crew leader can push unhandleable requests back. The request detail modal also includes a "Send to Office" button. Request alert messages and card rows show `translatedMessage` when in Spanish mode. CSS: `.ticket-sub-row.request-row`, `.send-to-office-btn`.
   - **Complete job modal** (legacy, centered): elapsed time vs. estimate, service checklist, optional notes
   - **Day summary** (centered modal): direct time (excludes Shop) vs. budgeted direct, travel time (all indirect = travel) vs. budgeted travel, separate Shop time row (orange), total hours, direct %, over/under badges, crew members. Stop counts exclude Shop ticket. No indirect category breakdown (simplified).
@@ -148,7 +150,7 @@ text-my-team/
 - iOS design system: SF Pro typography, exact system colors, dark mode, frosted glass tab bar with `backdrop-filter`, iOS spring animations, 44px touch targets, `prefers-reduced-motion` support
 - Bottom tab bar: Schedule (home) | Requests | Report Issue | Reports
 
-**estimate.html + estimate.css — Bidding & Estimating Tool (~14,947 lines HTML/JS + ~5,444 lines CSS)**
+**estimate.html + estimate.css — Bidding & Estimating Tool (~15,576 lines HTML/JS + ~5,574 lines CSS)**
 - **Division: Maintenance (MNT) fully built** — Irrigation, Construction, and Enhancement divisions planned, will reuse the same engine with division-specific catalogs and takeoffs
 - **Division & Job Type Selection**: When creating a new estimate, the user selects two things upfront:
   1. **Division** — Maintenance (MNT), Irrigation (IRR), Construction (CON), or Enhancement (ENH). This determines which item catalog, service catalog, and takeoff measurements are available. Stored as `division` on the estimate/bid.
@@ -260,9 +262,10 @@ text-my-team/
 - **Financials Dashboard (Earned Revenue)**: Summary cards (contract value, collected, earned, deferred revenue, completion %). Monthly bar chart comparing earned vs collected with pagination. Contract table with per-contract breakdown. Deferred revenue = collected - earned (orange if positive/deferred, green if ahead of schedule). Functions: `loadFinancials()`, `renderFinancials()`, `calcCollectedToDate()`, `calcMonthlyData()`, `renderMonthlyChart()`, `renderContractTable()`.
 - **Properties View**: First-class property entities loaded from backend Properties sheet via `getEstimatingProperties`. Each property has full measurements, difficulty splits, crew assignment, and sub-contractor tracking. Falls back to `aggregateProperties()` when backend sheet is empty. Nav item between Contacts and Invoices with house icon. "Add Property" button in toolbar. List view with search + filter (All / Active Contract / No Contract). Each property card shows address, primary contact name (from junction links or address-match fallback), contract status badge, and monthly value. Click to open property profile showing: **Measurements** (from property record with source badge — Attentive/Manual/Polygon/GPS/Drone — and Attentive report link), **Linked Contacts** (from PropertyContacts junction with role badges, unlink buttons; legacy address-match contacts also shown), **Sub-Contractors** (cards with company, service type, edit/delete), **Estimates** (all bids for this property), **Contracts** (with division badges MNT/IRR/CON/ENH), **Project History** (completed tickets grouped by division). Edit Property and Delete buttons in profile header. **Property Modal**: Full add/edit form with address (auto-parsed into street/city/state/zip from Attentive, zip auto-geocoded via Nominatim), details (type/PIN/gate code), crew assignment (dropdown populated from `getCrews`), drag-and-drop Attentive .xlsx upload zone (parses measurements and auto-populates grid), collapsible measurements section with excel-style grid (mower-table layout, blue `.pm-grid-input` fields), notes. Auto-generated 4-digit PIN with Hamming distance ≥ 2 from all existing PINs (single-digit typo can never match another property). Difficulty splits removed from property — set per-estimate instead. **Contact Linker**: Overlay to search and link contacts with role selection. **Sub-Contractor Modal**: Add/edit company, service type, phone, email, contract notes. **Estimate Builder Integration**: Property picker dropdown auto-fills address and measurements into new estimates, and auto-selects linked contacts.
 - **Invoices View**: Full invoicing system with Stripe Checkout integration. Nav item between Properties and Settings with receipt icon. **Invoice Lifecycle**: `draft → finalized → sent → partial/paid` (any non-paid status can be voided). **Summary Cards**: Outstanding, Overdue, Collected This Month, Drafts. **List View**: Searchable + filterable (All / Draft / Sent / Overdue / Paid) invoice cards showing ID, property, contact, due date, total, status badge (color-coded per status). **Batch Generation**: "Generate Invoices" button calls `generateInvoiceBatch` which scans all active contracts, checks for existing invoices in the billing period (dedup), creates draft invoices, auto-charges auto-pay contracts via Stripe PaymentIntents API. Batch review modal shows auto-pay results, open ticket warnings, and draft invoices with checkboxes for batch finalization. **Invoice Detail**: Full invoice display with header/dates/line items table/totals/payment history. Action buttons change by status: Draft→Finalize, Finalized→Send, Sent→Record Payment + Check Payment + Void, Partial→Record Payment, Overdue→Record Payment + Resend. **Record Payment Modal**: Amount (pre-filled with balance due), method (check/cash/card/ACH), date, notes. **Send Invoice**: Creates Stripe Checkout Session (payment mode) for Pay Now link, generates invoice PDF via HtmlService (fallback) or Lambda, uploads to Drive, emails customer with PDF attachment + Pay Now button. **Payment Status Polling**: Checks Stripe session status, auto-records payment if paid. **Auto-Pay**: Contract-level auto-pay setup via Stripe Checkout (setup mode) — saves `stripeCustomerId` + `stripePaymentMethodId` on contract. During batch generation, auto-pay contracts are charged immediately. State: `invoices[]`, `currentInvoice`, `invoiceSearchQuery`, `invoiceFilter`, `invoicePayments[]`. Functions: `loadInvoices()`, `filterInvoices()`, `renderInvoiceSummaryCards()`, `renderInvoicesList()`, `openInvoiceDetail()`, `loadInvoicePayments()`, `showInvoicesList()`, `generateInvoiceBatch()`, `openInvoiceBatchModal()`, `closeInvoiceBatchModal()`, `finalizeBatchInvoices()`, `finalizeCurrentInvoice()`, `voidCurrentInvoice()`, `sendCurrentInvoice()`, `checkCurrentPaymentStatus()`, `openRecordPaymentModal()`, `closeRecordPaymentModal()`, `submitRecordPayment()`, `setupAutoPayForContract()`, `checkAutoPaySetupStatus()`. CSS: `.invoice-status-badge` (7 status colors), `.invoice-detail-header`, `.invoice-detail-meta`, `.invoice-line-items-table`, `.invoice-totals`, `.invoice-actions`, `.invoice-payment-history`, `.invoice-payment-item`, `.invoice-batch-item`, `.invoice-batch-warning`.
+- **Work Tickets View (Reminders Dashboard)**: New sidebar nav item between Service Catalog and Settings with clipboard-check icon. `data-view="worktickets"`, `id="view-worktickets"`. Toolbar with search input, filter buttons (Active/Permanent/Completed/All), and "+ New Reminder" button. Table displays: Property, Description, Date, Status, Created By, Crew, Actions. Status badges: purple "Permanent", blue "Scheduled", green "Completed", gray "Cancelled". Actions: "Make Permanent" (converts one-off to permanent, clears date), "Complete" (marks as completed, sets completedAt). Create Reminder modal: property picker dropdown (populated from properties array), description textarea, date picker, crew input (auto-fills from selected property's crew). State: `allReminders[]`, `wtSearchQuery`, `wtFilter`. Functions: `renderWorkTickets()`, `openWtCreateModal()`, `closeWtCreateModal()`, `saveWtReminder()`, `toggleWtPermanent()`, `completeWtReminder()`. CSS: `.wt-toolbar`, `.wt-table`, `.wt-badge`, `.wt-badge-permanent`, `.wt-badge-reminder`, `.wt-badge-completed`, `.wt-badge-cancelled`, `.wt-actions-cell`, `.btn-sm`, `.btn-outline`, `.btn-success`. Loaded from `getInitData` response (`data.reminders`). Phase 2 planned: billable work ticket estimate builder for one-off jobs.
 - **Ticket Scheduling Engine**: Three date distribution strategies dispatched by visit count in `getDatesForVisitCount()`: `generateSeasonalMowingDates()` (weekly Apr–Oct, biweekly Nov–Mar; fills dormant gaps for higher targets (e.g. 52), trims dormant dates for lower targets — visits === seasonalAnchor), `generateWeeklyDates()` (every week, 50-54 visits), `generateSimpleScheduleDates()` (even distribution, all others). Item-level visit override via `lineItem.itemVisits`. Tickets bundled by date with earned value proportionally distributed and penny reconciliation. `previewTickets()` shows breakdown before committing.
 - Material Design styling with Google Sans/Roboto fonts
-- **Initialization (Bulk Load)**: On startup (auto-login or manual login), `loadAllData()` makes a single `getInitData` request that returns all 9 datasets (itemCatalog, bidSettings, bids, templates, serviceCatalog, contacts, properties, propertyContacts, subContractors) in one response. Processes each dataset to populate state and render UI. Falls back to individual parallel requests (`loadItemCatalog()`, `loadBidSettings()`, etc.) if the bulk call fails. Logs total load time via `performance.now()`.
+- **Initialization (Bulk Load)**: On startup (auto-login or manual login), `loadAllData()` makes a single `getInitData` request that returns all 10 datasets (itemCatalog, bidSettings, bids, templates, serviceCatalog, contacts, properties, propertyContacts, subContractors, reminders) in one response. Processes each dataset to populate state and render UI. Falls back to individual parallel requests (`loadItemCatalog()`, `loadBidSettings()`, etc.) if the bulk call fails. Logs total load time via `performance.now()`.
 
 **payment-success.html — Stripe Payment Success Redirect**
 - Receives `session_id` from Stripe Checkout redirect, shows success confirmation
@@ -282,14 +285,15 @@ text-my-team/
 - **Invoices Sheet** — Auto-provisioned. Columns: invoiceId (INV-0001), contractId, propertyAddress, contactName, contactEmail, billingAddress, invoiceDate, dueDate, billingPeriodStart, billingPeriodEnd, invoiceType (fixed_monthly/work_ticket/deposit), status (draft/finalized/sent/partial/paid/overdue/void), subtotal, taxRate, taxAmount, total, paidAmount, balanceDue, paymentTerms, payLinkToken, stripeSessionId, stripePaymentUrl, pdfUrl, pdfFileId, lineItemsJson (JSON column), createdAt, updatedAt
 - **Payments Sheet** — Auto-provisioned. Columns: paymentId (PAY-0001), invoiceId, paymentDate, paymentMethod (card/ach/check/cash), amount, stripePaymentIntentId, stripeSessionId, status, notes, createdAt
 - **Contracts Sheet (new columns for auto-pay)**: autoPay (YES/NO), stripeCustomerId, stripePaymentMethodId, stripeSetupSessionId — added dynamically by `ensureContractAutoPayColumns()`
+- **Reminders Sheet** — Auto-provisioned by `ensureRemindersSheet()`. Columns: reminderId (REM-0001), propertyAddress, propertyId, description, scheduledDate, isPermanent (TRUE/FALSE), status (active/completed/cancelled), createdBy, createdByPhone, assignedCrew, photoUrl, createdAt, completedAt. Supports both one-off date-scheduled reminders and permanent reminders that show every visit. `getRemindersForCrew(crewName, dateStr)` returns `{ scheduled: [...], permanent: [...] }` filtered by crew + active status + date match.
 - **Stripe Integration** — API calls via `UrlFetchApp.fetch()`, secret key in Script Properties (`STRIPE_SECRET_KEY`). No webhooks (Apps Script limitation) — uses polling from frontend + redirect pages. Zero card data touches our system (SAQ A PCI). Checkout flows: payment mode (one-time Pay Now) and setup mode (save card for auto-pay)
 
 #### Combined Apps Script Endpoints
 
-**GET endpoints (25):**
+**GET endpoints (26):**
 | Endpoint | Source | Description |
 |----------|--------|-------------|
-| `getInitData` | Estimating | **Bulk init** — returns all estimating data in a single request (itemCatalog, bidSettings, bids, templates, serviceCatalog, contacts, properties, propertyContacts, subContractors). Reduces 9+ network round-trips to 1. |
+| `getInitData` | Estimating | **Bulk init** — returns all estimating data in a single request (itemCatalog, bidSettings, bids, templates, serviceCatalog, contacts, properties, propertyContacts, subContractors, reminders). Reduces 10+ network round-trips to 1. |
 | `getItemCatalog` | Estimating | Returns item catalog with production rates |
 | `getBidSettings` | Estimating | Returns settings key-value pairs |
 | `getBids` | Estimating | Returns all bids |
@@ -308,7 +312,8 @@ text-my-team/
 | `getSavedReports` | Crew | Returns JSON report files from Drive for a property |
 | `getReportData` | Crew | Reads JSON report data from Drive by fileId |
 | `getPhotoBase64` | Crew | Reads photo from Drive, returns base64 |
-| `getCrewSchedule` | Crew | Auth by phone → returns crew members, today's tickets (with travelHours, completedServices for partial), time entries |
+| `getReminders` | Reminders | Returns all reminders from the Reminders sheet (auto-creates sheet if missing) |
+| `getCrewSchedule` | Crew | Auth by phone → returns crew members, today's tickets (with travelHours, completedServices for partial), time entries, reminders (one-off for today), permanentReminders (every visit) |
 | `verifyPin` | Crew | Validates 4-digit PIN against Crew Members sheet, returns {success, name, role, crew} |
 | `getProductionAnalysis` | Estimating | Compares catalog production rates vs actual field data. Params: startDate, endDate, crew. Reads Scheduled Tickets (completed/partial) + Time Entries (service type), aggregates by service and item. Returns service-level efficiency (est vs actual man-hours) with per-ticket detail, and item-level field rates (measured from single-item services, inferred from multi-item services) compared to catalog rates |
 | `getCrewMembers` | Crew | Returns all crew members from Crew Members sheet |
@@ -318,9 +323,13 @@ text-my-team/
 | `getInvoices` | Invoicing | Returns all invoices, optional filters (status, contractId). Auto-creates Invoices sheet if missing |
 | `getPayments` | Invoicing | Returns payments for a specific invoiceId. Auto-creates Payments sheet if missing |
 
-**POST endpoints (44):**
+`getInitData` bulk response also includes `reminders: getReminders()` so estimate.html gets all reminders on load.
+
+**POST endpoints (46):**
 | Endpoint | Source | Description |
 |----------|--------|-------------|
+| `saveReminder` | Reminders | Creates a reminder in the Reminders sheet with auto-generated REM-0001 format ID. Fields: propertyAddress, propertyId, description, scheduledDate, isPermanent, createdBy, createdByPhone, assignedCrew, photoUrl |
+| `updateReminder` | Reminders | Updates a reminder by reminderId. Supports status change (active→completed), making permanent (clears scheduledDate), updating description. Sets completedAt when status=completed |
 | `saveContact` | Estimating | Creates a new contact in the Contacts sheet with auto-generated C-{timestamp} ID |
 | `updateContact` | Estimating | Updates an existing contact by contactId |
 | `deleteContact` | Estimating | Deletes a contact by contactId |

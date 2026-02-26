@@ -531,6 +531,86 @@
     </div>
   </div>
 
+  <!-- Action Sheet (Report Issue tab) -->
+  <div id="action-sheet-overlay" class="action-sheet-overlay" onclick="if(event.target===this)hideActionSheet()">
+    <div class="action-sheet-card">
+      <div class="action-sheet-title" data-i18n="selectAction">Select Action</div>
+      <div class="action-sheet-item" id="action-report-issue">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:22px;height:22px;color:var(--ios-orange);">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
+        </svg>
+        <div>
+          <div class="action-sheet-item-title" data-i18n="reportIssue">Report Issue</div>
+          <div class="action-sheet-item-desc">Report a problem at a property</div>
+        </div>
+      </div>
+      <div class="action-sheet-item" id="action-create-reminder">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:22px;height:22px;color:var(--ios-purple,#AF52DE);">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"/>
+        </svg>
+        <div>
+          <div class="action-sheet-item-title" data-i18n="createReminder">Create Reminder</div>
+          <div class="action-sheet-item-desc">Set a reminder for a future visit</div>
+        </div>
+      </div>
+      <button class="action-sheet-cancel" onclick="hideActionSheet()" data-i18n="cancel">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Create Reminder Modal -->
+  <div id="reminder-overlay" class="modal-overlay">
+    <div class="site-report-topbar">
+      <button id="cancel-reminder-btn" class="topbar-btn-left"><svg viewBox="0 0 12 21" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 1L2 10.5L10 20"/></svg><span data-i18n="cancel">Cancel</span></button>
+      <span class="sr-title" data-i18n="createReminder">Create Reminder</span>
+      <div style="width:60px;"></div>
+    </div>
+    <div class="modal">
+      <div class="modal-section">
+        <div class="modal-label">Property</div>
+        <div class="search-container">
+          <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35" stroke-linecap="round"/>
+          </svg>
+          <input type="text" id="reminder-property" class="form-input search-input" style="max-width:100%;text-align:left;" placeholder="Search your address..." autocomplete="off">
+          <div id="reminder-autocomplete-list" class="autocomplete-list"></div>
+        </div>
+        <div id="reminder-property-card" class="property-card" style="display:none;">
+          <button type="button" id="reminder-property-clear" style="position:absolute;top:8px;right:8px;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,0.15);border:none;color:var(--ios-text-secondary);font-size:16px;cursor:pointer;">&times;</button>
+          <div class="property-address" id="reminder-card-address"></div>
+          <div class="crew-info">Crew: <strong id="reminder-card-crew"></strong></div>
+        </div>
+      </div>
+
+      <div class="modal-section">
+        <div class="modal-label" data-i18n="reminderDescription">What needs to be remembered?</div>
+        <textarea id="reminder-message" class="ios-textarea" placeholder="e.g. Reset irrigation timer to 1x/week"></textarea>
+      </div>
+
+      <div class="modal-section">
+        <div class="modal-label" data-i18n="reminderDate">Reminder Date</div>
+        <input type="date" id="reminder-date" class="form-input" style="width:100%;padding:12px;font-size:16px;border-radius:var(--ios-radius);border:0.5px solid var(--ios-separator);background:var(--ios-card);color:var(--ios-text-primary);font-family:inherit;">
+      </div>
+
+      <div class="modal-section">
+        <div class="modal-label">Photo (Optional)</div>
+        <input type="file" id="reminder-photo-input" accept="image/*" capture="environment" style="display:none;">
+        <button id="reminder-photo-btn" class="ios-btn ios-btn-secondary" style="display:flex;align-items:center;justify-content:center;gap:8px;">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+          </svg>
+          Take/Choose Photo
+        </button>
+        <div id="reminder-photo-preview" style="display:none;margin-top:12px;position:relative;">
+          <img id="reminder-preview-img" src="" style="width:100%;border-radius:var(--ios-radius);">
+          <button id="reminder-photo-remove" style="position:absolute;top:8px;right:8px;width:32px;height:32px;border-radius:50%;background:var(--ios-red);border:none;color:white;font-size:18px;cursor:pointer;">&times;</button>
+        </div>
+      </div>
+
+      <button id="submit-reminder-btn" class="ios-btn ios-btn-primary" style="margin-top:20px;" disabled>Create Reminder</button>
+    </div>
+  </div>
+
   <!-- Inspection Report Modal -->
   <div id="inspection-overlay" class="modal-overlay">
     <div class="site-report-topbar">
@@ -910,6 +990,8 @@
     var pinEntryMode = null;             // 'roster' or 'add'
     var pinEntryMemberIndex = null;      // Index in roster for 'roster' mode
     var pinDigits = [];                  // Current PIN input digits
+    var todayReminders = [];             // One-off reminders for today
+    var permanentReminders = [];         // Permanent reminders (show every visit)
     var rosterVerified = [];             // Array of booleans tracking verified status per roster member
     var expandedPropertyGroups = {};     // Track which property groups are expanded (by address key)
     var DEMO_MODE = new URLSearchParams(window.location.search).get('demo') === 'true';
@@ -1106,7 +1188,15 @@
         reopenService: 'Reopen Service',
         reopenConfirm: 'Reopen {name}? A new time entry will be created.',
         reopened: 'Reopened',
-        reopenedNote: 'Reopened — originally completed at {time}'
+        reopenedNote: 'Reopened — originally completed at {time}',
+        createReminder: 'Create Reminder',
+        reportIssue: 'Report Issue',
+        reminderDate: 'Reminder Date',
+        reminderDescription: 'What needs to be remembered?',
+        reminderSubmitted: 'Reminder created!',
+        permanentReminder: 'Permanent Reminder',
+        reminder: 'Reminder',
+        selectAction: 'Select Action'
       },
       es: {
         langToggle: 'English',
@@ -1264,7 +1354,15 @@
         reopenService: 'Reabrir Servicio',
         reopenConfirm: '\u00bfReabrir {name}? Se crear\u00e1 un nuevo registro de tiempo.',
         reopened: 'Reabierto',
-        reopenedNote: 'Reabierto \u2014 completado originalmente a las {time}'
+        reopenedNote: 'Reabierto \u2014 completado originalmente a las {time}',
+        createReminder: 'Crear Recordatorio',
+        reportIssue: 'Reportar Problema',
+        reminderDate: 'Fecha del Recordatorio',
+        reminderDescription: '\u00bfQu\u00e9 necesita recordar?',
+        reminderSubmitted: '\u00a1Recordatorio creado!',
+        permanentReminder: 'Recordatorio Permanente',
+        reminder: 'Recordatorio',
+        selectAction: 'Seleccionar Acci\u00f3n'
       }
     };
 
@@ -1658,8 +1756,43 @@
                     status: 'scheduled'
                   }
                 ],
-                timeEntries: []
+                timeEntries: [],
+                reminders: [
+                  {
+                    reminderId: 'REM-D001',
+                    propertyAddress: '875 Magnolia Blvd, Winter Park, FL',
+                    description: 'Reset irrigation timer back to 1x/week',
+                    scheduledDate: new Date().toISOString().split('T')[0],
+                    isPermanent: 'FALSE',
+                    status: 'active',
+                    createdBy: 'Jake Miller (Crew)',
+                    assignedCrew: 'Demo Crew'
+                  }
+                ],
+                permanentReminders: [
+                  {
+                    reminderId: 'REM-D002',
+                    propertyAddress: '2216 Mallard Circle, Windermere, FL',
+                    description: 'Customer has aggressive dog - use side gate only',
+                    isPermanent: 'TRUE',
+                    status: 'active',
+                    createdBy: 'Office',
+                    assignedCrew: 'Demo Crew'
+                  }
+                ]
               };
+            }
+
+            // Handle saveReminder in demo mode
+            if (body.saveReminder) {
+              console.log('[DEMO] saveReminder:', body.propertyAddress, body.description, body.scheduledDate);
+              mockResponse = { success: true, reminderId: 'REM-DEMO-' + (_nextEntryId++) };
+            }
+
+            // Handle updateReminder in demo mode
+            if (body.updateReminder) {
+              console.log('[DEMO] updateReminder:', body.reminderId, body.status || '', body.isPermanent || '');
+              mockResponse = { success: true };
             }
 
             // getRequests — return demo requests
@@ -1921,6 +2054,8 @@
             crewMembers = data.members || [];
             todayTickets = data.tickets || [];
             dayTimeEntries = data.timeEntries || [];
+            todayReminders = data.reminders || [];
+            permanentReminders = data.permanentReminders || [];
 
             // Inject persistent Shop ticket
             if (!todayTickets.some(function(t) { return t.ticketId === 'SHOP'; })) {
@@ -2111,6 +2246,59 @@
         html += renderPropertyGroupCard(group, stopNumber);
       });
 
+      // Standalone reminder cards for properties with no tickets today
+      var allScheduledAddresses = propertyGroups.map(function(g) { return g.address.toLowerCase(); });
+      var standaloneReminders = {};
+
+      // Collect one-off reminders not already shown in a property group
+      todayReminders.forEach(function(rem) {
+        var remAddr = (rem.propertyAddress || '').split(',')[0].trim().toLowerCase();
+        if (allScheduledAddresses.indexOf(remAddr) === -1) {
+          if (!standaloneReminders[remAddr]) standaloneReminders[remAddr] = { address: rem.propertyAddress, reminders: [] };
+          standaloneReminders[remAddr].reminders.push(rem);
+        }
+      });
+      // Collect permanent reminders not already shown
+      permanentReminders.forEach(function(rem) {
+        var remAddr = (rem.propertyAddress || '').split(',')[0].trim().toLowerCase();
+        if (allScheduledAddresses.indexOf(remAddr) === -1) {
+          if (!standaloneReminders[remAddr]) standaloneReminders[remAddr] = { address: rem.propertyAddress, reminders: [] };
+          standaloneReminders[remAddr].reminders.push(rem);
+        }
+      });
+
+      Object.keys(standaloneReminders).forEach(function(key) {
+        var group = standaloneReminders[key];
+        html += '<div class="property-group-card reminder-only">';
+        html += '<div class="property-group-header" onclick="togglePropertyGroup(this)">';
+        html += '<div class="property-group-number" style="background:var(--ios-purple,#AF52DE);color:#fff;">';
+        html += '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"/></svg>';
+        html += '</div>';
+        html += '<div class="property-group-info">';
+        html += '<div class="property-group-address">' + escapeHtml(group.address) + '</div>';
+        html += '<div class="property-group-meta" style="color:var(--ios-purple,#AF52DE);">' + group.reminders.length + ' ' + t('reminder').toLowerCase() + (group.reminders.length > 1 ? 's' : '') + '</div>';
+        html += '</div>';
+        html += '<div class="property-group-right">';
+        html += '<div class="property-group-est">0:00</div>';
+        html += '<div class="property-group-chevron">\u25BE</div>';
+        html += '</div></div>';
+        html += '<div class="property-group-tickets">';
+        group.reminders.forEach(function(rem) {
+          var isPerm = String(rem.isPermanent || '').toUpperCase() === 'TRUE';
+          var color = isPerm ? 'var(--ios-purple,#AF52DE)' : 'var(--ios-blue)';
+          html += '<div class="ticket-sub-row reminder-row' + (isPerm ? ' permanent' : '') + '">';
+          html += '<div class="ticket-sub-row-info">';
+          html += '<div class="ticket-sub-row-services" style="color:' + color + ';font-weight:600;font-size:13px;">';
+          html += '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px;color:' + color + ';"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"/></svg>';
+          html += isPerm ? t('permanentReminder') : t('reminder');
+          html += '</div>';
+          html += '<div style="font-size:13px;color:var(--ios-text-primary);margin-top:2px;">' + escapeHtml(rem.description || '') + '</div>';
+          html += '<div style="font-size:11px;color:var(--ios-text-tertiary);margin-top:1px;">' + escapeHtml(rem.createdBy || '') + '</div>';
+          html += '</div></div>';
+        });
+        html += '</div></div>';
+      });
+
       container.innerHTML = html;
 
     }
@@ -2231,6 +2419,41 @@
           html += '</div>';
         });
       }
+
+      // Show permanent reminders for this property
+      var addrFirst = address.split(',')[0].toLowerCase();
+      permanentReminders.forEach(function(rem) {
+        var remAddr = (rem.propertyAddress || '').split(',')[0].toLowerCase();
+        if (remAddr === addrFirst || (rem.propertyAddress || '').toLowerCase() === address.toLowerCase()) {
+          html += '<div class="ticket-sub-row reminder-row permanent">';
+          html += '<div class="ticket-sub-row-info">';
+          html += '<div class="ticket-sub-row-services" style="color:var(--ios-purple,#AF52DE);font-weight:600;font-size:13px;">';
+          html += '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px;color:var(--ios-purple,#AF52DE);"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"/></svg>';
+          html += t('permanentReminder');
+          html += '</div>';
+          html += '<div style="font-size:13px;color:var(--ios-text-primary);margin-top:2px;">' + escapeHtml(rem.description || '') + '</div>';
+          html += '<div style="font-size:11px;color:var(--ios-text-tertiary);margin-top:1px;">' + escapeHtml(rem.createdBy || '') + '</div>';
+          html += '</div>';
+          html += '</div>';
+        }
+      });
+
+      // Show one-off reminders for this property
+      todayReminders.forEach(function(rem) {
+        var remAddr = (rem.propertyAddress || '').split(',')[0].toLowerCase();
+        if (remAddr === addrFirst || (rem.propertyAddress || '').toLowerCase() === address.toLowerCase()) {
+          html += '<div class="ticket-sub-row reminder-row">';
+          html += '<div class="ticket-sub-row-info">';
+          html += '<div class="ticket-sub-row-services" style="color:var(--ios-blue);font-weight:600;font-size:13px;">';
+          html += '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px;color:var(--ios-blue);"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"/></svg>';
+          html += t('reminder');
+          html += '</div>';
+          html += '<div style="font-size:13px;color:var(--ios-text-primary);margin-top:2px;">' + escapeHtml(rem.description || '') + '</div>';
+          html += '<div style="font-size:11px;color:var(--ios-text-tertiary);margin-top:1px;">' + escapeHtml(rem.createdBy || '') + '</div>';
+          html += '</div>';
+          html += '</div>';
+        }
+      });
 
       tickets.forEach(function(ticket) {
         var isActive = !!activeTickets[ticket.ticketId] || ticket.ticketId === activeJobTicketId;
@@ -6572,21 +6795,43 @@
       }
     });
 
+    // ─── Action Sheet ───
+    function showActionSheet() {
+      var overlay = document.getElementById('action-sheet-overlay');
+      overlay.classList.add('visible');
+      haptic('light');
+    }
+    function hideActionSheet() {
+      document.getElementById('action-sheet-overlay').classList.remove('visible');
+    }
+    function openTicketFromActionSheet() {
+      hideActionSheet();
+      setTimeout(function() {
+        ticketSelectedProp = null;
+        ticketProperty.value = '';
+        ticketProperty.style.display = '';
+        ticketProperty.closest('.search-container').querySelector('.search-icon').style.display = '';
+        ticketPropertyCard.style.display = 'none';
+        ticketMessage.value = '';
+        ticketPhotoBase64 = null;
+        ticketPhotoUploadPromise = null;
+        ticketUploadedPhotoUrl = null;
+        ticketPhotoPreview.style.display = 'none';
+        ticketPhotoBtn.style.display = 'block';
+        updateTicketSaveBtn();
+        ticketOverlay.classList.add('active');
+        if (propertiesList.length === 0) loadProperties();
+      }, 200);
+    }
+
+    document.getElementById('action-report-issue').addEventListener('click', openTicketFromActionSheet);
+    document.getElementById('action-create-reminder').addEventListener('click', function() {
+      hideActionSheet();
+      setTimeout(function() { openCreateReminder(); }, 200);
+    });
+
     submitTicketBtn.addEventListener('click', function() {
-      ticketSelectedProp = null;
-      ticketProperty.value = '';
-      ticketProperty.style.display = '';
-      ticketProperty.closest('.search-container').querySelector('.search-icon').style.display = '';
-      ticketPropertyCard.style.display = 'none';
-      ticketMessage.value = '';
-      ticketPhotoBase64 = null;
-      ticketPhotoUploadPromise = null;
-      ticketUploadedPhotoUrl = null;
-      ticketPhotoPreview.style.display = 'none';
-      ticketPhotoBtn.style.display = 'block';
-      updateTicketSaveBtn();
-      ticketOverlay.classList.add('active');
-      if (propertiesList.length === 0) loadProperties();
+      showActionSheet();
     });
 
     ticketPhotoBtn.addEventListener('click', function() {
@@ -6720,6 +6965,190 @@
         submitTicketSaveBtn.disabled = false;
       });
     }
+
+    // --- Create Reminder ---
+    var reminderOverlay = document.getElementById('reminder-overlay');
+    var reminderProperty = document.getElementById('reminder-property');
+    var reminderMessage = document.getElementById('reminder-message');
+    var reminderDate = document.getElementById('reminder-date');
+    var reminderPhotoInput = document.getElementById('reminder-photo-input');
+    var reminderPhotoBtn = document.getElementById('reminder-photo-btn');
+    var reminderPhotoPreview = document.getElementById('reminder-photo-preview');
+    var reminderPreviewImg = document.getElementById('reminder-preview-img');
+    var reminderPhotoRemove = document.getElementById('reminder-photo-remove');
+    var submitReminderBtn = document.getElementById('submit-reminder-btn');
+    var cancelReminderBtn = document.getElementById('cancel-reminder-btn');
+    var reminderPhotoBase64 = null;
+    var reminderSelectedProp = null;
+    var reminderAcList = document.getElementById('reminder-autocomplete-list');
+    var reminderPropertyCard = document.getElementById('reminder-property-card');
+    var reminderCardAddress = document.getElementById('reminder-card-address');
+    var reminderCardCrew = document.getElementById('reminder-card-crew');
+    var reminderPropertyClear = document.getElementById('reminder-property-clear');
+
+    function openCreateReminder() {
+      reminderSelectedProp = null;
+      reminderProperty.value = '';
+      reminderProperty.style.display = '';
+      reminderProperty.closest('.search-container').querySelector('.search-icon').style.display = '';
+      reminderPropertyCard.style.display = 'none';
+      reminderMessage.value = '';
+      reminderPhotoBase64 = null;
+      reminderPhotoPreview.style.display = 'none';
+      reminderPhotoBtn.style.display = 'block';
+      // Set min date to tomorrow
+      var tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      reminderDate.min = tomorrow.toISOString().split('T')[0];
+      reminderDate.value = '';
+      updateReminderSaveBtn();
+      reminderOverlay.classList.add('active');
+      if (propertiesList.length === 0) loadProperties();
+    }
+
+    function updateReminderSaveBtn() {
+      var hasProperty = reminderSelectedProp !== null;
+      var hasMessage = reminderMessage.value.trim().length > 0;
+      var hasDate = reminderDate.value.length > 0;
+      submitReminderBtn.disabled = !(hasProperty && hasMessage && hasDate);
+    }
+
+    // Reminder property autocomplete
+    reminderProperty.addEventListener('input', function() {
+      var query = this.value.trim().toLowerCase();
+      reminderAcList.innerHTML = '';
+      if (query.length === 0) { reminderAcList.classList.remove('active'); return; }
+      var matches = propertiesList.filter(function(p) { return p.address.toLowerCase().indexOf(query) >= 0; });
+      if (matches.length === 0) { reminderAcList.classList.remove('active'); return; }
+      matches.forEach(function(prop) {
+        var item = document.createElement('div');
+        item.classList.add('autocomplete-item');
+        var idx = prop.address.toLowerCase().indexOf(query);
+        if (idx >= 0) {
+          item.innerHTML = escapeHtml(prop.address.substring(0, idx)) +
+            '<span class="highlight">' + escapeHtml(prop.address.substring(idx, idx + query.length)) + '</span>' +
+            escapeHtml(prop.address.substring(idx + query.length));
+        } else {
+          item.textContent = prop.address;
+        }
+        item.addEventListener('click', function() { selectReminderProperty(prop); });
+        reminderAcList.appendChild(item);
+      });
+      reminderAcList.classList.add('active');
+    });
+
+    function selectReminderProperty(prop) {
+      reminderSelectedProp = prop;
+      reminderProperty.value = prop.address;
+      reminderAcList.classList.remove('active');
+      reminderCardAddress.textContent = prop.address;
+      reminderCardCrew.textContent = prop.crew || 'N/A';
+      reminderPropertyCard.style.display = 'block';
+      reminderProperty.style.display = 'none';
+      reminderProperty.closest('.search-container').querySelector('.search-icon').style.display = 'none';
+      updateReminderSaveBtn();
+    }
+
+    reminderPropertyClear.addEventListener('click', function() {
+      reminderSelectedProp = null;
+      reminderProperty.value = '';
+      reminderPropertyCard.style.display = 'none';
+      reminderProperty.style.display = '';
+      reminderProperty.closest('.search-container').querySelector('.search-icon').style.display = '';
+      updateReminderSaveBtn();
+    });
+
+    reminderMessage.addEventListener('input', updateReminderSaveBtn);
+    reminderDate.addEventListener('change', updateReminderSaveBtn);
+
+    // Reminder photo
+    reminderPhotoBtn.addEventListener('click', function() { reminderPhotoInput.click(); });
+    reminderPhotoInput.addEventListener('change', function() {
+      var file = this.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        reminderPhotoBase64 = e.target.result;
+        reminderPreviewImg.src = reminderPhotoBase64;
+        reminderPhotoPreview.style.display = 'block';
+        reminderPhotoBtn.style.display = 'none';
+      };
+      reader.readAsDataURL(file);
+    });
+    reminderPhotoRemove.addEventListener('click', function() {
+      reminderPhotoBase64 = null;
+      reminderPhotoPreview.style.display = 'none';
+      reminderPhotoBtn.style.display = 'block';
+      reminderPhotoInput.value = '';
+    });
+
+    cancelReminderBtn.addEventListener('click', function() {
+      reminderOverlay.classList.remove('active');
+    });
+
+    // Close autocomplete when clicking outside
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('#reminder-overlay .search-container')) {
+        reminderAcList.classList.remove('active');
+      }
+    });
+
+    submitReminderBtn.addEventListener('click', function() {
+      submitReminderBtn.textContent = 'Submitting...';
+      submitReminderBtn.disabled = true;
+
+      var photoUploadPromise = Promise.resolve('');
+      if (reminderPhotoBase64) {
+        var dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        var filename = reminderSelectedProp.address.split(',')[0] + ' - Reminder - ' + dateStr;
+        photoUploadPromise = fetch(GOOGLE_SHEETS_URL, {
+          method: 'POST',
+          body: JSON.stringify({
+            photoOnly: true,
+            photo: reminderPhotoBase64,
+            filename: filename,
+            property: reminderSelectedProp.address,
+            internal: true
+          })
+        }).then(function(r) { return r.json(); }).then(function(d) { return d.photoUrl || ''; }).catch(function() { return ''; });
+      }
+
+      photoUploadPromise.then(function(photoUrl) {
+        var reminderData = {
+          saveReminder: true,
+          propertyAddress: reminderSelectedProp.address,
+          propertyId: reminderSelectedProp.propertyId || '',
+          description: reminderMessage.value.trim(),
+          scheduledDate: reminderDate.value,
+          isPermanent: false,
+          createdBy: currentCrewName + ' (Crew)',
+          createdByPhone: currentCrewPhone,
+          assignedCrew: reminderSelectedProp.crew || currentCrewName || '',
+          photoUrl: photoUrl
+        };
+
+        return fetch(GOOGLE_SHEETS_URL, {
+          method: 'POST',
+          body: JSON.stringify(reminderData)
+        });
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.success) {
+          reminderOverlay.classList.remove('active');
+          iosAlert(t('reminderSubmitted'));
+        } else {
+          iosAlert('Failed: ' + (data.error || 'Unknown error'));
+        }
+        submitReminderBtn.textContent = t('createReminder');
+        submitReminderBtn.disabled = false;
+      })
+      .catch(function() {
+        iosAlert('Connection error. Please try again.');
+        submitReminderBtn.textContent = t('createReminder');
+        submitReminderBtn.disabled = false;
+      });
+    });
 
     // --- Inspection Report ---
     var inspectionBtn = document.getElementById('inspection-btn');

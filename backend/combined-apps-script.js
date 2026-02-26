@@ -28,7 +28,8 @@ function doGet(e) {
           contacts: getContacts(),
           properties: getEstimatingProperties(),
           propertyContacts: getPropertyContacts(),
-          subContractors: getSubContractors()
+          subContractors: getSubContractors(),
+          reminders: getReminders()
         });
 
       // ─── Estimate Builder ───
@@ -60,6 +61,10 @@ function doGet(e) {
         return jsonResponse(getReportData(e.parameter.fileId));
       case 'getPhotoBase64':
         return jsonResponse(getPhotoBase64(e.parameter.fileId));
+
+      // ─── Reminders ───
+      case 'getReminders':
+        return jsonResponse(getReminders());
 
       // ─── Crew Schedule ───
       case 'getCrewSchedule':
@@ -201,6 +206,10 @@ function doPost(e) {
     if (data.setupAutoPay) return jsonResponse(setupAutoPay(data));
     if (data.checkAutoPaySetup) return jsonResponse(checkAutoPaySetup(data));
     if (data.checkStripePayment) return jsonResponse(checkStripePayment(data));
+
+    // ─── Reminders POST handlers ───
+    if (data.saveReminder) return jsonResponse(saveReminder(data));
+    if (data.updateReminder) return jsonResponse(updateReminder(data));
 
     // ─── Text My Team POST handlers ───
     if (data.photoOnly) {
@@ -2328,6 +2337,9 @@ function getCrewSchedule(phone, dateStr) {
     }
   }
 
+  // ─── Load reminders for this crew on this date ───
+  var reminderResult = getRemindersForCrew(crewName, targetDate);
+
   return {
     success: true,
     crewName: crewName,
@@ -2335,7 +2347,9 @@ function getCrewSchedule(phone, dateStr) {
     members: members,
     date: targetDate,
     tickets: tickets,
-    timeEntries: timeEntries
+    timeEntries: timeEntries,
+    reminders: reminderResult.scheduled,
+    permanentReminders: reminderResult.permanent
   };
 }
 
@@ -4663,4 +4677,151 @@ function deletePropertySubContractors(propertyId) {
       sheet.deleteRow(i + 1);
     }
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  REMINDERS
+// ═══════════════════════════════════════════════════════════════
+
+var REMINDERS_HEADERS = [
+  'reminderId', 'propertyAddress', 'propertyId', 'description',
+  'scheduledDate', 'isPermanent', 'status', 'createdBy',
+  'createdByPhone', 'assignedCrew', 'photoUrl',
+  'createdAt', 'completedAt'
+];
+
+function ensureRemindersSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Reminders');
+  if (!sheet) {
+    sheet = ss.insertSheet('Reminders');
+    sheet.getRange(1, 1, 1, REMINDERS_HEADERS.length).setValues([REMINDERS_HEADERS]);
+    sheet.getRange(1, 1, 1, REMINDERS_HEADERS.length).setFontWeight('bold');
+    return sheet;
+  }
+
+  var existingHeaders = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
+  REMINDERS_HEADERS.forEach(function(h) {
+    if (existingHeaders.indexOf(h) === -1) {
+      var nextCol = existingHeaders.length + 1;
+      sheet.getRange(1, nextCol).setValue(h).setFontWeight('bold');
+      existingHeaders.push(h);
+    }
+  });
+
+  return sheet;
+}
+
+function saveReminder(data) {
+  var sheet = ensureRemindersSheet();
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+
+  // Generate reminderId: REM-0001 format
+  var allData = sheet.getDataRange().getValues();
+  var maxNum = 0;
+  var idCol = headers.indexOf('reminderId');
+  for (var i = 1; i < allData.length; i++) {
+    var existingId = String(allData[i][idCol] || '');
+    if (existingId.indexOf('REM-') === 0) {
+      var num = parseInt(existingId.replace('REM-', ''), 10);
+      if (num > maxNum) maxNum = num;
+    }
+  }
+  var reminderId = 'REM-' + String(maxNum + 1).padStart(4, '0');
+  var now = new Date().toISOString();
+
+  var rowData = headers.map(function(h) {
+    if (h === 'reminderId') return reminderId;
+    if (h === 'status') return 'active';
+    if (h === 'isPermanent') return data.isPermanent === true || data.isPermanent === 'TRUE' ? 'TRUE' : 'FALSE';
+    if (h === 'createdAt') return now;
+    if (h === 'completedAt') return '';
+    return data[h] !== undefined ? data[h] : '';
+  });
+
+  sheet.appendRow(rowData);
+  return { success: true, reminderId: reminderId };
+}
+
+function updateReminder(data) {
+  var sheet = ensureRemindersSheet();
+  var allData = sheet.getDataRange().getValues();
+  var headers = allData[0];
+  var idCol = headers.indexOf('reminderId');
+
+  for (var i = 1; i < allData.length; i++) {
+    if (String(allData[i][idCol]) === String(data.reminderId)) {
+      var now = new Date().toISOString();
+      var rowData = headers.map(function(h) {
+        if (h === 'reminderId') return data.reminderId;
+        if (h === 'createdAt') return allData[i][headers.indexOf('createdAt')]; // preserve
+        // When making permanent, clear scheduledDate
+        if (h === 'scheduledDate' && (data.isPermanent === true || data.isPermanent === 'TRUE')) return '';
+        if (h === 'isPermanent' && data.isPermanent !== undefined) return data.isPermanent === true || data.isPermanent === 'TRUE' ? 'TRUE' : 'FALSE';
+        // When completing, set completedAt
+        if (h === 'completedAt' && data.status === 'completed') return now;
+        return data[h] !== undefined ? data[h] : allData[i][headers.indexOf(h)];
+      });
+      sheet.getRange(i + 1, 1, 1, headers.length).setValues([rowData]);
+      return { success: true };
+    }
+  }
+  return { success: false, error: 'Reminder not found' };
+}
+
+function getReminders() {
+  var sheet = ensureRemindersSheet();
+  var data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return { success: true, reminders: [] };
+  var headers = data[0];
+  var reminders = [];
+  for (var i = 1; i < data.length; i++) {
+    var obj = {};
+    for (var j = 0; j < headers.length; j++) {
+      obj[headers[j]] = data[i][j];
+    }
+    reminders.push(obj);
+  }
+  return { success: true, reminders: reminders };
+}
+
+function getRemindersForCrew(crewName, dateStr) {
+  var sheet;
+  try { sheet = ensureRemindersSheet(); } catch(e) { return { scheduled: [], permanent: [] }; }
+  var data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return { scheduled: [], permanent: [] };
+  var headers = data[0];
+  var scheduled = [];
+  var permanent = [];
+
+  for (var i = 1; i < data.length; i++) {
+    var obj = {};
+    for (var j = 0; j < headers.length; j++) {
+      obj[headers[j]] = data[i][j];
+    }
+    // Only active reminders
+    if (String(obj.status || '').toLowerCase() !== 'active') continue;
+    // Match crew
+    if (obj.assignedCrew && String(obj.assignedCrew) !== String(crewName)) continue;
+
+    var isPerm = String(obj.isPermanent || '').toUpperCase() === 'TRUE';
+
+    if (isPerm) {
+      permanent.push(obj);
+    } else {
+      // Check if scheduled for this date
+      var sDate = obj.scheduledDate;
+      if (sDate instanceof Date) {
+        sDate = sDate.getFullYear() + '-' + String(sDate.getMonth() + 1).padStart(2, '0') + '-' + String(sDate.getDate()).padStart(2, '0');
+      } else {
+        sDate = String(sDate || '');
+        if (sDate.indexOf('T') !== -1) sDate = sDate.split('T')[0];
+      }
+      if (sDate === dateStr) {
+        scheduled.push(obj);
+      }
+    }
+  }
+
+  return { scheduled: scheduled, permanent: permanent };
 }
