@@ -1506,7 +1506,7 @@ body {
 .save-status.unsaved { color: var(--gw-yellow); }
 
 .main-body {
-  display: none;
+  display: contents;
 }
 
 /* RIGHT SUMMARY PANEL - Google Sheets Explore Panel Style */
