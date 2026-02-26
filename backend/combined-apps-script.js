@@ -18,6 +18,8 @@ function doGet(e) {
     switch (action) {
       // ─── Bulk Init (single request for all estimate builder data) ───
       case 'getInitData':
+        var remindersResult;
+        try { remindersResult = getReminders(); } catch(re) { remindersResult = { success: true, reminders: [] }; }
         return jsonResponse({
           success: true,
           itemCatalog: getItemCatalog(),
@@ -29,7 +31,7 @@ function doGet(e) {
           properties: getEstimatingProperties(),
           propertyContacts: getPropertyContacts(),
           subContractors: getSubContractors(),
-          reminders: getReminders()
+          reminders: remindersResult
         });
 
       // ─── Estimate Builder ───
@@ -2338,7 +2340,8 @@ function getCrewSchedule(phone, dateStr) {
   }
 
   // ─── Load reminders for this crew on this date ───
-  var reminderResult = getRemindersForCrew(crewName, targetDate);
+  var reminderResult;
+  try { reminderResult = getRemindersForCrew(crewName, targetDate); } catch(re) { reminderResult = { scheduled: [], permanent: [] }; }
 
   return {
     success: true,
