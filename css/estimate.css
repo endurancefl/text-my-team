@@ -334,6 +334,8 @@ body {
 /* MAIN CONTENT AREA */
 .main-content {
   flex: 1;
+  display: flex;
+  flex-direction: column;
   position: relative;
   overflow: hidden;
   background: var(--gw-surface);
