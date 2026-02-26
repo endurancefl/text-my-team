@@ -549,7 +549,9 @@ function saveBid(bidData) {
     'notes': 'Notes',
     'estimateFileId': 'estimateFileID',
     'contractId': 'Contract ID',
-    'revisionCount': 'Revision Count'
+    'revisionCount': 'Revision Count',
+    'jobType': 'Job Type',
+    'scheduleType': 'Schedule Type'
   };
 
   // Reverse map: header to property
@@ -626,7 +628,9 @@ function updateBid(bidData) {
     'notes': 'Notes',
     'estimateFileId': 'estimateFileID',
     'contractId': 'Contract ID',
-    'revisionCount': 'Revision Count'
+    'revisionCount': 'Revision Count',
+    'jobType': 'Job Type',
+    'scheduleType': 'Schedule Type'
   };
 
   var headerToProperty = {};
@@ -819,7 +823,7 @@ function createContract(data) {
   // Ensure new columns exist on existing sheets
   var existingData = sheet.getDataRange().getValues();
   var headers = existingData[0];
-  var newCols = ['Payment Terms', 'Contract Value', 'CC Fee %', 'CC Gross-Up', 'Contact Name', 'Contact Email', 'Billing Address', 'PDF URL', 'PDF File ID'];
+  var newCols = ['Payment Terms', 'Contract Value', 'CC Fee %', 'CC Gross-Up', 'Contact Name', 'Contact Email', 'Billing Address', 'PDF URL', 'PDF File ID', 'Job Type', 'Schedule Type', 'Project Name', 'Deposit Percent', 'Deposit Amount'];
   newCols.forEach(function(colName) {
     if (headers.indexOf(colName) === -1) {
       var nextCol = headers.length + 1;
@@ -852,7 +856,12 @@ function createContract(data) {
     contactEmail: headers.indexOf('Contact Email'),
     billingAddress: headers.indexOf('Billing Address'),
     pdfUrl: headers.indexOf('PDF URL'),
-    pdfFileId: headers.indexOf('PDF File ID')
+    pdfFileId: headers.indexOf('PDF File ID'),
+    jobType: headers.indexOf('Job Type'),
+    scheduleType: headers.indexOf('Schedule Type'),
+    projectName: headers.indexOf('Project Name'),
+    depositPercent: headers.indexOf('Deposit Percent'),
+    depositAmount: headers.indexOf('Deposit Amount')
   };
 
   var idCol = col.contractId !== -1 ? col.contractId : 0;
@@ -892,6 +901,11 @@ function createContract(data) {
     else if (c === col.billingAddress) row.push(data.billingAddress || '');
     else if (c === col.pdfUrl) row.push(data.pdfUrl || '');
     else if (c === col.pdfFileId) row.push(data.pdfFileId || '');
+    else if (c === col.jobType) row.push(data.jobType || 'recurring');
+    else if (c === col.scheduleType) row.push(data.scheduleType || '');
+    else if (c === col.projectName) row.push(data.projectName || '');
+    else if (c === col.depositPercent) row.push(data.depositPercent || 0);
+    else if (c === col.depositAmount) row.push(data.depositAmount || 0);
     else row.push('');
   }
 
@@ -1086,6 +1100,16 @@ function saveTickets(data) {
       sheet.getRange(1, nrCol).setValue('Needs Reschedule');
       sheet.getRange(1, nrCol).setFontWeight('bold');
     }
+    // Auto-upgrade: add work ticket columns if missing
+    headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var wtTicketCols = ['Job Type', 'Day Number', 'Total Days', 'Project Name'];
+    wtTicketCols.forEach(function(colName) {
+      if (headerRow.indexOf(colName) === -1) {
+        var nc = sheet.getLastColumn() + 1;
+        sheet.getRange(1, nc).setValue(colName).setFontWeight('bold');
+        headerRow.push(colName);
+      }
+    });
   }
 
   var tickets = data.tickets || [];
@@ -1115,7 +1139,11 @@ function saveTickets(data) {
     notes: headers.indexOf('Notes'),
     createdDate: headers.indexOf('Created Date'),
     stopOrder: headers.indexOf('Stop Order'),
-    needsReschedule: headers.indexOf('Needs Reschedule')
+    needsReschedule: headers.indexOf('Needs Reschedule'),
+    jobType: headers.indexOf('Job Type'),
+    dayNumber: headers.indexOf('Day Number'),
+    totalDays: headers.indexOf('Total Days'),
+    projectName: headers.indexOf('Project Name')
   };
 
   var maxId = 0;
@@ -1155,6 +1183,10 @@ function saveTickets(data) {
       else if (c === colIdx.createdDate) row.push(dateStr);
       else if (c === colIdx.stopOrder) row.push('');
       else if (c === colIdx.needsReschedule) row.push('');
+      else if (c === colIdx.jobType) row.push(t.jobType || 'recurring');
+      else if (c === colIdx.dayNumber) row.push(t.dayNumber || '');
+      else if (c === colIdx.totalDays) row.push(t.totalDays || '');
+      else if (c === colIdx.projectName) row.push(t.projectName || '');
       else row.push('');
     }
     rows.push(row);

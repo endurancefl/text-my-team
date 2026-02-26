@@ -11,7 +11,7 @@
   <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.js"></script>
-  <link rel="stylesheet" href="css/estimate.css?v=worktickets1">
+  <link rel="stylesheet" href="css/estimate.css?v=worktickets2">
 </head>
 <body>
 
@@ -107,7 +107,7 @@
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
           </svg>
-          <span>Work Tickets</span>
+          <span>Reminders</span>
         </div>
         <div class="nav-item" data-view="settings">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -173,30 +173,102 @@
                 </svg>
               </div>
               <div class="contract-card-body">
-                <div class="contract-grid">
-                  <div class="form-group">
-                    <label class="form-label">Contract Start</label>
-                    <input type="date" class="form-input" id="contract-start">
+                <div id="recurring-contract-fields">
+                  <div class="contract-grid">
+                    <div class="form-group">
+                      <label class="form-label">Contract Start</label>
+                      <input type="date" class="form-input" id="contract-start">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Contract End</label>
+                      <input type="date" class="form-input" id="contract-end">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Duration (Months)</label>
+                      <input type="number" class="form-input" id="contract-duration" value="12" min="1" max="60">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Payment Months</label>
+                      <input type="number" class="form-input" id="contract-payment-months" value="12" min="1" max="12">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Price Increase %</label>
+                      <input type="number" class="form-input" id="contract-price-increase" value="0" step="0.5" min="0">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Payment Terms</label>
+                      <select class="form-select" id="contract-payment-terms">
+                        <option value="Due on Receipt">Due on Receipt</option>
+                        <option value="Net 15">Net 15</option>
+                        <option value="Net 30" selected>Net 30</option>
+                        <option value="Net 45">Net 45</option>
+                        <option value="Net 60">Net 60</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">CC Processing Fee %</label>
+                      <input type="number" class="form-input" id="contract-cc-fee" value="0" step="0.1" min="0" max="10">
+                    </div>
+                    <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
+                      <input type="checkbox" id="contract-cc-grossup" style="width: 18px; height: 18px; cursor: pointer;">
+                      <label class="form-label" for="contract-cc-grossup" style="margin: 0; cursor: pointer;">Gross-up monthly payment for CC fee</label>
+                    </div>
                   </div>
-                  <div class="form-group">
-                    <label class="form-label">Contract End</label>
-                    <input type="date" class="form-input" id="contract-end">
+                  <div style="padding: 0 16px 16px; border-top: 1px solid #eee; margin-top: 8px; padding-top: 12px;">
+                    <button class="btn btn-secondary" onclick="openTermsModal()" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="18" height="18">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                      </svg>
+                      Edit Terms &amp; Conditions
+                    </button>
                   </div>
-                  <div class="form-group">
-                    <label class="form-label">Duration (Months)</label>
-                    <input type="number" class="form-input" id="contract-duration" value="12" min="1" max="60">
+                </div>
+                <div id="wt-project-fields" style="display: none; padding: 16px;">
+                  <div class="form-group" style="margin-bottom: 12px;">
+                    <label class="form-label">Project Name</label>
+                    <input type="text" class="form-input" id="wt-project-name" placeholder="e.g., Spring Cleanup — 123 Oak St" onchange="currentEstimate.workTicket.projectName = this.value; markEstimateDirty();">
                   </div>
-                  <div class="form-group">
-                    <label class="form-label">Payment Months</label>
-                    <input type="number" class="form-input" id="contract-payment-months" value="12" min="1" max="12">
+                  <div class="form-group" style="margin-bottom: 12px;">
+                    <label class="form-label">Schedule Type</label>
+                    <div class="wt-schedule-type-picker">
+                      <button class="wt-schedule-btn active" data-type="single_visit" onclick="setScheduleType('single_visit')">Single Visit</button>
+                      <button class="wt-schedule-btn" data-type="multi_day" onclick="setScheduleType('multi_day')">Multi-Day</button>
+                    </div>
                   </div>
-                  <div class="form-group">
-                    <label class="form-label">Price Increase %</label>
-                    <input type="number" class="form-input" id="contract-price-increase" value="0" step="0.5" min="0">
+                  <div id="wt-single-visit-fields">
+                    <div class="form-group" style="margin-bottom: 12px;">
+                      <label class="form-label">Scheduled Date</label>
+                      <input type="date" class="form-input" id="wt-scheduled-date" onchange="currentEstimate.workTicket.scheduledDate = this.value; markEstimateDirty();">
+                    </div>
+                  </div>
+                  <div id="wt-multi-day-fields" style="display: none;">
+                    <div class="contract-grid" style="margin-bottom: 12px;">
+                      <div class="form-group">
+                        <label class="form-label">Start Date</label>
+                        <input type="date" class="form-input" id="wt-start-date" onchange="currentEstimate.workTicket.startDate = this.value; renderMultiDayAllocation(); markEstimateDirty();">
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">Number of Days</label>
+                        <input type="number" class="form-input" id="wt-num-days" value="2" min="2" max="30" onchange="currentEstimate.workTicket.numDays = parseInt(this.value) || 2; renderMultiDayAllocation(); markEstimateDirty();">
+                      </div>
+                    </div>
+                    <div id="wt-day-allocation" style="margin-bottom: 12px;"></div>
+                  </div>
+                  <div class="form-group" style="margin-bottom: 12px; padding-top: 12px; border-top: 1px solid #eee;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <input type="checkbox" id="wt-collect-deposit" style="width: 18px; height: 18px; cursor: pointer;" onchange="currentEstimate.workTicket.collectDeposit = this.checked; updateSummaryPanel(); markEstimateDirty();">
+                      <label class="form-label" for="wt-collect-deposit" style="margin: 0; cursor: pointer;">Collect deposit upfront</label>
+                    </div>
+                    <div id="wt-deposit-settings" style="display: none; margin-top: 8px;">
+                      <div style="display: flex; align-items: center; gap: 8px;">
+                        <label class="form-label" style="margin: 0; white-space: nowrap;">Deposit %</label>
+                        <input type="number" class="form-input" id="wt-deposit-percent" value="25" min="1" max="99" style="width: 80px;" onchange="currentEstimate.workTicket.depositPercent = parseInt(this.value) || 25; updateSummaryPanel(); markEstimateDirty();">
+                      </div>
+                    </div>
                   </div>
                   <div class="form-group">
                     <label class="form-label">Payment Terms</label>
-                    <select class="form-select" id="contract-payment-terms">
+                    <select class="form-select" id="wt-payment-terms" onchange="currentEstimate.contract.paymentTerms = this.value; markEstimateDirty();">
                       <option value="Due on Receipt">Due on Receipt</option>
                       <option value="Net 15">Net 15</option>
                       <option value="Net 30" selected>Net 30</option>
@@ -204,22 +276,6 @@
                       <option value="Net 60">Net 60</option>
                     </select>
                   </div>
-                  <div class="form-group">
-                    <label class="form-label">CC Processing Fee %</label>
-                    <input type="number" class="form-input" id="contract-cc-fee" value="0" step="0.1" min="0" max="10">
-                  </div>
-                  <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
-                    <input type="checkbox" id="contract-cc-grossup" style="width: 18px; height: 18px; cursor: pointer;">
-                    <label class="form-label" for="contract-cc-grossup" style="margin: 0; cursor: pointer;">Gross-up monthly payment for CC fee</label>
-                  </div>
-                </div>
-                <div style="padding: 0 16px 16px; border-top: 1px solid #eee; margin-top: 8px; padding-top: 12px;">
-                  <button class="btn btn-secondary" onclick="openTermsModal()" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="18" height="18">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                    </svg>
-                    Edit Terms &amp; Conditions
-                  </button>
                 </div>
               </div>
             </div>
@@ -1918,6 +1974,42 @@
     </div>
   </div>
 
+  <!-- JOB TYPE PICKER MODAL -->
+  <div class="modal-overlay" id="job-type-picker-modal">
+    <div class="template-picker-modal" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3>What type of job?</h3>
+        <button class="modal-close" onclick="closeJobTypePicker()">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body" style="padding: 20px;">
+        <div class="job-type-picker-grid">
+          <div class="job-type-card" onclick="selectJobType('recurring')">
+            <div class="job-type-card-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="36" height="36">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+              </svg>
+            </div>
+            <div class="job-type-card-title">Recurring Service</div>
+            <div class="job-type-card-desc">Ongoing contract with scheduled visits throughout the year</div>
+          </div>
+          <div class="job-type-card" onclick="selectJobType('work_ticket')">
+            <div class="job-type-card-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="36" height="36">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+              </svg>
+            </div>
+            <div class="job-type-card-title">Work Ticket</div>
+            <div class="job-type-card-desc">One-off billable job — single visit or multi-day project</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- SAVE TEMPLATE MODAL -->
   <div class="modal-overlay" id="save-template-modal">
     <div class="save-template-modal">
@@ -1989,27 +2081,33 @@
           </select>
         </div>
 
-        <div class="form-group" style="margin-bottom: 12px;">
-          <label class="form-label">Preferred Day</label>
-          <select id="finalize-preferred-day" class="form-input">
-            <option value="0">Monday</option>
-            <option value="1">Tuesday</option>
-            <option value="2" selected>Wednesday</option>
-            <option value="3">Thursday</option>
-            <option value="4">Friday</option>
-            <option value="5">Saturday</option>
-            <option value="6">Sunday</option>
-          </select>
+        <div id="finalize-recurring-fields">
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label class="form-label">Preferred Day</label>
+            <select id="finalize-preferred-day" class="form-input">
+              <option value="0">Monday</option>
+              <option value="1">Tuesday</option>
+              <option value="2" selected>Wednesday</option>
+              <option value="3">Thursday</option>
+              <option value="4">Friday</option>
+              <option value="5">Saturday</option>
+              <option value="6">Sunday</option>
+            </select>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label class="form-label">Contract Start Date</label>
+            <input type="date" id="finalize-start-date" class="form-input">
+          </div>
+
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label class="form-label">Contract Duration (months)</label>
+            <input type="number" id="finalize-duration" class="form-input" value="12" min="1" max="60">
+          </div>
         </div>
 
-        <div class="form-group" style="margin-bottom: 12px;">
-          <label class="form-label">Contract Start Date</label>
-          <input type="date" id="finalize-start-date" class="form-input">
-        </div>
-
-        <div class="form-group" style="margin-bottom: 16px;">
-          <label class="form-label">Contract Duration (months)</label>
-          <input type="number" id="finalize-duration" class="form-input" value="12" min="1" max="60">
+        <div id="finalize-wt-fields" style="display: none;">
+          <div id="finalize-wt-schedule-summary" style="background: #f8f9fa; border-radius: 8px; padding: 12px; margin-bottom: 12px; font-size: 13px;"></div>
         </div>
 
         <div id="finalize-preview" style="background: #f8f9fa; border-radius: 8px; padding: 12px; margin-bottom: 16px; display: none;">
@@ -8458,7 +8556,7 @@ function showView(viewId) {
     'contacts': 'Contacts',
     'properties': 'Properties',
     'invoices': 'Invoices',
-    'worktickets': 'Work Tickets',
+    'worktickets': 'Reminders',
     'settings': 'Settings'
   };
   document.getElementById('header-title').textContent = titles[viewId] || 'Estimates';
@@ -8766,10 +8864,17 @@ async function openSavedEstimate(bidId) {
           } catch (e) { /* PDF URL load is non-critical */ }
         }
 
+        // Ensure workTicket sub-object exists for older saved estimates
+        if (!currentEstimate.workTicket) {
+          currentEstimate.workTicket = { scheduleType: 'single_visit', projectName: '', scheduledDate: '', startDate: '', numDays: 2, hoursPerDay: [], depositPercent: 25, collectDeposit: false };
+        }
+        if (!currentEstimate.jobType) currentEstimate.jobType = 'recurring';
+
         // Re-render everything
         renderPropertySetupTables();
         renderTableBody();
         calculateBidTotals();
+        adaptBuilderForJobType();
         showView('builder');
         updateHeaderActions();
 
@@ -8825,9 +8930,16 @@ async function openSavedEstimate(bidId) {
         } catch (e) { /* PDF URL load is non-critical */ }
       }
 
+      // Ensure workTicket sub-object exists for older saved estimates
+      if (!currentEstimate.workTicket) {
+        currentEstimate.workTicket = { scheduleType: 'single_visit', projectName: '', scheduledDate: '', startDate: '', numDays: 2, hoursPerDay: [], depositPercent: 25, collectDeposit: false };
+      }
+      if (!currentEstimate.jobType) currentEstimate.jobType = 'recurring';
+
       renderPropertySetupTables();
       renderTableBody();
       calculateBidTotals();
+      adaptBuilderForJobType();
       showView('builder');
       updateHeaderActions();
 
@@ -8929,6 +9041,15 @@ function renderSettingsForm() {
 function renderTableBody() {
   const tbody = document.getElementById('table-body');
   if (!tbody) return;
+
+  // Enforce work ticket constraints on services
+  if (currentEstimate.jobType === 'work_ticket') {
+    currentEstimate.services.forEach(s => {
+      s.billingTier = 'fixed';
+      s.visits = 1;
+    });
+  }
+
   const totals = calculateBidTotals();
   const rates = getEffectiveRates();
 
@@ -9025,7 +9146,7 @@ function renderTableBody() {
         <td></td>
         <td>
           <input type="number" class="table-input visits-input" value="${service.visits || 0}"
-            data-service="${sIdx}" min="1">
+            data-service="${sIdx}" min="1" ${currentEstimate.jobType === 'work_ticket' ? 'readonly style="opacity:0.5;cursor:not-allowed;"' : ''}>
         </td>
         <td></td>
         <td></td>
@@ -9627,6 +9748,11 @@ async function finalizeEstimate() {
     return;
   }
 
+  // Branch for work tickets
+  if (currentEstimate.jobType === 'work_ticket') {
+    return finalizeWorkTicket(finalizeBtn, linkedContact);
+  }
+
   const crew = document.getElementById('finalize-crew').value;
   const preferredDay = parseInt(document.getElementById('finalize-preferred-day').value);
   const startDate = document.getElementById('finalize-start-date').value;
@@ -9992,6 +10118,265 @@ async function finalizeEstimate() {
 }
 
 // ═══════════════════════════════════════════════════════════════
+//  WORK TICKET — FINALIZATION
+// ═══════════════════════════════════════════════════════════════
+
+function generateWorkTickets() {
+  const wt = currentEstimate.workTicket;
+  const totals = calculateBidTotals();
+  const travelPercent = currentEstimate.travelPercent || 0;
+
+  // Build services array for tickets
+  const ticketServices = currentEstimate.services.filter(s => !s.isSubcontractor).map(s => {
+    const serviceHours = calcServiceHours(s);
+    return {
+      name: s.name,
+      proposalName: s.proposalName || s.name,
+      estimatedHours: Math.round(serviceHours * 100) / 100,
+      items: (s.lineItems || []).map(li => ({
+        name: li.itemName,
+        quantities: li.quantities || {},
+        hoursPerVisit: calcItemHoursPerVisit(li)
+      }))
+    };
+  });
+
+  const totalEstHours = ticketServices.reduce((sum, s) => sum + s.estimatedHours, 0);
+  const travelHours = Math.round(totalEstHours * (travelPercent / 100) * 100) / 100;
+
+  if (wt.scheduleType === 'single_visit') {
+    return [{
+      eventDate: wt.scheduledDate,
+      services: ticketServices,
+      totalEstHours: Math.round(totalEstHours * 100) / 100,
+      travelHours: travelHours,
+      jobType: 'work_ticket',
+      dayNumber: 1,
+      totalDays: 1,
+      projectName: wt.projectName || ''
+    }];
+  } else {
+    // Multi-day
+    const numDays = wt.numDays || 2;
+    const dates = wt.startDate ? getBusinessDays(wt.startDate, numDays) : [];
+    const hoursPerDay = wt.hoursPerDay && wt.hoursPerDay.length === numDays
+      ? wt.hoursPerDay
+      : Array(numDays).fill(totalEstHours / numDays);
+
+    const totalAllocated = hoursPerDay.reduce((s, h) => s + h, 0);
+
+    return dates.map((date, i) => {
+      const dayShare = totalAllocated > 0 ? hoursPerDay[i] / totalAllocated : 1 / numDays;
+      const dayServices = ticketServices.map(s => ({
+        ...s,
+        estimatedHours: Math.round(s.estimatedHours * dayShare * 100) / 100
+      }));
+      const dayEstHours = dayServices.reduce((sum, s) => sum + s.estimatedHours, 0);
+
+      return {
+        eventDate: date,
+        services: dayServices,
+        totalEstHours: Math.round(dayEstHours * 100) / 100,
+        travelHours: Math.round(dayEstHours * (travelPercent / 100) * 100) / 100,
+        jobType: 'work_ticket',
+        dayNumber: i + 1,
+        totalDays: numDays,
+        projectName: wt.projectName || ''
+      };
+    });
+  }
+}
+
+async function finalizeWorkTicket(finalizeBtn, linkedContact) {
+  const wt = currentEstimate.workTicket;
+  const crew = document.getElementById('finalize-crew').value;
+
+  // Validate dates
+  if (wt.scheduleType === 'single_visit') {
+    if (!wt.scheduledDate) {
+      showToast('Please set a scheduled date in Project Settings.', 'error');
+      return;
+    }
+  } else {
+    if (!wt.startDate) {
+      showToast('Please set a start date in Project Settings.', 'error');
+      return;
+    }
+  }
+
+  const tickets = generateWorkTickets();
+  if (tickets.length === 0) {
+    showToast('No tickets could be generated. Check your dates.', 'error');
+    return;
+  }
+
+  const totals = calculateBidTotals();
+  const projectTotal = totals.bidTotal;
+
+  // Build confirm message
+  let confirmMsg = `Create work order with ${tickets.length} ticket${tickets.length > 1 ? 's' : ''}?\n\n`;
+  confirmMsg += `Project: ${wt.projectName || currentEstimate.propertyAddress}\n`;
+  if (wt.scheduleType === 'single_visit') {
+    confirmMsg += `Date: ${wt.scheduledDate}\n`;
+  } else {
+    confirmMsg += `Dates: ${tickets[0].eventDate} to ${tickets[tickets.length - 1].eventDate}\n`;
+  }
+  confirmMsg += `Total: ${formatCurrency(projectTotal)}\n`;
+  confirmMsg += `Crew: ${crew || 'Unassigned'}\n`;
+  if (wt.collectDeposit) {
+    confirmMsg += `Deposit: ${formatCurrency(projectTotal * wt.depositPercent / 100)} (${wt.depositPercent}%)\n`;
+  }
+  confirmMsg += `\nContinue?`;
+
+  if (!confirm(confirmMsg)) return;
+
+  closeFinalizeModal();
+  if (finalizeBtn) finalizeBtn.classList.add('btn--loading');
+
+  try {
+    // Step 1: Save estimate
+    if (!currentEstimate.bidId) {
+      await handleSaveBid();
+    }
+
+    // Step 2: Calculate earned value per ticket
+    const allTicketHours = tickets.reduce((sum, t) => sum + (t.totalEstHours || 0) + (t.travelHours || 0), 0);
+    if (allTicketHours > 0) {
+      let runningEV = 0;
+      let runningIC = 0;
+      tickets.forEach((ticket, idx) => {
+        const ticketHours = (ticket.totalEstHours || 0) + (ticket.travelHours || 0);
+        const share = ticketHours / allTicketHours;
+        if (idx < tickets.length - 1) {
+          ticket.earnedValue = Math.round(projectTotal * share * 100) / 100;
+          ticket.internalCost = Math.round(totals.internalCost * share * 100) / 100;
+          runningEV += ticket.earnedValue;
+          runningIC += ticket.internalCost;
+        } else {
+          ticket.earnedValue = Math.round((projectTotal - runningEV) * 100) / 100;
+          ticket.internalCost = Math.round((totals.internalCost - runningIC) * 100) / 100;
+        }
+      });
+    }
+
+    // Step 3: Create contract
+    const depositAmount = wt.collectDeposit ? Math.round(projectTotal * wt.depositPercent / 100 * 100) / 100 : 0;
+
+    const contractResult = await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        createContract: true,
+        bidId: currentEstimate.bidId,
+        propertyAddress: currentEstimate.propertyAddress,
+        assignedCrew: crew,
+        preferredDay: 0,
+        startDate: wt.scheduleType === 'single_visit' ? wt.scheduledDate : wt.startDate,
+        endDate: tickets[tickets.length - 1].eventDate,
+        contractMonths: 0,
+        monthlyPayment: 0,
+        paymentTerms: currentEstimate.contract.paymentTerms || 'Net 30',
+        contractValue: Math.round(projectTotal * 100) / 100,
+        ccFeePercent: 0,
+        ccGrossUp: false,
+        contactName: linkedContact ? ((linkedContact.firstName || '') + ' ' + (linkedContact.lastName || '')).trim() : '',
+        contactEmail: linkedContact ? (linkedContact.email || '') : '',
+        billingAddress: linkedContact ? (linkedContact.billingAddress || '') : '',
+        jobType: 'work_ticket',
+        scheduleType: wt.scheduleType,
+        projectName: wt.projectName || '',
+        depositPercent: wt.collectDeposit ? wt.depositPercent : 0,
+        depositAmount: depositAmount
+      })
+    });
+    const contractData = await contractResult.json();
+
+    if (!contractData.success) {
+      showToast('Error creating contract: ' + (contractData.error || 'Unknown'), 'error');
+      return;
+    }
+
+    const contractId = contractData.contractId;
+
+    // Step 4: Save tickets
+    const ticketPayload = tickets.map(t => ({
+      contractId: contractId,
+      propertyAddress: currentEstimate.propertyAddress,
+      assignedCrew: crew,
+      eventDate: t.eventDate,
+      services: t.services,
+      totalEstHours: t.totalEstHours,
+      travelHours: t.travelHours || 0,
+      earnedValue: t.earnedValue || 0,
+      internalCost: t.internalCost || 0,
+      jobType: 'work_ticket',
+      dayNumber: t.dayNumber,
+      totalDays: t.totalDays,
+      projectName: t.projectName || ''
+    }));
+
+    const ticketResult = await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        saveTickets: true,
+        tickets: ticketPayload
+      })
+    });
+    const ticketData = await ticketResult.json();
+
+    if (!ticketData.success) {
+      showToast('Contract created but error saving tickets: ' + (ticketData.error || 'Unknown'), 'error');
+      return;
+    }
+
+    // Step 5: Update bid status
+    await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        updateBid: true,
+        bidData: {
+          bidId: currentEstimate.bidId,
+          status: 'Finalized',
+          contractId: contractId,
+          revisionCount: 0
+        }
+      })
+    });
+
+    currentEstimate.status = 'Finalized';
+    currentEstimate.contractId = contractId;
+    currentEstimate.revisionCount = 0;
+    estimateDirty = false;
+
+    showToast(`Work order ${contractId} created with ${ticketData.ticketCount} ticket${ticketData.ticketCount > 1 ? 's' : ''}!`, 'success', 5000);
+
+    // Auto-promote contact to Customer
+    if (currentEstimate.contactId) {
+      const contact = contacts.find(c => c.contactId === currentEstimate.contactId);
+      if (contact && contact.stage !== 'Customer') {
+        try {
+          await fetch(GOOGLE_SHEETS_URL, {
+            method: 'POST',
+            body: JSON.stringify({ updateContact: true, contactId: contact.contactId, firstName: contact.firstName, lastName: contact.lastName, email: contact.email, phone: contact.phone, company: contact.company, billingAddress: contact.billingAddress, propertyAddress: contact.propertyAddress, stage: 'Customer', source: contact.source, notes: contact.notes })
+          });
+          contact.stage = 'Customer';
+        } catch (e) {
+          console.error('Error auto-promoting contact:', e);
+        }
+      }
+    }
+
+    loadBids();
+    showView('estimates');
+
+  } catch (err) {
+    console.error('Error finalizing work ticket:', err);
+    showToast('Error creating work order. Check your connection and try again.', 'error');
+  } finally {
+    if (finalizeBtn) finalizeBtn.classList.remove('btn--loading');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
 //  CONTRACT PDF GENERATION
 // ═══════════════════════════════════════════════════════════════
 
@@ -10183,7 +10568,41 @@ async function openFinalizeModal() {
   const modalDesc = document.getElementById('finalize-description');
   const actionBtn = document.getElementById('finalize-action-btn');
 
-  if (isRevision) {
+  const isWT = currentEstimate.jobType === 'work_ticket';
+
+  // Show/hide recurring vs work ticket fields
+  document.getElementById('finalize-recurring-fields').style.display = isWT ? 'none' : '';
+  document.getElementById('finalize-wt-fields').style.display = isWT ? '' : 'none';
+
+  if (isWT) {
+    if (modalTitle) modalTitle.textContent = 'Finalize Work Ticket';
+    if (modalDesc) modalDesc.textContent = 'This will create a work order and generate scheduled ticket(s).';
+    if (actionBtn) { actionBtn.textContent = 'Create Work Order'; actionBtn.style.background = '#1A73E8'; }
+
+    // Build schedule summary
+    const wt = currentEstimate.workTicket;
+    const totals = calculateBidTotals();
+    let summaryHtml = '';
+    if (wt.scheduleType === 'single_visit') {
+      summaryHtml = `<div style="font-weight:600;margin-bottom:4px;">Single Visit</div>`;
+      summaryHtml += `<div>Date: ${wt.scheduledDate ? formatDateShort(wt.scheduledDate) : '<em>Not set</em>'}</div>`;
+      summaryHtml += `<div>Total Hours: ${totals.totalHours.toFixed(1)}</div>`;
+    } else {
+      const numDays = wt.numDays || 2;
+      const dates = wt.startDate ? getBusinessDays(wt.startDate, numDays) : [];
+      summaryHtml = `<div style="font-weight:600;margin-bottom:4px;">Multi-Day Project (${numDays} days)</div>`;
+      if (dates.length >= 2) {
+        summaryHtml += `<div>Dates: ${formatDateShort(dates[0])} — ${formatDateShort(dates[dates.length - 1])}</div>`;
+      }
+      summaryHtml += `<div>Total Hours: ${totals.totalHours.toFixed(1)}</div>`;
+    }
+    if (wt.collectDeposit) {
+      const depositAmt = totals.bidTotal * (wt.depositPercent / 100);
+      summaryHtml += `<div style="margin-top:4px;">Deposit: ${formatCurrency(depositAmt)} (${wt.depositPercent}%)</div>`;
+    }
+    summaryHtml += `<div style="font-weight:600;margin-top:4px;">Total: ${formatCurrency(totals.bidTotal)}</div>`;
+    document.getElementById('finalize-wt-schedule-summary').innerHTML = summaryHtml;
+  } else if (isRevision) {
     if (modalTitle) modalTitle.textContent = 'Update Contract & Regenerate Tickets';
     if (modalDesc) modalDesc.textContent = 'This will update the contract and regenerate future tickets. Completed and today\'s tickets will not be affected.';
     if (actionBtn) { actionBtn.textContent = 'Update & Regenerate'; actionBtn.style.background = '#E8A000'; }
@@ -10312,6 +10731,26 @@ function updateHeaderActions() {
 }
 
 function previewTickets() {
+  // Work ticket preview
+  if (currentEstimate.jobType === 'work_ticket') {
+    const tickets = generateWorkTickets();
+    const totals = calculateBidTotals();
+    let html = `<div style="margin-bottom: 8px;"><strong>${tickets.length}</strong> ticket${tickets.length > 1 ? 's' : ''}</div>`;
+    html += `<div style="margin-bottom: 8px; padding: 8px; background: #e6f4ea; border-radius: 6px; font-size: 13px;">`;
+    html += `<div style="display:flex;justify-content:space-between;"><span>Total Price:</span><strong>${formatCurrency(totals.bidTotal)}</strong></div>`;
+    html += `<div style="display:flex;justify-content:space-between;color:#666;"><span>Total Hours:</span><span>${totals.totalHours.toFixed(1)}</span></div>`;
+    html += `</div>`;
+    tickets.forEach(t => {
+      html += `<div style="display: flex; justify-content: space-between; padding: 3px 0; font-size: 13px;">`;
+      html += `<span>${t.dayNumber > 1 ? 'Day ' + t.dayNumber + ': ' : ''}${formatDateShort(t.eventDate)}</span>`;
+      html += `<span>${t.totalEstHours.toFixed(1)} hrs</span>`;
+      html += `</div>`;
+    });
+    document.getElementById('finalize-preview-content').innerHTML = html;
+    document.getElementById('finalize-preview').style.display = 'block';
+    return;
+  }
+
   const startDate = document.getElementById('finalize-start-date').value;
   const contractMonths = parseInt(document.getElementById('finalize-duration').value) || 12;
   const preferredDay = parseInt(document.getElementById('finalize-preferred-day').value);
@@ -11474,6 +11913,9 @@ function getDefaultMeasurementSource(category) {
 }
 
 function updateSummaryPanel() {
+  if (currentEstimate.jobType === 'work_ticket') {
+    return updateSummaryPanelForWorkTicket();
+  }
   const totals = calculateBidTotals();
   const tierTotals = calculateTierTotals();
   const paymentMonths = currentEstimate.contract.paymentMonths || 12;
@@ -11678,6 +12120,12 @@ function startBlankFromPicker() {
   estimateDirty = false;
   startedFromBlank = true; // Flag to skip mowing suggestion
 
+  // Apply pending job type from picker
+  if (window._pendingJobType) {
+    currentEstimate.jobType = window._pendingJobType;
+    window._pendingJobType = null;
+  }
+
   // Reset UI elements
   document.getElementById('prop-address').value = '';
   document.getElementById('prop-type').value = 'Residential';
@@ -11698,6 +12146,7 @@ function startBlankFromPicker() {
   document.getElementById('estimate-travel-percent').value = currentEstimate.travelPercent;
 
   renderTableBody();
+  adaptBuilderForJobType();
   showView('builder');
 }
 
@@ -11731,6 +12180,12 @@ async function selectTemplateAndStart() {
     await loadEstimateFromTemplate(selectedTemplateId);
   }
 
+  // Apply pending job type from picker
+  if (window._pendingJobType) {
+    currentEstimate.jobType = window._pendingJobType;
+    window._pendingJobType = null;
+  }
+
   // Reset dirty state - will be marked dirty when user makes changes
   estimateDirty = false;
 
@@ -11754,6 +12209,7 @@ async function selectTemplateAndStart() {
   document.getElementById('estimate-travel-percent').value = currentEstimate.travelPercent;
 
   renderTableBody();
+  adaptBuilderForJobType();
   showView('builder');
 }
 
@@ -11790,6 +12246,17 @@ async function loadEstimateFromTemplate(templateId) {
       priceIncrease: data.priceIncrease || 0,
       paymentTerms: 'Net 30',
       termsAndConditionsHtml: null
+    },
+    jobType: 'recurring',
+    workTicket: {
+      scheduleType: 'single_visit',
+      projectName: '',
+      scheduledDate: '',
+      startDate: '',
+      numDays: 2,
+      hoursPerDay: [],
+      depositPercent: 25,
+      collectDeposit: false
     }
   };
 
@@ -12388,6 +12855,7 @@ function openServiceDetailsModal(sIdx) {
   document.getElementById('service-internal-name').value = service.name;
   document.getElementById('service-proposal-name').value = service.proposalName || service.name;
   document.getElementById('service-billing-tier').value = service.billingTier || 'fixed';
+  document.getElementById('service-billing-tier').disabled = currentEstimate.jobType === 'work_ticket';
 
   // Set color picker
   selectedServiceColor = service.mapColor || 'green';
@@ -12543,7 +13011,19 @@ function resetEstimate() {
       termsAndConditionsHtml: null
     },
     // Takeoffs data - initialized by initializeTakeoffs() on first use
-    takeoffs: null
+    takeoffs: null,
+    // Job type: 'recurring' (default) or 'work_ticket'
+    jobType: 'recurring',
+    workTicket: {
+      scheduleType: 'single_visit',
+      projectName: '',
+      scheduledDate: '',
+      startDate: '',
+      numDays: 2,
+      hoursPerDay: [],
+      depositPercent: 25,
+      collectDeposit: false
+    }
   };
 
   // Reset UI state
@@ -12554,9 +13034,258 @@ function resetEstimate() {
 function startNewEstimate() {
   // Check for unsaved changes first
   confirmDiscardEstimate(() => {
-    // Open template picker instead of starting directly
-    openTemplatePicker();
+    // Open job type picker first
+    openJobTypePicker();
   });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  JOB TYPE PICKER
+// ═══════════════════════════════════════════════════════════════
+
+function openJobTypePicker() {
+  document.getElementById('job-type-picker-modal').classList.add('active');
+}
+
+function closeJobTypePicker() {
+  document.getElementById('job-type-picker-modal').classList.remove('active');
+}
+
+function selectJobType(type) {
+  closeJobTypePicker();
+  // Store selected job type — will be applied after estimate is created
+  window._pendingJobType = type;
+  openTemplatePicker();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  WORK TICKET — BUILDER ADAPTATIONS
+// ═══════════════════════════════════════════════════════════════
+
+function adaptBuilderForJobType() {
+  const isWT = currentEstimate.jobType === 'work_ticket';
+  const contractCard = document.getElementById('contract-card');
+  const recurringFields = document.getElementById('recurring-contract-fields');
+  const wtFields = document.getElementById('wt-project-fields');
+  const cardTitle = contractCard ? contractCard.querySelector('.contract-card-header h3') : null;
+
+  if (isWT) {
+    // Change card title
+    if (cardTitle) {
+      const svgIcon = cardTitle.querySelector('svg');
+      cardTitle.textContent = 'Project Settings';
+      if (svgIcon) cardTitle.prepend(svgIcon);
+    }
+    recurringFields.style.display = 'none';
+    wtFields.style.display = 'block';
+
+    // Populate fields from data model
+    document.getElementById('wt-project-name').value = currentEstimate.workTicket.projectName || '';
+    document.getElementById('wt-scheduled-date').value = currentEstimate.workTicket.scheduledDate || '';
+    document.getElementById('wt-start-date').value = currentEstimate.workTicket.startDate || '';
+    document.getElementById('wt-num-days').value = currentEstimate.workTicket.numDays || 2;
+    document.getElementById('wt-collect-deposit').checked = !!currentEstimate.workTicket.collectDeposit;
+    document.getElementById('wt-deposit-percent').value = currentEstimate.workTicket.depositPercent || 25;
+    document.getElementById('wt-payment-terms').value = currentEstimate.contract.paymentTerms || 'Net 30';
+
+    // Toggle deposit settings visibility
+    document.getElementById('wt-deposit-settings').style.display = currentEstimate.workTicket.collectDeposit ? 'block' : 'none';
+
+    // Set schedule type buttons
+    setScheduleType(currentEstimate.workTicket.scheduleType || 'single_visit');
+
+    // Auto-set billing tier and visits for all services
+    currentEstimate.services.forEach(s => {
+      s.billingTier = 'fixed';
+      s.visits = 1;
+    });
+
+    // Hide recurring summary sections, show work ticket summary
+    toggleSummaryForWorkTicket(true);
+  } else {
+    // Restore recurring mode
+    if (cardTitle) {
+      const svgIcon = cardTitle.querySelector('svg');
+      cardTitle.textContent = 'Contract Settings';
+      if (svgIcon) cardTitle.prepend(svgIcon);
+    }
+    recurringFields.style.display = '';
+    wtFields.style.display = 'none';
+    toggleSummaryForWorkTicket(false);
+  }
+}
+
+function toggleSummaryForWorkTicket(isWT) {
+  // Hide/show recurring-specific summary sections
+  const tierSections = ['tier-fixed-section', 'tier-billed-section', 'tier-recommended-section'];
+  const paymentSection = document.querySelector('.summary-payment-section');
+
+  tierSections.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = isWT ? 'none' : '';
+  });
+  if (paymentSection) paymentSection.style.display = isWT ? 'none' : '';
+
+  // Show/hide work ticket summary
+  let wtSummary = document.getElementById('wt-summary-section');
+  if (isWT && !wtSummary) {
+    // Create work ticket summary section
+    const summaryTotal = document.querySelector('.summary-total');
+    if (summaryTotal) {
+      wtSummary = document.createElement('div');
+      wtSummary.id = 'wt-summary-section';
+      wtSummary.innerHTML = `
+        <div class="summary-total" style="margin-top: 0;">
+          <div class="summary-total-label">Total Project Price</div>
+          <div class="summary-total-value" id="wt-sum-total">$0.00</div>
+        </div>
+        <div id="wt-deposit-display" style="display: none; padding: 0 16px 12px;">
+          <div class="wt-deposit-row">
+            <span>Deposit (<span id="wt-dep-pct-display">25</span>%)</span>
+            <span id="wt-dep-amount">$0.00</span>
+          </div>
+          <div class="wt-deposit-row" style="font-weight: 600;">
+            <span>Balance Due on Completion</span>
+            <span id="wt-balance-amount">$0.00</span>
+          </div>
+        </div>
+      `;
+      summaryTotal.after(wtSummary);
+    }
+  }
+  if (wtSummary) wtSummary.style.display = isWT ? '' : 'none';
+
+  // Hide/show the main "Annual Contract Value" label
+  const mainTotal = document.querySelector('.summary-total');
+  if (mainTotal) mainTotal.style.display = isWT ? 'none' : '';
+}
+
+function setScheduleType(type) {
+  currentEstimate.workTicket.scheduleType = type;
+  // Update buttons
+  document.querySelectorAll('.wt-schedule-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.type === type);
+  });
+  // Toggle fields
+  document.getElementById('wt-single-visit-fields').style.display = type === 'single_visit' ? '' : 'none';
+  document.getElementById('wt-multi-day-fields').style.display = type === 'multi_day' ? '' : 'none';
+
+  if (type === 'multi_day') {
+    renderMultiDayAllocation();
+  }
+  markEstimateDirty();
+}
+
+function renderMultiDayAllocation() {
+  const container = document.getElementById('wt-day-allocation');
+  if (!container) return;
+
+  const numDays = currentEstimate.workTicket.numDays || 2;
+  const totals = calculateBidTotals();
+  const totalHours = totals.totalHours || 0;
+  const evenSplit = totalHours / numDays;
+
+  // Initialize hoursPerDay if empty or wrong length
+  if (!currentEstimate.workTicket.hoursPerDay || currentEstimate.workTicket.hoursPerDay.length !== numDays) {
+    currentEstimate.workTicket.hoursPerDay = Array(numDays).fill(Math.round(evenSplit * 100) / 100);
+  }
+
+  // Calculate business day dates
+  const startDate = currentEstimate.workTicket.startDate;
+  const dates = startDate ? getBusinessDays(startDate, numDays) : [];
+
+  let html = '<div style="font-size: 12px; font-weight: 600; color: #5f6368; margin-bottom: 6px;">Per-Day Hour Allocation</div>';
+  html += '<div style="font-size: 11px; color: #80868b; margin-bottom: 8px;">Total: ' + totalHours.toFixed(1) + ' hrs (drag to adjust)</div>';
+
+  for (let i = 0; i < numDays; i++) {
+    const dayLabel = dates[i] ? formatDateShort(dates[i]) : 'Day ' + (i + 1);
+    const hrs = currentEstimate.workTicket.hoursPerDay[i] || 0;
+    html += `<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+      <span style="font-size: 12px; min-width: 80px; color: #3c4043;">${dayLabel}</span>
+      <input type="number" class="form-input" value="${hrs.toFixed(1)}" step="0.5" min="0" style="width: 70px; font-size: 12px; padding: 4px 6px;"
+        onchange="updateDayAllocation(${i}, parseFloat(this.value) || 0)">
+      <span style="font-size: 11px; color: #80868b;">hrs</span>
+    </div>`;
+  }
+
+  container.innerHTML = html;
+}
+
+function updateDayAllocation(dayIndex, hours) {
+  currentEstimate.workTicket.hoursPerDay[dayIndex] = hours;
+  markEstimateDirty();
+}
+
+function getBusinessDays(startDateStr, count) {
+  const dates = [];
+  const d = new Date(startDateStr + 'T00:00:00');
+  while (dates.length < count) {
+    const dow = d.getDay();
+    if (dow !== 0 && dow !== 6) {
+      dates.push(d.toISOString().split('T')[0]);
+    }
+    d.setDate(d.getDate() + 1);
+  }
+  return dates;
+}
+
+function formatDateShort(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function updateSummaryPanelForWorkTicket() {
+  const totals = calculateBidTotals();
+  const projectTotal = totals.bidTotal;
+
+  // Refresh multi-day allocation if visible
+  if (currentEstimate.workTicket.scheduleType === 'multi_day') {
+    renderMultiDayAllocation();
+  }
+
+  // Update total
+  const wtTotal = document.getElementById('wt-sum-total');
+  if (wtTotal) wtTotal.textContent = formatCurrency(projectTotal);
+
+  // Update deposit display
+  const depositDisplay = document.getElementById('wt-deposit-display');
+  const depositCheckbox = document.getElementById('wt-collect-deposit');
+  if (depositDisplay) {
+    const showDeposit = currentEstimate.workTicket.collectDeposit;
+    depositDisplay.style.display = showDeposit ? 'block' : 'none';
+    document.getElementById('wt-deposit-settings').style.display = showDeposit ? 'block' : 'none';
+
+    if (showDeposit) {
+      const pct = currentEstimate.workTicket.depositPercent || 25;
+      const depositAmt = projectTotal * (pct / 100);
+      const balance = projectTotal - depositAmt;
+      document.getElementById('wt-dep-pct-display').textContent = pct;
+      document.getElementById('wt-dep-amount').textContent = formatCurrency(depositAmt);
+      document.getElementById('wt-balance-amount').textContent = formatCurrency(balance);
+    }
+  }
+
+  // Still update cost breakdown and profitability
+  document.getElementById('sum-labor-cost').textContent = formatCurrency(totals.laborCost);
+  document.getElementById('sum-labor-billed').textContent = formatCurrency(totals.laborBilled);
+  document.getElementById('sum-material-cost').textContent = formatCurrency(totals.totalMaterialCost);
+  document.getElementById('sum-material-billed').textContent = formatCurrency(totals.materialBilled);
+  document.getElementById('sum-sub-cost').textContent = formatCurrency(totals.totalSubCost);
+  document.getElementById('sum-sub-billed').textContent = formatCurrency(totals.subBilled);
+  document.getElementById('sum-break-even').textContent = formatCurrency(totals.internalCost);
+  document.getElementById('sum-profit').textContent = formatCurrency(totals.profit);
+  document.getElementById('sum-margin').textContent = formatPercent(totals.margin);
+  document.getElementById('sum-hours').textContent = formatNumber(totals.totalHours);
+
+  // Update rate settings
+  const rates = getEffectiveRates();
+  document.getElementById('estimate-labor-rate').value = rates.laborRate;
+  document.getElementById('estimate-labor-markup').value = rates.laborMarkup;
+  document.getElementById('estimate-material-markup').value = rates.materialMarkup;
+  document.getElementById('estimate-sub-markup').value = rates.subMarkup;
+  document.getElementById('estimate-travel-percent').value = rates.travelPercent;
+  const billedRatePerHour = rates.laborRate * (1 + rates.laborMarkup / 100);
+  document.getElementById('estimate-billed-rate').textContent = formatCurrency(billedRatePerHour) + '/hr';
 }
 
 function startBlankEstimate() {
@@ -12679,7 +13408,9 @@ async function _handleSaveBidInner() {
     })),
     estimateFileId: estimateFileId,
     contractId: currentEstimate.contractId || '',
-    revisionCount: currentEstimate.revisionCount || 0
+    revisionCount: currentEstimate.revisionCount || 0,
+    jobType: currentEstimate.jobType || 'recurring',
+    scheduleType: currentEstimate.workTicket?.scheduleType || ''
   };
 
   // Check if updating existing or creating new

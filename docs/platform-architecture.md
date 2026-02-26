@@ -48,12 +48,12 @@ The platform supports four divisions, each representing a distinct revenue strea
 text-my-team/
 ├── index.html                     # Customer service request portal (~3,100 lines)
 ├── crew.html                      # Crew leader app (~9,768 lines HTML/JS)
-├── estimate.html                  # Bidding & estimating tool (~15,574 lines HTML/JS)
+├── estimate.html                  # Bidding & estimating tool (~16,294 lines HTML/JS)
 ├── payment-success.html           # Stripe payment success redirect
 ├── payment-cancel.html            # Stripe payment cancel redirect
 ├── css/
 │   ├── crew.css                   # All CSS for crew.html (~4,511 lines)
-│   └── estimate.css               # All CSS for estimate.html (~5,572 lines)
+│   └── estimate.css               # All CSS for estimate.html (~5,662 lines)
 ├── assets/
 │   ├── manifest.json              # PWA manifest for index.html
 │   ├── manifest-crew.json         # PWA manifest for crew.html
@@ -63,7 +63,7 @@ text-my-team/
 │       ├── iceberg-icon.png
 │       └── 26__Endurace_Icon_Green_LightBackground.png
 ├── backend/
-│   └── combined-apps-script.js    # Google Apps Script backend (~4,827 lines)
+│   └── combined-apps-script.js    # Google Apps Script backend (~4,862 lines)
 ├── cloud-function/                # AWS Lambda PDF generation
 │   ├── pdf_generator.py           # PDF library (WeasyPrint + ReportLab)
 │   ├── lambda_function.py         # AWS Lambda handler
@@ -150,57 +150,83 @@ text-my-team/
 - iOS design system: SF Pro typography, exact system colors, dark mode, frosted glass tab bar with `backdrop-filter`, iOS spring animations, 44px touch targets, `prefers-reduced-motion` support
 - Bottom tab bar: Schedule (home) | Requests | Report Issue | Reports
 
-**estimate.html + estimate.css — Bidding & Estimating Tool (~15,574 lines HTML/JS + ~5,572 lines CSS)**
+**estimate.html + estimate.css — Bidding & Estimating Tool (~15,900+ lines HTML/JS + ~5,670+ lines CSS)**
 - **Division: Maintenance (MNT) fully built** — Irrigation, Construction, and Enhancement divisions planned, will reuse the same engine with division-specific catalogs and takeoffs
-- **Division & Job Type Selection**: When creating a new estimate, the user selects two things upfront:
-  1. **Division** — Maintenance (MNT), Irrigation (IRR), Construction (CON), or Enhancement (ENH). This determines which item catalog, service catalog, and takeoff measurements are available. Stored as `division` on the estimate/bid.
-  2. **Job Type** — **Recurring Service** or **Work Ticket**. Recurring services generate a contract with scheduled tickets over the contract duration (weekly mowing, monthly irrigation inspections). Work Tickets are one-off jobs with a defined scope and completion date — no recurring schedule, no monthly amortization (large mulch install, irrigation repair, retaining wall build, seasonal color rotation). Stored as `jobType` on the estimate (`'recurring'` or `'work_ticket'`).
+- **Job Type Selection** ✅ **BUILT**: When creating a new estimate, the user first picks a job type via the Job Type Picker modal:
+  - **Recurring Service** — Ongoing contract with scheduled visits throughout the year (existing flow, unchanged)
+  - **Work Ticket** — One-off billable job with single visit or multi-day schedule
+
+  Stored as `currentEstimate.jobType` (`'recurring'` or `'work_ticket'`).
 
   **How job type affects the pipeline:**
   | Aspect | Recurring Service | Work Ticket |
   |--------|------------------|-------------|
-  | Billing tier | Fixed / Billed Separately / Recommended | Single total or milestone-based |
-  | Payment schedule | Monthly amortization over contract months | Upon completion, 50/50 split, or milestone draws |
-  | Ticket generation | `getDatesForVisitCount()` across contract duration | Single ticket or milestone tickets (e.g., "Demolition", "Install", "Cleanup") |
-  | Contract PDF | Full contract with payment schedule + T&Cs | Proposal/work order with scope, price, timeline |
-  | Schedule view | Recurring dots on calendar | One-time block on calendar |
-  | Finalization | Creates contract row + recurring scheduled tickets | Creates work order + work ticket(s) |
+  | Billing tier | Fixed / Billed Separately / Recommended | All services forced to Fixed |
+  | Visits | Per-service configurable | Locked to 1 |
+  | Payment schedule | Monthly amortization over contract months | Total project price + optional deposit/balance split |
+  | Contract card | "Contract Settings" — start/end, duration, payment months, price increase, CC fee | "Project Settings" — project name, schedule type, date(s), deposit toggle |
+  | Ticket generation | `generateAllTickets()` across contract duration | `generateWorkTickets()` — 1 ticket (single visit) or N tickets (multi-day) |
+  | Summary panel | Annual Contract Value + tier breakdown + monthly payment + payment schedule grid | Total Project Price + deposit/balance breakdown (if deposit enabled) |
+  | Finalization | Creates contract + recurring scheduled tickets | Creates work order + work ticket(s) with jobType/dayNumber/totalDays metadata |
 
-  **Division × Job Type combinations** — All four divisions support both types:
-  - MNT Recurring: weekly mowing contract, monthly hedge program
-  - MNT Work Ticket: one-time leaf cleanup, storm damage cleanup
-  - IRR Recurring: monthly irrigation inspection contract
-  - IRR Work Ticket: sprinkler head repair, zone addition, backflow replacement
-  - CON Recurring: rare (ongoing drainage maintenance)
-  - CON Work Ticket: patio install, retaining wall, grading project
-  - ENH Recurring: quarterly seasonal color rotation
-  - ENH Work Ticket: large mulch job, landscape renovation, planting project
-
-  The division and job type selection appears as the first step when clicking "New Estimate" — before the builder loads. The builder UI adapts: Work Tickets hide the payment schedule card and replace "Contract Duration" with "Project Timeline", and the billing tier picker is replaced with a simpler total/milestone pricing structure.
-
-  **Work Ticket Scheduling (Hybrid Model)**: When a work ticket is created, the estimator picks a schedule type that controls how the job appears on the calendar and in the crew app:
-
+  **Work Ticket Schedule Types** ✅ **BUILT**:
   | Schedule Type | When to Use | What Gets Generated |
   |---------------|-------------|-------------------|
-  | **Single Visit** | Small jobs done in one trip | One ticket, one date |
-  | **Multi-Day** | Simple labor spanning consecutive days | N consecutive day tickets, same scope. Estimator picks start date and number of days. Hours split evenly or manually allocated per day. |
-  | **Milestone** | Complex projects with distinct phases | Named phases, each independently scheduled with its own date, estimated hours, crew needs, and line items. Estimator defines the phases during estimation (e.g., "Demo → Grade & Base → Paver Install → Cleanup"). |
+  | **Single Visit** | Small jobs done in one trip | One ticket with all services, one date |
+  | **Multi-Day** | Simple labor spanning consecutive days | N consecutive business day tickets. Estimator picks start date + number of days (2-30). Hours split evenly by default, manually editable per-day allocation. |
 
-  **Schedule view rendering:**
-  - **Day view**: Work ticket visits show like normal stop cards but with a project badge (division color) and progress indicator ("Day 2 of 4" or "Phase: Paver Install — 2/4").
-  - **Week view**: Multi-day and milestone tickets render a colored bar spanning the date range (Gantt-style), with individual day markers inside the bar. Single-visit work tickets show as a single dot like recurring tickets.
-  - **Month view**: Spanning bar across the date range with the project name. Distinct from recurring ticket dots.
+  **Milestone** schedule type (complex projects with distinct phases) is planned but not yet built.
 
-  **Same man-hour engine, same crew app experience:** Work tickets use the exact same estimation pipeline as recurring services — items × production rates ÷ difficulty → man-hours. The estimated hours flow into each generated ticket identically to recurring tickets. In the crew app, work ticket stop cards show the same per-service progress bars, remaining wall-clock time, crew assignment overlays, and time entry tracking. The crew leader starts services, assigns members, splits time entries on crew changes, and completes services the same way. All time data feeds back into production rate analysis. The only difference is the project badge and progress label — the underlying time tracking is identical.
+  **Work Ticket Deposit System** ✅ **BUILT**: Optional deposit/final payment split:
+  - Checkbox: "Collect deposit upfront?"
+  - Editable deposit percentage (default 25%)
+  - Summary panel shows deposit amount + balance due on completion
+  - `depositPercent` and `depositAmount` stored on the contract row in Sheets
+  - No auto-invoice generation — values stored for future invoicing system
 
-  **Crew app rendering:**
-  - Stop card shows project name, phase/day label, and overall progress: "Mulch Install — Day 2 of 3" or "Patio Build — Phase: Base Prep (2/4)".
-  - Same per-service clocking, progress bars, remaining time labels, and reassignment wizard as recurring tickets.
-  - Completing the final visit/milestone marks the entire work ticket as complete.
-  - If a multi-day job finishes early (done in 2 days instead of 3), crew leader can mark remaining day tickets as "Not Needed" which removes them from the schedule without counting as skipped.
-  - Actual vs estimated comparison at completion feeds into production rate analysis — building the same data loop for work ticket service types (mulch spreading, paver install, grading) as exists for recurring services (mowing, edging, hedge trimming).
+  **Builder Adaptations** ✅ **BUILT** — `adaptBuilderForJobType()` function:
+  - Contract card title changes to "Project Settings"
+  - Hides recurring fields (start/end dates, duration, payment months, price increase, CC fee)
+  - Shows work ticket fields (project name, schedule type segmented control, date pickers, deposit toggle)
+  - All services auto-set to `billingTier: 'fixed'`, `visits: 1` on every `renderTableBody()` call
+  - Billing tier dropdown disabled in service details modal
+  - Visits input readonly in bid table
 
-  **Data model**: Work ticket schedule type stored as `scheduleType` on the bid (`'single'`, `'multi_day'`, `'milestone'`). Multi-day tickets store `plannedDays` (integer). Milestone tickets store an ordered array of `milestones` — each with `name`, `sortOrder`, `estimatedHours`, `scheduledDate`, and associated `lineItems`. All generated tickets reference the parent work ticket via `workTicketId` and carry `sequenceIndex` (day number or milestone order) and `sequenceTotal`.
+  **Key Functions** ✅ **BUILT**:
+  - `openJobTypePicker()` / `closeJobTypePicker()` / `selectJobType(type)` — Job type picker modal
+  - `adaptBuilderForJobType()` — Adapts builder UI based on jobType
+  - `setScheduleType(type)` — Toggles between single_visit and multi_day
+  - `renderMultiDayAllocation()` — Per-day hour allocation table for multi-day
+  - `getBusinessDays(startDate, count)` — Returns consecutive weekday dates
+  - `updateSummaryPanelForWorkTicket()` — Work ticket summary panel rendering
+  - `toggleSummaryForWorkTicket(isWT)` — Show/hide summary sections
+  - `generateWorkTickets()` — Generates 1 or N tickets based on schedule type
+  - `finalizeWorkTicket()` — Creates contract + tickets with work ticket metadata
+  - `previewTickets()` — Branched for work ticket preview
+
+  **Data Model** — `currentEstimate.workTicket` sub-object:
+  ```javascript
+  workTicket: {
+    scheduleType: 'single_visit',  // 'single_visit' | 'multi_day'
+    projectName: '',
+    scheduledDate: '',             // Single visit date
+    startDate: '',                 // Multi-day start
+    numDays: 2,                    // Multi-day count (2-30)
+    hoursPerDay: [],               // Manual per-day allocation
+    depositPercent: 25,            // Editable deposit % (default 25%)
+    collectDeposit: false          // Whether to collect deposit
+  }
+  ```
+
+  **Backend Columns Added**:
+  - Bids sheet: `Job Type`, `Schedule Type`
+  - Contracts sheet: `Job Type`, `Schedule Type`, `Project Name`, `Deposit Percent`, `Deposit Amount`
+  - Scheduled Tickets sheet: `Job Type`, `Day Number`, `Total Days`, `Project Name`
+  - All columns auto-upgrade on existing sheets (no manual migration needed)
+
+  **Crew App Integration**: Work ticket tickets appear as normal stop cards via `getCrewSchedule()` — no crew.html changes needed. Tickets carry `jobType`, `dayNumber`, `totalDays`, `projectName` metadata.
+
+  **Sidebar Rename**: "Work Tickets" sidebar item renamed to "Reminders" to avoid confusion with the new Work Ticket job type.
 
 - Three-panel Google Workspace layout (sidebar, main content, summary panel). **CSS layout chain**: `.app-container` (flex row, 100vh) → `.sidebar` (fixed width) + `.main-content` (flex: 1, `position: relative`, `overflow: hidden`) + `.summary-panel` (280px). `.main-header` (56px, `position: relative`, z-index: 2) sits at top. `.main-body` (`position: relative; flex: 1; overflow: hidden`) contains all `.view` panels as direct children. `.view.active` has `height: 100%; overflow-y: auto; padding: 24px` — each view fills main-body and scrolls independently.
 - **Bid Builder**: Spreadsheet-style table with columns: Item, OCC, QTY, Unit, P/H, AH, TH, P/P, TP, GM%
