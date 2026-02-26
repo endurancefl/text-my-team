@@ -11,7 +11,7 @@
   <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.js"></script>
-  <link rel="stylesheet" href="css/estimate.css?v=viewfix3">
+  <link rel="stylesheet" href="css/estimate.css?v=worktickets1">
 </head>
 <body>
 
@@ -102,6 +102,12 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
           </svg>
           <span>Service Catalog</span>
+        </div>
+        <div class="nav-item" data-view="worktickets">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+          </svg>
+          <span>Work Tickets</span>
         </div>
         <div class="nav-item" data-view="settings">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -307,7 +313,6 @@
                       </button>
                     </div>
                   </div>
-                </div>
                 </div>
                 <!-- Property Takeoffs and Lawn Takeoff Side by Side -->
                 <div class="form-group" style="grid-column: 1 / -1; margin-top: 16px;">
@@ -1516,6 +1521,63 @@
           </div>
         </div>
 
+        <!-- WORK TICKETS VIEW -->
+        <div class="view" id="view-worktickets">
+          <div class="wt-toolbar">
+            <div class="wt-toolbar-left">
+              <input type="text" class="form-input contacts-search" id="wt-search" placeholder="Search reminders...">
+              <div class="contacts-stage-filters">
+                <button class="contacts-filter-btn active" data-wt-filter="active">Active</button>
+                <button class="contacts-filter-btn" data-wt-filter="permanent">Permanent</button>
+                <button class="contacts-filter-btn" data-wt-filter="completed">Completed</button>
+                <button class="contacts-filter-btn" data-wt-filter="all">All</button>
+              </div>
+            </div>
+            <button class="btn btn-primary" onclick="openWtCreateModal()">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="18" height="18">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+              </svg>
+              New Reminder
+            </button>
+          </div>
+          <div class="contacts-count" id="wt-count"></div>
+          <div id="wt-list"></div>
+
+          <!-- Create Reminder Modal (Office) -->
+          <div id="wt-create-modal" class="modal-backdrop" style="display:none;">
+            <div class="modal-card" style="max-width:520px;">
+              <div class="modal-card-header">
+                <h3>New Reminder</h3>
+                <button class="modal-close-btn" onclick="closeWtCreateModal()">&times;</button>
+              </div>
+              <div class="modal-card-body">
+                <div class="form-group">
+                  <label class="form-label">Property</label>
+                  <select id="wt-property-select" class="form-input">
+                    <option value="">Select a property...</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Description</label>
+                  <textarea id="wt-description" class="form-input" rows="3" placeholder="What needs to be done or remembered?"></textarea>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Scheduled Date</label>
+                  <input type="date" id="wt-date" class="form-input">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Assign Crew</label>
+                  <input type="text" id="wt-crew" class="form-input" placeholder="e.g. Crew A">
+                </div>
+                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+                  <button class="btn btn-secondary" onclick="closeWtCreateModal()">Cancel</button>
+                  <button class="btn btn-primary" id="wt-save-btn" onclick="saveWtReminder()">Create Reminder</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Invoice Batch Review Modal -->
         <div class="modal-overlay" id="invoice-batch-modal" style="display:none;">
           <div class="modal" style="max-width: 700px; max-height: 80vh; overflow-y: auto;">
@@ -2469,6 +2531,9 @@ let currentInvoice = null;       // Currently viewed invoice
 let invoiceSearchQuery = '';     // Invoice search filter
 let invoiceFilter = 'all';      // 'all', 'draft', 'sent', 'overdue', 'paid'
 let invoicePayments = [];        // Payments for current invoice
+let allReminders = [];           // All reminders loaded from backend
+let wtSearchQuery = '';          // Work tickets search filter
+let wtFilter = 'active';        // 'active', 'permanent', 'completed', 'all'
 
 // Current estimate state
 let currentEstimate = {
@@ -5016,6 +5081,13 @@ async function loadAllData() {
     }
     if (data.subContractors && data.subContractors.success) {
       propertySubContractors = data.subContractors.subContractors || [];
+    }
+    // Reminders
+    if (data.reminders && data.reminders.success) {
+      allReminders = data.reminders.reminders || [];
+      if (currentView === 'worktickets') {
+        renderWorkTickets();
+      }
     }
 
     if (backendProps.length > 0) {
@@ -8386,6 +8458,7 @@ function showView(viewId) {
     'contacts': 'Contacts',
     'properties': 'Properties',
     'invoices': 'Invoices',
+    'worktickets': 'Work Tickets',
     'settings': 'Settings'
   };
   document.getElementById('header-title').textContent = titles[viewId] || 'Estimates';
@@ -8409,6 +8482,8 @@ function showView(viewId) {
     subtitleEl.textContent = properties.length + ' properties';
   } else if (viewId === 'invoices') {
     subtitleEl.textContent = invoices.length + ' invoices';
+  } else if (viewId === 'worktickets') {
+    subtitleEl.textContent = allReminders.length + ' reminders';
   } else {
     subtitleEl.textContent = '';
   }
@@ -8458,6 +8533,11 @@ function showView(viewId) {
   // Load invoices when invoices view is shown
   if (viewId === 'invoices') {
     loadInvoices();
+  }
+
+  // Render work tickets when work tickets view is shown
+  if (viewId === 'worktickets') {
+    renderWorkTickets();
   }
 
   // Populate contact picker when builder view is shown
@@ -15241,6 +15321,253 @@ function renderProdItemsTable(items) {
   html += '</tbody></table></div></div>';
   return html;
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  WORK TICKETS / REMINDERS
+// ═══════════════════════════════════════════════════════════════
+
+function renderWorkTickets() {
+  const container = document.getElementById('wt-list');
+  const countEl = document.getElementById('wt-count');
+  if (!container) return;
+
+  let filtered = allReminders.slice();
+
+  // Apply filter
+  if (wtFilter === 'active') {
+    filtered = filtered.filter(r => String(r.status || '').toLowerCase() === 'active' && String(r.isPermanent || '').toUpperCase() !== 'TRUE');
+  } else if (wtFilter === 'permanent') {
+    filtered = filtered.filter(r => String(r.isPermanent || '').toUpperCase() === 'TRUE' && String(r.status || '').toLowerCase() === 'active');
+  } else if (wtFilter === 'completed') {
+    filtered = filtered.filter(r => String(r.status || '').toLowerCase() === 'completed' || String(r.status || '').toLowerCase() === 'cancelled');
+  }
+  // 'all' = no filter
+
+  // Apply search
+  if (wtSearchQuery) {
+    const q = wtSearchQuery.toLowerCase();
+    filtered = filtered.filter(r =>
+      (r.propertyAddress || '').toLowerCase().includes(q) ||
+      (r.description || '').toLowerCase().includes(q) ||
+      (r.createdBy || '').toLowerCase().includes(q) ||
+      (r.assignedCrew || '').toLowerCase().includes(q)
+    );
+  }
+
+  countEl.textContent = filtered.length + ' reminder' + (filtered.length !== 1 ? 's' : '');
+
+  if (filtered.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:40px 20px;color:#999;">No reminders found.</div>';
+    return;
+  }
+
+  let html = '<table class="wt-table"><thead><tr>';
+  html += '<th>Property</th><th>Description</th><th>Date</th><th>Status</th><th>Created By</th><th>Crew</th><th>Actions</th>';
+  html += '</tr></thead><tbody>';
+
+  filtered.forEach(rem => {
+    const isPerm = String(rem.isPermanent || '').toUpperCase() === 'TRUE';
+    const isCompleted = String(rem.status || '').toLowerCase() === 'completed';
+    const isCancelled = String(rem.status || '').toLowerCase() === 'cancelled';
+
+    let dateStr = '';
+    if (rem.scheduledDate) {
+      const d = rem.scheduledDate instanceof Date ? rem.scheduledDate : new Date(rem.scheduledDate);
+      if (!isNaN(d.getTime())) dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    let statusBadge = '';
+    if (isPerm) {
+      statusBadge = '<span class="wt-badge wt-badge-permanent">Permanent</span>';
+    } else if (isCompleted) {
+      statusBadge = '<span class="wt-badge wt-badge-completed">Completed</span>';
+    } else if (isCancelled) {
+      statusBadge = '<span class="wt-badge wt-badge-cancelled">Cancelled</span>';
+    } else {
+      statusBadge = '<span class="wt-badge wt-badge-reminder">Scheduled</span>';
+    }
+
+    let actions = '';
+    if (!isCompleted && !isCancelled) {
+      if (!isPerm) {
+        actions += '<button class="btn btn-sm btn-outline" onclick="toggleWtPermanent(\'' + escapeHtml(rem.reminderId) + '\')">Make Permanent</button> ';
+      }
+      actions += '<button class="btn btn-sm btn-outline btn-success" onclick="completeWtReminder(\'' + escapeHtml(rem.reminderId) + '\')">Complete</button>';
+    }
+
+    html += '<tr>';
+    html += '<td><strong>' + escapeHtml(rem.propertyAddress || '') + '</strong></td>';
+    html += '<td>' + escapeHtml(rem.description || '') + '</td>';
+    html += '<td>' + (isPerm ? 'Every visit' : escapeHtml(dateStr)) + '</td>';
+    html += '<td>' + statusBadge + '</td>';
+    html += '<td>' + escapeHtml(rem.createdBy || '') + '</td>';
+    html += '<td>' + escapeHtml(rem.assignedCrew || '') + '</td>';
+    html += '<td class="wt-actions-cell">' + actions + '</td>';
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+function openWtCreateModal() {
+  const modal = document.getElementById('wt-create-modal');
+  document.getElementById('wt-description').value = '';
+  document.getElementById('wt-date').value = '';
+  document.getElementById('wt-crew').value = '';
+
+  // Populate property dropdown
+  const select = document.getElementById('wt-property-select');
+  select.innerHTML = '<option value="">Select a property...</option>';
+  properties.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.address || '';
+    opt.textContent = p.address || '';
+    opt.dataset.propertyId = p.propertyId || '';
+    opt.dataset.crew = p.crew || '';
+    select.appendChild(opt);
+  });
+
+  // Auto-fill crew when property selected
+  select.onchange = function() {
+    const selected = select.options[select.selectedIndex];
+    if (selected && selected.dataset.crew) {
+      document.getElementById('wt-crew').value = selected.dataset.crew;
+    }
+  };
+
+  modal.style.display = 'flex';
+}
+
+function closeWtCreateModal() {
+  document.getElementById('wt-create-modal').style.display = 'none';
+}
+
+async function saveWtReminder() {
+  const propSelect = document.getElementById('wt-property-select');
+  const description = document.getElementById('wt-description').value.trim();
+  const date = document.getElementById('wt-date').value;
+  const crew = document.getElementById('wt-crew').value.trim();
+  const selectedOpt = propSelect.options[propSelect.selectedIndex];
+
+  if (!propSelect.value || !description || !date) {
+    alert('Please fill in property, description, and date.');
+    return;
+  }
+
+  const saveBtn = document.getElementById('wt-save-btn');
+  saveBtn.textContent = 'Saving...';
+  saveBtn.disabled = true;
+
+  try {
+    const resp = await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        saveReminder: true,
+        propertyAddress: propSelect.value,
+        propertyId: selectedOpt.dataset.propertyId || '',
+        description: description,
+        scheduledDate: date,
+        isPermanent: false,
+        createdBy: 'Office',
+        createdByPhone: '',
+        assignedCrew: crew,
+        photoUrl: ''
+      })
+    });
+    const data = await resp.json();
+    if (data.success) {
+      allReminders.push({
+        reminderId: data.reminderId,
+        propertyAddress: propSelect.value,
+        propertyId: selectedOpt.dataset.propertyId || '',
+        description: description,
+        scheduledDate: date,
+        isPermanent: 'FALSE',
+        status: 'active',
+        createdBy: 'Office',
+        createdByPhone: '',
+        assignedCrew: crew,
+        photoUrl: '',
+        createdAt: new Date().toISOString(),
+        completedAt: ''
+      });
+      closeWtCreateModal();
+      renderWorkTickets();
+    } else {
+      alert('Failed: ' + (data.error || 'Unknown error'));
+    }
+  } catch (err) {
+    alert('Connection error: ' + err.message);
+  }
+  saveBtn.textContent = 'Create Reminder';
+  saveBtn.disabled = false;
+}
+
+async function toggleWtPermanent(reminderId) {
+  try {
+    const resp = await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        updateReminder: true,
+        reminderId: reminderId,
+        isPermanent: true
+      })
+    });
+    const data = await resp.json();
+    if (data.success) {
+      const rem = allReminders.find(r => r.reminderId === reminderId);
+      if (rem) {
+        rem.isPermanent = 'TRUE';
+        rem.scheduledDate = '';
+      }
+      renderWorkTickets();
+    }
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function completeWtReminder(reminderId) {
+  try {
+    const resp = await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        updateReminder: true,
+        reminderId: reminderId,
+        status: 'completed'
+      })
+    });
+    const data = await resp.json();
+    if (data.success) {
+      const rem = allReminders.find(r => r.reminderId === reminderId);
+      if (rem) {
+        rem.status = 'completed';
+        rem.completedAt = new Date().toISOString();
+      }
+      renderWorkTickets();
+    }
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+// Work ticket filter buttons
+document.addEventListener('click', function(e) {
+  if (e.target.matches('[data-wt-filter]')) {
+    document.querySelectorAll('[data-wt-filter]').forEach(b => b.classList.remove('active'));
+    e.target.classList.add('active');
+    wtFilter = e.target.dataset.wtFilter;
+    renderWorkTickets();
+  }
+});
+
+// Work ticket search
+document.getElementById('wt-search')?.addEventListener('input', function() {
+  wtSearchQuery = this.value.trim();
+  renderWorkTickets();
+});
+
 </script>
 
 </body>

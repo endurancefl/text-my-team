@@ -48,12 +48,12 @@ The platform supports four divisions, each representing a distinct revenue strea
 text-my-team/
 ├── index.html                     # Customer service request portal (~3,100 lines)
 ├── crew.html                      # Crew leader app (~9,768 lines HTML/JS)
-├── estimate.html                  # Bidding & estimating tool (~15,576 lines HTML/JS)
+├── estimate.html                  # Bidding & estimating tool (~15,574 lines HTML/JS)
 ├── payment-success.html           # Stripe payment success redirect
 ├── payment-cancel.html            # Stripe payment cancel redirect
 ├── css/
 │   ├── crew.css                   # All CSS for crew.html (~4,511 lines)
-│   └── estimate.css               # All CSS for estimate.html (~5,574 lines)
+│   └── estimate.css               # All CSS for estimate.html (~5,572 lines)
 ├── assets/
 │   ├── manifest.json              # PWA manifest for index.html
 │   ├── manifest-crew.json         # PWA manifest for crew.html
@@ -150,7 +150,7 @@ text-my-team/
 - iOS design system: SF Pro typography, exact system colors, dark mode, frosted glass tab bar with `backdrop-filter`, iOS spring animations, 44px touch targets, `prefers-reduced-motion` support
 - Bottom tab bar: Schedule (home) | Requests | Report Issue | Reports
 
-**estimate.html + estimate.css — Bidding & Estimating Tool (~15,576 lines HTML/JS + ~5,574 lines CSS)**
+**estimate.html + estimate.css — Bidding & Estimating Tool (~15,574 lines HTML/JS + ~5,572 lines CSS)**
 - **Division: Maintenance (MNT) fully built** — Irrigation, Construction, and Enhancement divisions planned, will reuse the same engine with division-specific catalogs and takeoffs
 - **Division & Job Type Selection**: When creating a new estimate, the user selects two things upfront:
   1. **Division** — Maintenance (MNT), Irrigation (IRR), Construction (CON), or Enhancement (ENH). This determines which item catalog, service catalog, and takeoff measurements are available. Stored as `division` on the estimate/bid.
@@ -202,7 +202,7 @@ text-my-team/
 
   **Data model**: Work ticket schedule type stored as `scheduleType` on the bid (`'single'`, `'multi_day'`, `'milestone'`). Multi-day tickets store `plannedDays` (integer). Milestone tickets store an ordered array of `milestones` — each with `name`, `sortOrder`, `estimatedHours`, `scheduledDate`, and associated `lineItems`. All generated tickets reference the parent work ticket via `workTicketId` and carry `sequenceIndex` (day number or milestone order) and `sequenceTotal`.
 
-- Three-panel Google Workspace layout (sidebar, main content, summary panel). **CSS layout chain**: `.app-container` (flex row, 100vh) → `.sidebar` (fixed width) + `.main-content` (flex: 1, `position: relative`, `overflow: hidden`) + `.summary-panel` (280px). `.main-header` (56px, `position: relative`, z-index: 2) sits at top. `.main-body` is `display: none` (empty in real DOM due to long-standing `</div>` mismatch in property-card-body that causes browser to parse views as siblings of main-body). `.view.active` is absolutely positioned (`top: var(--header-height); left: 0; right: 0; bottom: 0`) with `overflow-y: auto` and `padding: 24px` — each view is its own independent scroll container.
+- Three-panel Google Workspace layout (sidebar, main content, summary panel). **CSS layout chain**: `.app-container` (flex row, 100vh) → `.sidebar` (fixed width) + `.main-content` (flex: 1, `position: relative`, `overflow: hidden`) + `.summary-panel` (280px). `.main-header` (56px, `position: relative`, z-index: 2) sits at top. `.main-body` (`position: relative; flex: 1; overflow: hidden`) contains all `.view` panels as direct children. `.view.active` has `height: 100%; overflow-y: auto; padding: 24px` — each view fills main-body and scrolls independently.
 - **Bid Builder**: Spreadsheet-style table with columns: Item, OCC, QTY, Unit, P/H, AH, TH, P/P, TP, GM%
 - **Real-time calculation engine**: labor hours from quantities ÷ production rates, material costs from coverage rates, travel time percentage, separate markups for labor/materials/subcontractors. Per-service sub-contractor markup override (`subMarkupOverride`) allows individual services to use 0% or custom markup instead of the estimate-level default — applied in `calculateBidTotals()`, `calculateTierTotals()`, proposal preview, and finalization payload
 - **Sub-Contractor Billing**: Property-level subs (with monthlyCost and contract PDF) flow into estimates via "From Subs" tab in the Add Service modal. Creates service with `isSubcontractor: true`, `subCost: monthlyCost * 12`, `billingTier: 'billed'`, `subContractorId` link. Default 10% markup from bid settings; per-service `subMarkupOverride` allows 0% or custom markup. Sub services render in the bid table as a single row showing cost/markup/billed/margin (no line items). Contract PDF upload via `uploadSubContractPdf` to Drive Sub-Contracts folder. Adding a sub to a finalized contract uses existing revision flow. Functions: `renderServicePickerSubs()`, `addSubFromProperty()`, `handleSubContractFileSelect()`, `clearSubContractFile()`
