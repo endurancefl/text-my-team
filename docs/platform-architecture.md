@@ -424,6 +424,46 @@ text-my-team/
 - No tenant isolation — single-company only
 - No relational integrity, no foreign keys, no data backup strategy
 
+### Platform Completion Estimate: ~35-40% (as of Feb 2026)
+
+**What's built and working:**
+
+| Area | Status | Weight |
+|------|--------|--------|
+| Crew App (crew.html) | Production-quality, used daily | High |
+| Customer Portal (index.html) | Fully built, bilingual | Medium |
+| Estimating Engine (estimate.html) | Fully built — takeoffs, calculations, 3-tier billing, work tickets, templates, catalogs | High |
+| Contract PDF Generation | Built — residential + commercial templates, WeasyPrint on Lambda | Medium |
+| Invoicing (estimate.html) | Built — Stripe Checkout, batch generation, auto-pay setup, payment tracking | Medium |
+| Properties / CRM / Contacts | Built as lite versions in estimate.html | Medium |
+| Schedule View | Built — day/week/month modes, drag-drop | Medium |
+| Financials Dashboard | Built — earned revenue, deferred revenue, monthly chart | Medium |
+| Production Rates View | Built — catalog vs field comparison | Low-Medium |
+| Site Reports / Before-After | Built — full wizard + PDF generation | Medium |
+| Reminders System | Built — crew + office creation | Low |
+| Backend (Apps Script) | 72 endpoints (26 GET + 46 POST), functional | Medium |
+
+**What's not built yet:**
+
+| Area | Impact | Notes |
+|------|--------|-------|
+| Real database (PostgreSQL) | Critical | Google Sheets won't scale. Schema is designed but not implemented |
+| Real auth (BetterAuth) | Critical | Currently phone number only, no roles, no security |
+| Multi-tenancy (RLS) | Critical | Single-company only today |
+| React/TypeScript rewrite | Large | All 3 HTML files need migration to proper components |
+| Real backend (Node/Express) | Large | Apps Script has 6-min timeouts, cold starts, no real auth |
+| 3 additional divisions (IRR/CON/ENH) | Medium | Catalogs, items, services need creation |
+| HubSpot CRM integration | Medium | Planned but not started |
+| QuickBooks integration | Medium | Planned but not started |
+| E-Signature (built-in + DocuSign) | Medium | Schema designed, not built |
+| Email/SMS (SendGrid + Twilio) | Medium | Not started |
+| Overhead tracking / true P&L | Medium | Schema designed, not built |
+| Google Calendar sync | Low | Optional, not started |
+| Offline-first crew app | Low-Medium | Basic queuing exists, full offline not built |
+| Customer portal v2 | Low | Proposal viewing, invoice payment, service request tracking |
+
+**Summary:** The domain logic and UX are deeply built — the calculation engine, crew workflows, iOS design patterns, and business processes are production-quality. The infrastructure is prototype-grade — Google Sheets as database, Apps Script as API, phone-number auth, single HTML files. The current state is a very detailed working prototype that happens to also be in production. The "hard thinking" is done; the "hard engineering" of making it scalable, secure, and multi-tenant is the remaining ~60-65%.
+
 ### What's Highly Reusable (Migration to React/PostgreSQL)
 
 **Extract almost directly to TypeScript service modules (→ `packages/calculation-engine`):**
