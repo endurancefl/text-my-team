@@ -16186,10 +16186,9 @@ async function generateSignedPdf() {
       method: 'POST',
       body: JSON.stringify({
         contractPdf: true,
-        pdfData: base64,
-        filename: currentEstimate.contractId + '-signed',
-        contractId: currentEstimate.contractId,
-        propertyAddress: currentEstimate.propertyAddress || ''
+        pdfBase64: base64,
+        property: currentEstimate.propertyAddress || '',
+        filename: currentEstimate.contractId + '-signed'
       })
     });
     const uploadResult = await uploadResp.json();
