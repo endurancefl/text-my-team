@@ -8749,9 +8749,17 @@ async function openSavedEstimate(bidId) {
                 contract = allContracts.find(c => c.contractId === currentEstimate.contractId);
               }
             }
-            if (contract && contract.pdfUrl) {
-              currentEstimate.pdfUrl = contract.pdfUrl;
-              currentEstimate.pdfFileId = contract.pdfFileId || '';
+            if (contract) {
+              if (contract.pdfUrl) {
+                currentEstimate.pdfUrl = contract.pdfUrl;
+                currentEstimate.pdfFileId = contract.pdfFileId || '';
+              }
+              currentEstimate.signingStatus = contract.signingStatus || '';
+              currentEstimate.signedName = contract.signedName || '';
+              currentEstimate.signedAt = contract.signedAt || '';
+              currentEstimate.signedPdfUrl = contract.signedPdfUrl || '';
+              currentEstimate.signedPdfFileId = contract.signedPdfFileId || '';
+              currentEstimate.contactEmail = contract.contactEmail || '';
             }
           } catch (e) { /* PDF URL load is non-critical */ }
         }
@@ -8815,9 +8823,17 @@ async function openSavedEstimate(bidId) {
               contract = allContracts.find(c => c.contractId === currentEstimate.contractId);
             }
           }
-          if (contract && contract.pdfUrl) {
-            currentEstimate.pdfUrl = contract.pdfUrl;
-            currentEstimate.pdfFileId = contract.pdfFileId || '';
+          if (contract) {
+            if (contract.pdfUrl) {
+              currentEstimate.pdfUrl = contract.pdfUrl;
+              currentEstimate.pdfFileId = contract.pdfFileId || '';
+            }
+            currentEstimate.signingStatus = contract.signingStatus || '';
+            currentEstimate.signedName = contract.signedName || '';
+            currentEstimate.signedAt = contract.signedAt || '';
+            currentEstimate.signedPdfUrl = contract.signedPdfUrl || '';
+            currentEstimate.signedPdfFileId = contract.signedPdfFileId || '';
+            currentEstimate.contactEmail = contract.contactEmail || '';
           }
         } catch (e) { /* PDF URL load is non-critical */ }
       }
@@ -10565,10 +10581,32 @@ function updateHeaderActions() {
           </svg>
           Contract PDF
         </button>`;
+    // Signing status badge + buttons
+    let signingHtml = '';
+    const sigStatus = currentEstimate.signingStatus || '';
+    if (sigStatus === 'signed') {
+      signingHtml = `<span class="status-badge" style="background:rgba(30,142,62,0.12);color:#1e8e3e;">Signed</span>`;
+      if (currentEstimate.signedPdfUrl) {
+        signingHtml += `<button class="btn btn-secondary" onclick="window.open('${currentEstimate.signedPdfUrl}', '_blank')" style="font-size:12px;padding:4px 10px;">View Signed PDF</button>`;
+      } else {
+        signingHtml += `<button class="btn btn-secondary" onclick="generateSignedPdf()" id="btn-gen-signed-pdf" style="font-size:12px;padding:4px 10px;">Generate Signed PDF</button>`;
+      }
+    } else if (sigStatus === 'sent' || sigStatus === 'viewed') {
+      signingHtml = `<span class="status-badge" style="background:rgba(232,160,0,0.12);color:#b8860b;">Awaiting Signature</span>`;
+    } else if (currentEstimate.pdfUrl) {
+      signingHtml = `<button class="btn btn-secondary" onclick="sendContractForSigning()" style="font-size:12px;padding:4px 10px;">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+        </svg>
+        Send Contract
+      </button>`;
+    }
+
     actionsEl.innerHTML = `
       <span class="status-badge status-finalized">Finalized</span>
       <span style="color: var(--gw-text-secondary); font-size: 13px; margin-left: 8px;">${currentEstimate.contractId || ''}</span>
       ${pdfButtons}
+      ${signingHtml}
       <button class="btn btn-secondary" onclick="enterRevisionMode()">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
@@ -16026,6 +16064,161 @@ document.getElementById('wt-search')?.addEventListener('input', function() {
   wtSearchQuery = this.value.trim();
   renderWorkTickets();
 });
+
+// ═══════════════════════════════════════════════════════════════
+//  CONTRACT SIGNING
+// ═══════════════════════════════════════════════════════════════
+
+async function sendContractForSigning() {
+  if (!currentEstimate.contractId) {
+    showToast('No contract to send.', 'error');
+    return;
+  }
+  if (!currentEstimate.pdfUrl) {
+    showToast('Generate a contract PDF first.', 'error');
+    return;
+  }
+
+  // Find contact email
+  const ct = currentContact || (currentEstimate.contactId ? contacts.find(c => c.contactId === currentEstimate.contactId) : null);
+  const email = ct?.email || currentEstimate.contactEmail || '';
+  if (!email) {
+    showToast('No email address on the contact. Add one first.', 'error');
+    return;
+  }
+
+  if (!confirm(`Send contract to ${email} for signature?`)) return;
+
+  try {
+    showToast('Sending contract...', 'info', 8000);
+    const resp = await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        sendContractForSigning: true,
+        contractId: currentEstimate.contractId,
+        contactEmail: email
+      })
+    });
+    const result = await resp.json();
+    if (result.success) {
+      currentEstimate.signingStatus = 'sent';
+      updateHeaderActions();
+      showToast('Contract sent to ' + email + ' for signature.', 'success');
+    } else {
+      showToast(result.error || 'Failed to send contract.', 'error');
+    }
+  } catch (err) {
+    showToast('Error sending contract: ' + err.message, 'error');
+  }
+}
+
+async function generateSignedPdf() {
+  if (!currentEstimate.contractId) return;
+  if (!currentEstimate.signedName) {
+    showToast('Contract has not been signed yet.', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('btn-gen-signed-pdf');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Generating...';
+  }
+
+  try {
+    // Build same metadata as generateContractPdf() but add signed fields
+    const ct = currentContact || (currentEstimate.contactId ? contacts.find(c => c.contactId === currentEstimate.contactId) : null);
+
+    const metadata = {
+      type: 'contract',
+      renderer: 'weasyprint',
+      propertyType: currentEstimate.propertyType || 'residential',
+      companyName: 'Endurance Services',
+      companyPhone: '(407) 579-4403',
+      companyWebsite: 'endurancefl.com',
+      companyCity: 'Orlando, FL',
+      contractId: currentEstimate.contractId,
+      customerName: ct?.name || currentEstimate.contactName || '',
+      customerCompany: ct?.company || '',
+      billingAddress: currentEstimate.billingAddress || ct?.address || '',
+      propertyAddress: currentEstimate.propertyAddress || '',
+      generatedDate: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      startDate: currentEstimate.startDate || '',
+      endDate: currentEstimate.endDate || '',
+      monthlyPayment: currentEstimate.monthlyPayment || 0,
+      contractValue: currentEstimate.contractValue || 0,
+      paymentTerms: currentEstimate.paymentTerms || 'Net 30',
+      services: (currentEstimate.sections || []).map(s => ({
+        name: s.sectionName || s.name || '',
+        frequency: s.frequency || '',
+        annualTotal: s.annualTotal || 0,
+        description: s.description || '',
+        billingTier: s.billingTier || 'fixed'
+      })),
+      signedName: currentEstimate.signedName,
+      signedAt: currentEstimate.signedAt
+    };
+
+    // Add T&C if available
+    if (currentEstimate.termsAndConditionsHtml) {
+      metadata.termsAndConditionsHtml = currentEstimate.termsAndConditionsHtml;
+    }
+
+    const formData = new FormData();
+    formData.append('metadata', JSON.stringify(metadata));
+
+    const pdfResp = await fetch(CONTRACT_PDF_URL, { method: 'POST', body: formData });
+    if (!pdfResp.ok) throw new Error('PDF generation failed');
+
+    const pdfBlob = await pdfResp.blob();
+    const base64 = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result.split(',')[1]);
+      reader.readAsDataURL(pdfBlob);
+    });
+
+    // Upload to Drive
+    const uploadResp = await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        contractPdf: true,
+        pdfData: base64,
+        filename: currentEstimate.contractId + '-signed',
+        contractId: currentEstimate.contractId,
+        propertyAddress: currentEstimate.propertyAddress || ''
+      })
+    });
+    const uploadResult = await uploadResp.json();
+
+    if (uploadResult.success) {
+      currentEstimate.signedPdfUrl = uploadResult.url || uploadResult.pdfUrl;
+      currentEstimate.signedPdfFileId = uploadResult.fileId || uploadResult.pdfFileId;
+
+      // Save signed PDF URL to contract
+      await fetch(GOOGLE_SHEETS_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+          updateContract: true,
+          contractId: currentEstimate.contractId,
+          signedPdfUrl: currentEstimate.signedPdfUrl,
+          signedPdfFileId: currentEstimate.signedPdfFileId
+        })
+      });
+
+      updateHeaderActions();
+      showToast('Signed PDF generated successfully.', 'success');
+    } else {
+      showToast('Failed to upload signed PDF.', 'error');
+    }
+  } catch (err) {
+    showToast('Error generating signed PDF: ' + err.message, 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Generate Signed PDF';
+    }
+  }
+}
 
 </script>
 

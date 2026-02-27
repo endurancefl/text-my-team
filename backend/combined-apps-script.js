@@ -104,6 +104,10 @@ function doGet(e) {
       case 'getPayments':
         return jsonResponse(getPayments(e.parameter.invoiceId));
 
+      // ─── Contract Signing ───
+      case 'getContractForSigning':
+        return jsonResponse(getContractForSigning(e.parameter.token));
+
       default:
         return jsonResponse({ success: false, error: 'Unknown action: ' + action });
     }
@@ -208,6 +212,10 @@ function doPost(e) {
     if (data.setupAutoPay) return jsonResponse(setupAutoPay(data));
     if (data.checkAutoPaySetup) return jsonResponse(checkAutoPaySetup(data));
     if (data.checkStripePayment) return jsonResponse(checkStripePayment(data));
+
+    // ─── Contract Signing POST handlers ───
+    if (data.sendContractForSigning) return jsonResponse(sendContractForSigning(data));
+    if (data.recordSignature) return jsonResponse(recordSignature(data));
 
     // ─── Reminders POST handlers ───
     if (data.saveReminder) return jsonResponse(saveReminder(data));
@@ -954,7 +962,9 @@ function updateContract(data) {
         'Contact Email': data.contactEmail,
         'Billing Address': data.billingAddress,
         'PDF URL': data.pdfUrl,
-        'PDF File ID': data.pdfFileId
+        'PDF File ID': data.pdfFileId,
+        'signedPdfUrl': data.signedPdfUrl,
+        'signedPdfFileId': data.signedPdfFileId
       };
 
       for (var field in fieldsToUpdate) {
@@ -1039,7 +1049,12 @@ function getContracts() {
     contactEmail: headers.indexOf('Contact Email'),
     billingAddress: headers.indexOf('Billing Address'),
     pdfUrl: headers.indexOf('PDF URL'),
-    pdfFileId: headers.indexOf('PDF File ID')
+    pdfFileId: headers.indexOf('PDF File ID'),
+    signingStatus: headers.indexOf('signingStatus'),
+    signedName: headers.indexOf('signedName'),
+    signedAt: headers.indexOf('signedAt'),
+    signedPdfUrl: headers.indexOf('signedPdfUrl'),
+    signedPdfFileId: headers.indexOf('signedPdfFileId')
   };
 
   var contracts = [];
@@ -1068,7 +1083,12 @@ function getContracts() {
         contactEmail: col.contactEmail !== -1 ? (row[col.contactEmail] || '') : '',
         billingAddress: col.billingAddress !== -1 ? (row[col.billingAddress] || '') : '',
         pdfUrl: col.pdfUrl !== -1 ? (row[col.pdfUrl] || '') : '',
-        pdfFileId: col.pdfFileId !== -1 ? (row[col.pdfFileId] || '') : ''
+        pdfFileId: col.pdfFileId !== -1 ? (row[col.pdfFileId] || '') : '',
+        signingStatus: col.signingStatus !== -1 ? (row[col.signingStatus] || '') : '',
+        signedName: col.signedName !== -1 ? (row[col.signedName] || '') : '',
+        signedAt: col.signedAt !== -1 ? (row[col.signedAt] || '') : '',
+        signedPdfUrl: col.signedPdfUrl !== -1 ? (row[col.signedPdfUrl] || '') : '',
+        signedPdfFileId: col.signedPdfFileId !== -1 ? (row[col.signedPdfFileId] || '') : ''
       });
     }
   }
@@ -4859,4 +4879,233 @@ function getRemindersForCrew(crewName, dateStr) {
   }
 
   return { scheduled: scheduled, permanent: permanent };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CONTRACT SIGNING
+// ═══════════════════════════════════════════════════════════════
+
+function ensureSigningColumns(sheet, headers) {
+  var needed = ['signingToken', 'signingStatus', 'signedName', 'signedAt', 'signedIP', 'signedUserAgent', 'signedPdfUrl', 'signedPdfFileId'];
+  needed.forEach(function(col) {
+    if (headers.indexOf(col) < 0) {
+      var lastCol = sheet.getLastColumn();
+      sheet.getRange(1, lastCol + 1).setValue(col).setFontWeight('bold');
+      headers.push(col);
+    }
+  });
+}
+
+function sendContractForSigning(data) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Contracts');
+  if (!sheet) return { success: false, error: 'Contracts sheet not found' };
+
+  var allData = sheet.getDataRange().getValues();
+  var headers = allData[0];
+
+  // Ensure signing columns exist
+  ensureSigningColumns(sheet, headers);
+  // Re-read after potential column additions
+  allData = sheet.getDataRange().getValues();
+  headers = allData[0];
+
+  var idCol = headers.indexOf('Contract ID');
+  if (idCol < 0) idCol = 0;
+  var contractRow = -1;
+  var contract = {};
+
+  for (var i = 1; i < allData.length; i++) {
+    if (String(allData[i][idCol]) === String(data.contractId)) {
+      contractRow = i + 1; // 1-based for sheet
+      for (var j = 0; j < headers.length; j++) {
+        contract[headers[j]] = allData[i][j];
+      }
+      break;
+    }
+  }
+
+  if (contractRow < 0) return { success: false, error: 'Contract not found' };
+
+  var email = contract['Contact Email'] || data.contactEmail;
+  if (!email) return { success: false, error: 'No email address on contact' };
+
+  // Generate signing token
+  var token = Utilities.getUuid();
+
+  // Store token and set status
+  var tokenCol = headers.indexOf('signingToken');
+  var statusCol = headers.indexOf('signingStatus');
+  if (tokenCol >= 0) sheet.getRange(contractRow, tokenCol + 1).setValue(token);
+  if (statusCol >= 0) sheet.getRange(contractRow, statusCol + 1).setValue('sent');
+
+  // Build signing link
+  var signingUrl = 'https://endurancefl.github.io/text-my-team/sign.html?token=' + token;
+
+  // Build email
+  var propertyAddr = contract['Property Address'] || '';
+  var contactName = contract['Contact Name'] || '';
+  var monthly = parseFloat(contract['Monthly Payment']) || 0;
+  var contractValue = parseFloat(contract['Contract Value']) || 0;
+  var contractId = contract['Contract ID'] || '';
+
+  var subject = 'Contract ' + contractId + ' — Ready for Signature';
+  var body = '<div style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;max-width:600px;margin:0 auto;">' +
+    '<div style="background:#1a2e24;padding:24px 32px;border-radius:8px 8px 0 0;">' +
+    '<h1 style="color:#fff;margin:0;font-size:20px;">Endurance Services</h1>' +
+    '</div>' +
+    '<div style="padding:32px;background:#fff;border:1px solid #e0e0e0;border-top:none;">' +
+    '<p style="font-size:16px;color:#333;">Hi ' + contactName + ',</p>' +
+    '<p style="font-size:15px;color:#555;">Your landscape maintenance contract is ready for review and signature.</p>' +
+    '<table style="width:100%;margin:20px 0;font-size:14px;border-collapse:collapse;">' +
+    '<tr><td style="padding:8px 0;color:#666;border-bottom:1px solid #f0f0f0;">Property</td><td style="padding:8px 0;font-weight:600;border-bottom:1px solid #f0f0f0;">' + propertyAddr + '</td></tr>' +
+    '<tr><td style="padding:8px 0;color:#666;border-bottom:1px solid #f0f0f0;">Contract #</td><td style="padding:8px 0;font-weight:600;border-bottom:1px solid #f0f0f0;">' + contractId + '</td></tr>' +
+    '<tr><td style="padding:8px 0;color:#666;border-bottom:1px solid #f0f0f0;">Monthly</td><td style="padding:8px 0;font-weight:600;border-bottom:1px solid #f0f0f0;">$' + monthly.toFixed(2) + '</td></tr>' +
+    '<tr><td style="padding:8px 0;color:#666;">Annual Total</td><td style="padding:8px 0;font-weight:600;font-size:16px;">$' + contractValue.toFixed(2) + '</td></tr>' +
+    '</table>' +
+    '<p style="text-align:center;margin:28px 0;">' +
+    '<a href="' + signingUrl + '" style="display:inline-block;padding:14px 36px;background:#1e8e3e;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:16px;">Review & Sign Contract</a>' +
+    '</p>' +
+    '<p style="font-size:13px;color:#999;">The contract PDF is attached to this email for your records.</p>' +
+    '</div>' +
+    '<div style="padding:16px 32px;background:#f8f9fa;border:1px solid #e0e0e0;border-top:none;border-radius:0 0 8px 8px;">' +
+    '<p style="font-size:12px;color:#999;margin:0;">Endurance Services &middot; (407) 579-4403 &middot; endurancefl.com</p>' +
+    '</div>' +
+    '</div>';
+
+  // Attach contract PDF if available
+  var emailOptions = {
+    to: email,
+    subject: subject,
+    htmlBody: body
+  };
+
+  var pdfFileId = contract['PDF File ID'] || '';
+  if (pdfFileId) {
+    try {
+      emailOptions.attachments = [DriveApp.getFileById(pdfFileId).getBlob()];
+    } catch (e) {
+      Logger.log('Could not attach PDF: ' + e);
+    }
+  }
+
+  MailApp.sendEmail(emailOptions);
+
+  return { success: true, token: token };
+}
+
+function getContractForSigning(token) {
+  if (!token) return { success: false, error: 'Missing token' };
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Contracts');
+  if (!sheet) return { success: false, error: 'Not found' };
+
+  var allData = sheet.getDataRange().getValues();
+  var headers = allData[0];
+  var tokenCol = headers.indexOf('signingToken');
+  if (tokenCol < 0) return { success: false, error: 'Not found' };
+
+  for (var i = 1; i < allData.length; i++) {
+    if (String(allData[i][tokenCol]) === String(token)) {
+      var contract = {};
+      for (var j = 0; j < headers.length; j++) {
+        contract[headers[j]] = allData[i][j];
+      }
+
+      // Look up bid data for services
+      var bidId = contract['Bid ID'] || '';
+      var services = [];
+      if (bidId) {
+        try {
+          var bidSheet = ss.getSheetByName('Bids');
+          if (bidSheet) {
+            var bidData = bidSheet.getDataRange().getValues();
+            var bidHeaders = bidData[0];
+            var bidIdCol = bidHeaders.indexOf('bidId');
+            var jsonCol = bidHeaders.indexOf('json');
+            for (var b = 1; b < bidData.length; b++) {
+              if (String(bidData[b][bidIdCol]) === String(bidId) && bidData[b][jsonCol]) {
+                var bidJson = JSON.parse(bidData[b][jsonCol]);
+                var sections = bidJson.sections || [];
+                for (var s = 0; s < sections.length; s++) {
+                  var sec = sections[s];
+                  services.push({
+                    name: sec.sectionName || sec.name || '',
+                    frequency: sec.frequency || '',
+                    annualTotal: sec.annualTotal || 0
+                  });
+                }
+                break;
+              }
+            }
+          }
+        } catch (e) {
+          Logger.log('Error loading bid services: ' + e);
+        }
+      }
+
+      // Return only customer-safe data
+      return {
+        success: true,
+        contractId: contract['Contract ID'] || '',
+        companyName: 'Endurance Services',
+        customerName: contract['Contact Name'] || '',
+        propertyAddress: contract['Property Address'] || '',
+        services: services,
+        contractValue: parseFloat(contract['Contract Value']) || 0,
+        monthlyPayment: parseFloat(contract['Monthly Payment']) || 0,
+        startDate: contract['Start Date'] || '',
+        endDate: contract['End Date'] || '',
+        paymentTerms: contract['Payment Terms'] || 'Net 30',
+        pdfFileId: contract['PDF File ID'] || '',
+        signingStatus: contract['signingStatus'] || ''
+      };
+    }
+  }
+
+  return { success: false, error: 'Invalid or expired signing link' };
+}
+
+function recordSignature(data) {
+  if (!data.token) return { success: false, error: 'Missing token' };
+  if (!data.signedName) return { success: false, error: 'Missing signature name' };
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Contracts');
+  if (!sheet) return { success: false, error: 'Contracts sheet not found' };
+
+  var allData = sheet.getDataRange().getValues();
+  var headers = allData[0];
+  var tokenCol = headers.indexOf('signingToken');
+  if (tokenCol < 0) return { success: false, error: 'Signing not configured' };
+
+  for (var i = 1; i < allData.length; i++) {
+    if (String(allData[i][tokenCol]) === String(data.token)) {
+      var statusCol = headers.indexOf('signingStatus');
+      var currentStatus = statusCol >= 0 ? allData[i][statusCol] : '';
+      if (currentStatus === 'signed') {
+        return { success: false, error: 'Contract already signed' };
+      }
+
+      var row = i + 1;
+      var cols = {
+        signingStatus: headers.indexOf('signingStatus'),
+        signedName: headers.indexOf('signedName'),
+        signedAt: headers.indexOf('signedAt'),
+        signedIP: headers.indexOf('signedIP'),
+        signedUserAgent: headers.indexOf('signedUserAgent')
+      };
+
+      if (cols.signingStatus >= 0) sheet.getRange(row, cols.signingStatus + 1).setValue('signed');
+      if (cols.signedName >= 0) sheet.getRange(row, cols.signedName + 1).setValue(data.signedName);
+      if (cols.signedAt >= 0) sheet.getRange(row, cols.signedAt + 1).setValue(new Date().toISOString());
+      if (cols.signedIP >= 0) sheet.getRange(row, cols.signedIP + 1).setValue(data.signedIP || '');
+      if (cols.signedUserAgent >= 0) sheet.getRange(row, cols.signedUserAgent + 1).setValue(data.signedUserAgent || '');
+
+      return { success: true };
+    }
+  }
+
+  return { success: false, error: 'Invalid signing token' };
 }

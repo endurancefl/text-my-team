@@ -51,6 +51,7 @@ text-my-team/
 ├── estimate.html                  # Bidding & estimating tool (~16,033 lines HTML/JS)
 ├── payment-success.html           # Stripe payment success redirect
 ├── payment-cancel.html            # Stripe payment cancel redirect
+├── sign.html                      # Standalone contract e-signature page (~250 lines)
 ├── css/
 │   ├── crew.css                   # All CSS for crew.html (~4,511 lines)
 │   └── estimate.css               # All CSS for estimate.html (~5,533 lines)
@@ -63,7 +64,7 @@ text-my-team/
 │       ├── iceberg-icon.png
 │       └── 26__Endurace_Icon_Green_LightBackground.png
 ├── backend/
-│   └── combined-apps-script.js    # Google Apps Script backend (~4,862 lines)
+│   └── combined-apps-script.js    # Google Apps Script backend (~5,111 lines)
 ├── cloud-function/                # AWS Lambda PDF generation
 │   ├── pdf_generator.py           # PDF library (WeasyPrint + ReportLab)
 │   ├── lambda_function.py         # AWS Lambda handler
@@ -258,6 +259,21 @@ text-my-team/
   - After upload, the Google Drive PDF URL and file ID are saved to the contract record via `updateContract`
   - Once a PDF URL is stored, header shows "View PDF" button (opens Drive link in new tab) + small "Regenerate" button
   - When opening a saved finalized estimate, the contract's `pdfUrl` is loaded from `allContracts` (or fetched) so the View PDF button persists across sessions
+  - **Signed PDF generation**: When `signedName` and `signedAt` are included in metadata, the signature is rendered in Dancing Script cursive font above the customer signature line. Both ReportLab and WeasyPrint engines support signature rendering. Output filename appended with `-signed` suffix.
+- **Typed E-Signature Flow**: Full contract signing workflow without DocuSign or login:
+  1. Estimator finalizes estimate → generates contract PDF → clicks "Send Contract" button
+  2. Backend generates UUID token, sends email to customer with PDF attached + "Review & Sign" link
+  3. Customer opens `sign.html?token=<uuid>` — standalone page (no login required)
+  4. Page shows contract summary (property, services, totals, dates), embedded Google Drive PDF viewer, and typed signature input with live Dancing Script cursive preview
+  5. Customer types name, checks consent box, clicks "Sign & Accept"
+  6. Backend records `signedName`, `signedAt`, `signedIP`, `signedUserAgent`, sets `signingStatus = 'signed'`
+  7. estimate.html shows green "Signed" badge, "Generate Signed PDF" button
+  8. Signed PDF re-generates contract with cursive signature rendered on signature page
+  - **Signing status lifecycle**: `unsent` → `sent` (email sent) → `signed` (customer signed)
+  - **Double-sign prevention**: `sign.html` shows "Already Signed" state if contract already signed
+  - **Header buttons in estimate.html**: When no PDF → no send button; PDF exists but unsent → "Send Contract"; sent/viewed → amber "Awaiting Signature" badge; signed → green "Signed" badge + "Generate Signed PDF" or "View Signed PDF"
+  - **Contracts sheet columns**: `signingToken`, `signingStatus`, `signedName`, `signedAt`, `signedIP`, `signedUserAgent`, `signedPdfUrl`, `signedPdfFileId` (auto-created by `ensureSigningColumns()`)
+  - **sign.html**: Standalone page following `payment-success.html` pattern — single file, inline CSS/JS, no frameworks. Google Font (Dancing Script 700) for cursive preview. Mobile responsive. States: loading, error, already-signed, signing, success.
 - **Estimate Revision & Re-Finalize Workflow**: Three-status lifecycle (Draft → Finalized → Revision → Finalized). When a finalized estimate is reopened and edited, status transitions to "Revision" (amber badge) instead of resetting to Draft. Re-finalizing updates the existing contract row and regenerates only future scheduled tickets — completed, skipped, and today's tickets are never touched. `revisionCount` tracks how many times a contract has been revised. The "Revise Estimate" button enters revision mode explicitly; "Update Contract" opens the finalize modal with revision-aware text ("Update Contract & Regenerate Tickets"). First-time finalization is unchanged.
 - **Finalization Contact Validation**: Before finalizing, linked contact must have both email address and billing address populated. Shows toast error if missing. Prevents creating contracts without essential invoicing data.
 - **Weekly Reports**: per-property visit summaries with services performed, dates, notes, customer email — send individually or batch send to all customers
@@ -407,6 +423,9 @@ text-my-team/
 | `setupAutoPay` | Invoicing | Creates Stripe Customer + Checkout Session in `setup` mode, emails customer setup link. Adds `autoPay`, `stripeCustomerId`, `stripePaymentMethodId`, `stripeSetupSessionId` columns to Contracts sheet |
 | `checkAutoPaySetup` | Invoicing | Polls Stripe setup session, stores payment method + customer ID on contract when complete |
 | `checkStripePayment` | Invoicing | Polls Stripe payment session, auto-records payment if paid. Returns `{ paid, status }` |
+| `sendContractForSigning` | Signing | Generates UUID token, stores on contract, sends HTML email with PDF + signing link to customer. Sets `signingStatus = 'sent'` |
+| `getContractForSigning` | Signing (GET) | Takes `token` param, returns customer-safe contract data (no markups/margins). Used by `sign.html` |
+| `recordSignature` | Signing | Records `signedName`, `signedAt`, `signedIP`, `signedUserAgent`. Sets `signingStatus = 'signed'`. Validates token exists and not already signed |
 
 ### What Works Well
 - The UX patterns and workflows are production-quality — crew uses them daily
@@ -441,7 +460,7 @@ text-my-team/
 | Production Rates View | Built — catalog vs field comparison | Low-Medium |
 | Site Reports / Before-After | Built — full wizard + PDF generation | Medium |
 | Reminders System | Built — crew + office creation | Low |
-| Backend (Apps Script) | 72 endpoints (26 GET + 46 POST), functional | Medium |
+| Backend (Apps Script) | 75 endpoints (27 GET + 48 POST), functional | Medium |
 
 **What's not built yet:**
 
@@ -455,7 +474,7 @@ text-my-team/
 | 3 additional divisions (IRR/CON/ENH) | Medium | Catalogs, items, services need creation |
 | HubSpot CRM integration | Medium | Planned but not started |
 | QuickBooks integration | Medium | Planned but not started |
-| E-Signature (built-in + DocuSign) | Medium | Schema designed, not built |
+| E-Signature (built-in typed signature) | Medium | **Built** — typed e-signature via sign.html, Dancing Script cursive, signed PDF generation. DocuSign integration not started |
 | Email/SMS (SendGrid + Twilio) | Medium | Not started |
 | Overhead tracking / true P&L | Medium | Schema designed, not built |
 | Google Calendar sync | Low | Optional, not started |
@@ -567,7 +586,7 @@ Both apps live in the same monorepo, share the component library (`packages/ui`)
 - **ReportLab engine** (`main.py`): Original coordinate-based PDF generation (~2,193 lines). Kept as fallback during migration. Will be deleted after all 4 PDF types are validated in production.
 - `lambda_function.py` — Lambda handler: parses multipart boundary from API Gateway event, extracts metadata JSON + photo blobs, selects rendering engine, routes by `metadata.type`: `invoice` → `generate_invoice_pdf()` (WeasyPrint only), `contract` → `generate_contract_pdf()`, `before_after` → `generate_before_after_report()`, `standard` → `generate_standard_report()`
 - Lambda config: Python 3.11, **2048MB memory** (WeasyPrint needs more than ReportLab), **300s timeout** (increased from 60s/1024MB to handle 25+ photo site reports)
-- **Deployment**: **Docker container image** (not zip). `Dockerfile` in `cloud-function/` uses `public.ecr.aws/lambda/python:3.11` base with system deps (pango, cairo, gdk-pixbuf2, libffi, fontconfig, freetype, harfbuzz). SAM template uses `PackageType: Image`. ECR repo created on first `sam deploy --guided`. Deploy via `cloud-function/deploy/deploy.sh`.
+- **Deployment**: **Docker container image** (not zip). `Dockerfile` in `cloud-function/` uses `public.ecr.aws/lambda/python:3.11` base with system deps (pango, cairo, gdk-pixbuf2, libffi, fontconfig, freetype, harfbuzz). Custom fonts (Dancing Script for e-signatures) installed to `/usr/share/fonts/custom/` with `fc-cache`. SAM template uses `PackageType: Image`. ECR repo created on first `sam deploy --guided`. Deploy via `cloud-function/deploy/deploy.sh`.
 - **Template structure**:
   ```
   cloud-function/templates/
@@ -581,14 +600,14 @@ Both apps live in the same monorepo, share the component library (`packages/ui`)
       common.css                # Shared print CSS (header, info box, category bars)
       site_report.css           # 2-column CSS grid, photo frames, note boxes
       before_after.css          # BEFORE/AFTER paired layout
-      contract.css              # Tables, signatures, terms, payment schedule
+      contract.css              # Tables, signatures, terms, payment schedule, @font-face Dancing Script for e-signatures
       invoice.css               # Invoice table, totals, bill-to, details box
   ```
 - **Color palette** (CSS variables in `base.html`): `--green: #3A5F4B`, `--dark: #1A2E24`, `--gray-header: #666666`, `--light-gray: #CCCCCC`, `--contract-light-gray: #F5F5F5`, `--contract-red: #C62828`, `--before-red: #DC2626`, `--after-green: #16A34A`
 - Handles Site Report, Before & After, and Contract PDF types (distinguished by `metadata.type` field)
 - **Site Report layout**: 2-column CSS grid. Photos grouped by category with category headers, notes below each photo, page numbering via `@page` counters, logo on page 1. `object-fit: cover` replaces ReportLab's manual crop algorithm.
 - **Before & After layout**: Side-by-side comparison — BEFORE (red banner) left, AFTER (green banner) right. CSS grid pairs with `page-break-inside: avoid`. New page per category.
-- **Contract PDF layout**: Two templates based on `propertyType`. Residential: 3-page (quote, service descriptions, T&C + signatures). Commercial: 5-6 page (cover, three-tier services tables, payment schedule, service descriptions, T&C, signatures). Both include 12 standard terms clauses with template variables. Clause 12 (Named Tropical Event Policy) uses numbered sub-items instead of plain text. `_get_terms_clauses()` returns `(title, text)` tuples where text is a string or a list of sub-item strings. Both engines and all templates handle both formats. Optional `service_map` photo for commercial cover page. Functions: `generate_contract_pdf()`, `_generate_residential_contract()`, `_generate_commercial_contract()`
+- **Contract PDF layout**: Two templates based on `propertyType`. Residential: 3-page (quote, service descriptions, T&C + signatures). Commercial: 5-6 page (cover, three-tier services tables, payment schedule, service descriptions, T&C, signatures). Both include 12 standard terms clauses with template variables. Clause 12 (Named Tropical Event Policy) uses numbered sub-items instead of plain text. `_get_terms_clauses()` returns `(title, text)` tuples where text is a string or a list of sub-item strings. Both engines and all templates handle both formats. Optional `service_map` photo for commercial cover page. **E-signature rendering**: When `signedName`/`signedAt` present in metadata, customer signature column shows typed name in Dancing Script cursive font above the signature line, with "Signed: {date}" replacing the generic date. Conditional rendering via Jinja2 `{% if signed_name %}` in templates and direct font rendering in ReportLab. Both engines register/embed Dancing Script Bold TTF (`assets/fonts/DancingScript-Bold.ttf`). Functions: `generate_contract_pdf()`, `_generate_residential_contract()`, `_generate_commercial_contract()`
 - Request format: `multipart/form-data` with JSON `metadata` field + photo blobs (`photos`, `before_photos`, `after_photos`)
 - Photos composited client-side (annotations burned onto canvas) before upload. Site Report: max 1600px, 85% JPEG quality. Before & After: max 1000px, 75% quality
 - PDF returned as binary blob (base64 via API Gateway) → auto-downloaded to device → uploaded to Google Drive via Apps Script (`siteReportPdf: true`)

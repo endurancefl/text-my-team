@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign Contract — Endurance Services</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #f4f6f5;
+    min-height: 100vh;
+    color: #333;
+  }
+  .header {
+    background: #1a2e24;
+    padding: 20px 24px;
+    text-align: center;
+  }
+  .header h1 {
+    color: #fff;
+    font-size: 20px;
+    font-weight: 600;
+  }
+  .container {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 24px 16px 48px;
+  }
+  .card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    padding: 28px 24px;
+    margin-bottom: 20px;
+  }
+  .card h2 {
+    font-size: 18px;
+    color: #1a2e24;
+    margin-bottom: 16px;
+  }
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 14px;
+  }
+  .info-row:last-child { border-bottom: none; }
+  .info-label { color: #888; }
+  .info-value { font-weight: 600; color: #1a2e24; text-align: right; max-width: 60%; }
+  .services-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+    font-size: 14px;
+  }
+  .services-table th {
+    text-align: left;
+    padding: 8px 8px;
+    border-bottom: 2px solid #1a2e24;
+    font-size: 12px;
+    text-transform: uppercase;
+    color: #888;
+    font-weight: 600;
+  }
+  .services-table th:last-child { text-align: right; }
+  .services-table td {
+    padding: 10px 8px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .services-table td:last-child { text-align: right; font-weight: 600; }
+  .total-row td {
+    border-top: 2px solid #1a2e24;
+    border-bottom: none;
+    font-weight: 700;
+    font-size: 15px;
+    padding-top: 12px;
+  }
+  .pdf-viewer {
+    width: 100%;
+    height: 500px;
+    border: none;
+    border-radius: 8px;
+    background: #f0f0f0;
+  }
+  .pdf-fallback {
+    text-align: center;
+    margin-top: 8px;
+    font-size: 13px;
+  }
+  .pdf-fallback a { color: #1a73e8; }
+  .sig-section { margin-top: 8px; }
+  .sig-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #555;
+    margin-bottom: 6px;
+  }
+  .sig-input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 16px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .sig-input:focus { border-color: #1e8e3e; }
+  .sig-preview {
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 12px 0;
+    padding: 12px;
+    border: 1px dashed #ccc;
+    border-radius: 8px;
+    background: #fafafa;
+  }
+  .sig-preview-text {
+    font-family: 'Dancing Script', cursive;
+    font-size: 32px;
+    font-weight: 700;
+    color: #1a2e24;
+  }
+  .sig-preview-placeholder {
+    font-size: 14px;
+    color: #bbb;
+    font-style: italic;
+  }
+  .consent-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 16px 0;
+    font-size: 13px;
+    color: #555;
+    line-height: 1.5;
+  }
+  .consent-row input[type="checkbox"] {
+    margin-top: 3px;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    accent-color: #1e8e3e;
+  }
+  .sig-date {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 16px;
+  }
+  .btn-sign {
+    width: 100%;
+    padding: 16px;
+    background: #1e8e3e;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 17px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, opacity 0.2s;
+  }
+  .btn-sign:hover { background: #177a33; }
+  .btn-sign:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+  }
+  .btn-sign.loading {
+    opacity: 0.7;
+    pointer-events: none;
+  }
+
+  /* States */
+  .state { display: none; }
+  .state.active { display: block; }
+
+  .loading-state {
+    text-align: center;
+    padding: 60px 20px;
+  }
+  .spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid #e0e0e0;
+    border-top-color: #1e8e3e;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .error-state, .already-signed-state {
+    text-align: center;
+    padding: 60px 20px;
+  }
+  .error-icon, .success-icon, .signed-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+  }
+  .error-icon { background: rgba(220, 53, 69, 0.1); }
+  .error-icon svg { color: #dc3545; }
+  .success-icon { background: rgba(30, 142, 62, 0.1); }
+  .success-icon svg { color: #1e8e3e; }
+  .signed-icon { background: rgba(30, 142, 62, 0.1); }
+  .signed-icon svg { color: #1e8e3e; }
+
+  .success-state {
+    text-align: center;
+    padding: 48px 20px;
+  }
+  .success-state h2 { color: #1e8e3e; margin-bottom: 8px; }
+  .success-state p { color: #666; font-size: 15px; line-height: 1.5; }
+  .success-check {
+    animation: scaleIn 0.3s ease-out;
+  }
+  @keyframes scaleIn {
+    from { transform: scale(0); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  @media (max-width: 480px) {
+    .container { padding: 16px 12px 40px; }
+    .card { padding: 20px 16px; }
+    .pdf-viewer { height: 360px; }
+    .sig-preview-text { font-size: 26px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Endurance Services</h1>
+</div>
+
+<div class="container">
+  <!-- Loading State -->
+  <div id="state-loading" class="state active">
+    <div class="card loading-state">
+      <div class="spinner"></div>
+      <p style="color:#888;">Loading contract...</p>
+    </div>
+  </div>
+
+  <!-- Error State -->
+  <div id="state-error" class="state">
+    <div class="card error-state">
+      <div class="error-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+        </svg>
+      </div>
+      <h2 style="color:#dc3545;margin-bottom:8px;">Invalid Link</h2>
+      <p id="error-message" style="color:#666;font-size:15px;">This signing link is invalid or has expired.</p>
+    </div>
+  </div>
+
+  <!-- Already Signed State -->
+  <div id="state-already-signed" class="state">
+    <div class="card already-signed-state">
+      <div class="signed-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+        </svg>
+      </div>
+      <h2 style="color:#1e8e3e;margin-bottom:8px;">Contract Already Signed</h2>
+      <p id="already-signed-details" style="color:#666;font-size:15px;"></p>
+    </div>
+  </div>
+
+  <!-- Signing State -->
+  <div id="state-signing" class="state">
+    <!-- Contract Summary -->
+    <div class="card">
+      <h2>Contract Summary</h2>
+      <div id="contract-info"></div>
+      <table class="services-table" id="services-table">
+        <thead><tr><th>Service</th><th>Frequency</th><th>Annual</th></tr></thead>
+        <tbody id="services-body"></tbody>
+      </table>
+    </div>
+
+    <!-- PDF Viewer -->
+    <div class="card">
+      <h2>Contract Document</h2>
+      <iframe id="pdf-iframe" class="pdf-viewer" src="about:blank"></iframe>
+      <div class="pdf-fallback">
+        Can't see the contract? <a id="pdf-download-link" href="#" target="_blank">Download PDF</a>
+      </div>
+    </div>
+
+    <!-- Signature -->
+    <div class="card">
+      <h2>Your Signature</h2>
+      <div class="sig-section">
+        <div class="sig-label">Type your full name</div>
+        <input type="text" id="sig-name-input" class="sig-input" placeholder="e.g. John Smith" autocomplete="name" maxlength="100">
+        <div class="sig-preview" id="sig-preview">
+          <span class="sig-preview-placeholder" id="sig-placeholder">Your signature will appear here</span>
+          <span class="sig-preview-text" id="sig-text" style="display:none;"></span>
+        </div>
+        <div class="sig-date" id="sig-date"></div>
+        <label class="consent-row">
+          <input type="checkbox" id="consent-checkbox">
+          <span>I agree that my typed name above constitutes my electronic signature and that I have reviewed and accept the terms of this contract.</span>
+        </label>
+        <button id="btn-sign" class="btn-sign" disabled onclick="submitSignature()">Sign & Accept</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Success State -->
+  <div id="state-success" class="state">
+    <div class="card success-state">
+      <div class="success-icon success-check">
+        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      </div>
+      <h2>Contract Signed!</h2>
+      <p>Thank you for signing. A confirmation has been recorded and your signed contract will be available shortly.</p>
+      <p id="success-details" style="margin-top:16px;font-size:14px;color:#888;"></p>
+    </div>
+  </div>
+</div>
+
+<script>
+const GOOGLE_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbygkHGZmIYUj9F91u-3eF3_V9mC7xZ03PfCJt6AD_VnpSXheLlEvt6h1obmqUf4JkRg/exec';
+
+let contractData = null;
+let signingToken = null;
+
+function showState(stateId) {
+  document.querySelectorAll('.state').forEach(el => el.classList.remove('active'));
+  document.getElementById('state-' + stateId).classList.add('active');
+}
+
+function formatCurrency(n) {
+  return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+async function init() {
+  const params = new URLSearchParams(window.location.search);
+  signingToken = params.get('token');
+
+  if (!signingToken) {
+    document.getElementById('error-message').textContent = 'No signing token provided. Please use the link from your email.';
+    showState('error');
+    return;
+  }
+
+  try {
+    const resp = await fetch(GOOGLE_SHEETS_URL + '?action=getContractForSigning&token=' + encodeURIComponent(signingToken));
+    const data = await resp.json();
+
+    if (!data.success) {
+      document.getElementById('error-message').textContent = data.error || 'This signing link is invalid or has expired.';
+      showState('error');
+      return;
+    }
+
+    contractData = data;
+
+    // Already signed?
+    if (data.signingStatus === 'signed') {
+      document.getElementById('already-signed-details').textContent =
+        'This contract was signed by ' + (data.signedName || data.customerName) + '. No further action is needed.';
+      showState('already-signed');
+      return;
+    }
+
+    // View tracking is handled server-side via getContractForSigning access logs
+
+    renderContract(data);
+    showState('signing');
+  } catch (err) {
+    document.getElementById('error-message').textContent = 'Failed to load contract. Please try again.';
+    showState('error');
+  }
+}
+
+function renderContract(data) {
+  // Info rows
+  const infoHtml = [
+    ['Property', data.propertyAddress],
+    ['Contract #', data.contractId],
+    ['Customer', data.customerName],
+    ['Start Date', data.startDate],
+    ['End Date', data.endDate],
+    ['Payment Terms', data.paymentTerms],
+    ['Monthly Payment', formatCurrency(data.monthlyPayment)]
+  ].map(([label, value]) =>
+    '<div class="info-row"><span class="info-label">' + label + '</span><span class="info-value">' + (value || '') + '</span></div>'
+  ).join('');
+  document.getElementById('contract-info').innerHTML = infoHtml;
+
+  // Services table
+  const services = data.services || [];
+  let tbody = '';
+  let total = 0;
+  services.forEach(svc => {
+    const ann = parseFloat(svc.annualTotal) || 0;
+    total += ann;
+    tbody += '<tr><td>' + (svc.name || '') + '</td><td>' + (svc.frequency || '') + '</td><td>' + formatCurrency(ann) + '</td></tr>';
+  });
+  tbody += '<tr class="total-row"><td colspan="2">Annual Total</td><td>' + formatCurrency(data.contractValue || total) + '</td></tr>';
+  document.getElementById('services-body').innerHTML = tbody;
+
+  // PDF viewer
+  if (data.pdfFileId) {
+    document.getElementById('pdf-iframe').src = 'https://drive.google.com/file/d/' + data.pdfFileId + '/preview';
+    document.getElementById('pdf-download-link').href = 'https://drive.google.com/file/d/' + data.pdfFileId + '/view';
+  }
+
+  // Date
+  const today = new Date();
+  document.getElementById('sig-date').textContent = 'Date: ' + today.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+// Live signature preview
+document.getElementById('sig-name-input').addEventListener('input', function() {
+  const name = this.value.trim();
+  const placeholder = document.getElementById('sig-placeholder');
+  const sigText = document.getElementById('sig-text');
+
+  if (name) {
+    placeholder.style.display = 'none';
+    sigText.style.display = 'inline';
+    sigText.textContent = name;
+  } else {
+    placeholder.style.display = 'inline';
+    sigText.style.display = 'none';
+  }
+  updateSignButton();
+});
+
+document.getElementById('consent-checkbox').addEventListener('change', updateSignButton);
+
+function updateSignButton() {
+  const name = document.getElementById('sig-name-input').value.trim();
+  const consent = document.getElementById('consent-checkbox').checked;
+  document.getElementById('btn-sign').disabled = !name || !consent;
+}
+
+async function submitSignature() {
+  const signedName = document.getElementById('sig-name-input').value.trim();
+  if (!signedName) return;
+
+  const btn = document.getElementById('btn-sign');
+  btn.classList.add('loading');
+  btn.textContent = 'Signing...';
+  btn.disabled = true;
+
+  try {
+    // Get IP address (best effort)
+    let signedIP = '';
+    try {
+      const ipResp = await fetch('https://api.ipify.org?format=json');
+      const ipData = await ipResp.json();
+      signedIP = ipData.ip || '';
+    } catch (e) { /* ignore */ }
+
+    const resp = await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        recordSignature: true,
+        token: signingToken,
+        signedName: signedName,
+        signedIP: signedIP,
+        signedUserAgent: navigator.userAgent
+      })
+    });
+
+    const result = await resp.json();
+
+    if (result.success) {
+      document.getElementById('success-details').textContent = 'Signed by ' + signedName + ' on ' +
+        new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      showState('success');
+    } else {
+      btn.classList.remove('loading');
+      btn.textContent = 'Sign & Accept';
+      btn.disabled = false;
+      alert(result.error || 'Failed to record signature. Please try again.');
+    }
+  } catch (err) {
+    btn.classList.remove('loading');
+    btn.textContent = 'Sign & Accept';
+    btn.disabled = false;
+    alert('Network error. Please check your connection and try again.');
+  }
+}
+
+init();
+</script>
+</body>
+</html>

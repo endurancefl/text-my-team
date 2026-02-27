@@ -1,3 +1,17 @@
+/* Dancing Script cursive font for typed e-signatures */
+@font-face {
+  font-family: 'Dancing Script';
+  src: url('file:///var/task/assets/fonts/DancingScript-Bold.ttf') format('truetype');
+  font-weight: bold;
+}
+
+.signature-typed {
+  font-family: 'Dancing Script', cursive;
+  font-size: 18pt;
+  color: var(--dark);
+  margin-bottom: 4px;
+}
+
 /* Contract styles — shared between residential and commercial */
 
 .contract-header {

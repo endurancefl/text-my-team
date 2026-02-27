@@ -278,11 +278,14 @@ def _generate_residential_contract(metadata):
         "effective_date": metadata.get("effectiveDate", metadata.get("startDate", "")),
         "custom_terms_html": custom_terms_html,
         "clauses": clause_list,
+        "signed_name": metadata.get("signedName", ""),
+        "signed_at": metadata.get("signedAt", ""),
     }
 
     pdf_bytes = _render_pdf("contract_residential.html", context)
     contract_id_clean = metadata.get("contractId", "contract").replace(" ", "-")
-    return (pdf_bytes, f"{contract_id_clean}-contract.pdf")
+    suffix = "-signed" if metadata.get("signedName") else ""
+    return (pdf_bytes, f"{contract_id_clean}-contract{suffix}.pdf")
 
 
 def _generate_commercial_contract(metadata, service_map_buffer=None):
@@ -382,11 +385,14 @@ def _generate_commercial_contract(metadata, service_map_buffer=None):
         "customer_company": customer_company,
         "generated_date": generated_date,
         "contract_id": contract_id,
+        "signed_name": metadata.get("signedName", ""),
+        "signed_at": metadata.get("signedAt", ""),
     }
 
     pdf_bytes = _render_pdf("contract_commercial.html", context)
     contract_id_clean = contract_id.replace(" ", "-") if contract_id else "contract"
-    return (pdf_bytes, f"{contract_id_clean}-contract.pdf")
+    suffix = "-signed" if metadata.get("signedName") else ""
+    return (pdf_bytes, f"{contract_id_clean}-contract{suffix}.pdf")
 
 
 # ── Invoice PDF ──────────────────────────────────────────────

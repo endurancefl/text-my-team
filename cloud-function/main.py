@@ -14,7 +14,17 @@ from reportlab.platypus import (
     Image as RLImage, KeepTogether, Flowable, PageBreak,
 )
 from reportlab.pdfgen import canvas as pdf_canvas
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from PIL import Image
+
+# Register Dancing Script cursive font for typed e-signatures
+_DANCING_SCRIPT_PATH = os.path.join(os.path.dirname(__file__), "assets", "fonts", "DancingScript-Bold.ttf")
+if os.path.exists(_DANCING_SCRIPT_PATH):
+    pdfmetrics.registerFont(TTFont("DancingScript", _DANCING_SCRIPT_PATH))
+    _HAS_DANCING_SCRIPT = True
+else:
+    _HAS_DANCING_SCRIPT = False
 
 
 ALLOWED_ORIGINS = [
@@ -1558,22 +1568,33 @@ def _generate_residential_contract(metadata):
     c.drawString(LEFT, y_left, f"Date: {_escape(generated_date)}")
 
     # Right column — Customer
+    signed_name = metadata.get("signedName", "")
+    signed_at = metadata.get("signedAt", "")
+    if signed_name and _HAS_DANCING_SCRIPT:
+        c.setFont("DancingScript", 18)
+        c.setFillColor(CONTRACT_DARK)
+        c.drawString(mid + 10, y + 6, _escape(signed_name))
     c.line(mid + 10, y, mid + 10 + sig_line_w, y)
     y_right = y - 14
     c.setFont("Helvetica-Bold", 10)
+    c.setFillColor(CONTRACT_DARK)
     c.drawString(mid + 10, y_right, _escape(customer) if customer else "________________")
     y_right -= 14
     c.setFont("Helvetica", 9)
     c.drawString(mid + 10, y_right, _escape(prop_addr)[:40] if prop_addr else "")
     y_right -= 14
-    c.drawString(mid + 10, y_right, f"Date: {_escape(generated_date)}")
+    if signed_at:
+        c.drawString(mid + 10, y_right, f"Signed: {_escape(signed_at)}")
+    else:
+        c.drawString(mid + 10, y_right, f"Date: {_escape(generated_date)}")
 
     draw_footer()
     c.save()
     buffer.seek(0)
 
     contract_id_clean = contract_id.replace(" ", "-") if contract_id else "contract"
-    return (buffer.getvalue(), f"{contract_id_clean}-contract.pdf")
+    suffix = "-signed" if signed_name else ""
+    return (buffer.getvalue(), f"{contract_id_clean}-contract{suffix}.pdf")
 
 
 def _generate_commercial_contract(metadata, service_map_buffer=None):
@@ -2073,23 +2094,33 @@ def _generate_commercial_contract(metadata, service_map_buffer=None):
     c.drawString(LEFT, sig_y - 42, f"Date: {_escape(generated_date)}")
 
     # Right column — Customer
+    signed_name = metadata.get("signedName", "")
+    signed_at = metadata.get("signedAt", "")
     c.setFont("Helvetica-Bold", 9)
     c.setFillColor(CONTRACT_GRAY)
     c.drawString(mid + 10, sig_y + 30, "By")
+    if signed_name and _HAS_DANCING_SCRIPT:
+        c.setFont("DancingScript", 18)
+        c.setFillColor(CONTRACT_DARK)
+        c.drawString(mid + 10, sig_y + 6, _escape(signed_name))
     c.line(mid + 10, sig_y, mid + 10 + sig_line_w, sig_y)
     c.setFont("Helvetica-Bold", 10)
     c.setFillColor(CONTRACT_DARK)
     c.drawString(mid + 10, sig_y - 14, _escape(customer) if customer else "________________")
     c.setFont("Helvetica", 9)
     c.drawString(mid + 10, sig_y - 28, _escape(customer_company) if customer_company else "")
-    c.drawString(mid + 10, sig_y - 42, f"Date: {_escape(generated_date)}")
+    if signed_at:
+        c.drawString(mid + 10, sig_y - 42, f"Signed: {_escape(signed_at)}")
+    else:
+        c.drawString(mid + 10, sig_y - 42, f"Date: {_escape(generated_date)}")
 
     draw_footer()
     c.save()
     buffer.seek(0)
 
     contract_id_clean = contract_id.replace(" ", "-") if contract_id else "contract"
-    return (buffer.getvalue(), f"{contract_id_clean}-contract.pdf")
+    suffix = "-signed" if signed_name else ""
+    return (buffer.getvalue(), f"{contract_id_clean}-contract{suffix}.pdf")
 
 
 # ── Legacy helpers (unused but kept for reference) ──

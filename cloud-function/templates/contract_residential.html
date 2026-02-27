@@ -142,10 +142,17 @@
       <div class="sig-date">Date: {{ generated_date }}</div>
     </div>
     <div class="signature-col">
+      {% if signed_name %}
+      <div class="signature-typed">{{ signed_name }}</div>
+      {% endif %}
       <div class="sig-line"></div>
       <div class="sig-name">{{ customer_name or "________________" }}</div>
       <div class="sig-company">{{ property_address }}</div>
+      {% if signed_at %}
+      <div class="sig-date">Signed: {{ signed_at }}</div>
+      {% else %}
       <div class="sig-date">Date: {{ generated_date }}</div>
+      {% endif %}
     </div>
   </div>
 </div>
