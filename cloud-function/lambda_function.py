@@ -34,7 +34,7 @@ try:
         generate_invoice_pdf as wp_generate_invoice_pdf,
     )
     WEASYPRINT_AVAILABLE = True
-except ImportError:
+except (ImportError, OSError):
     WEASYPRINT_AVAILABLE = False
 
 # Default renderer — flip to "weasyprint" once all types are validated
