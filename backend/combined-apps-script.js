@@ -4056,10 +4056,12 @@ function setupAutoPay(data) {
   }
 
   // Create setup session
+  var methodParam = data.autoPayMethod || 'card';
   var params = {
     'mode': 'setup',
     'customer': customerId,
-    'success_url': 'https://endurancefl.github.io/text-my-team/payment-success.html?setup=true&session_id={CHECKOUT_SESSION_ID}',
+    'payment_method_types[0]': data.paymentMethodType || 'card',
+    'success_url': 'https://endurancefl.github.io/text-my-team/payment-success.html?setup=true&method=' + methodParam + '&session_id={CHECKOUT_SESSION_ID}',
     'cancel_url': 'https://endurancefl.github.io/text-my-team/payment-cancel.html',
     'metadata[contractId]': data.contractId
   };
@@ -4078,30 +4080,34 @@ function setupAutoPay(data) {
       var sessCol = updatedHeaders.indexOf('stripeSetupSessionId');
       if (custCol >= 0) contractSheet.getRange(r + 1, custCol + 1).setValue(customerId);
       if (sessCol >= 0) contractSheet.getRange(r + 1, sessCol + 1).setValue(session.id);
+      var methodCol = updatedHeaders.indexOf('autoPayMethod');
+      if (methodCol >= 0 && data.autoPayMethod) contractSheet.getRange(r + 1, methodCol + 1).setValue(data.autoPayMethod);
       break;
     }
   }
 
-  // Email customer
-  var email = contract.contactEmail || contract.customerEmail;
-  if (email) {
-    MailApp.sendEmail({
-      to: email,
-      subject: 'Set Up Auto-Pay — Endurance Services',
-      htmlBody: '<h2>Set Up Auto-Pay</h2>' +
-        '<p>Hi ' + (contract.contactName || contract.customerName || '') + ',</p>' +
-        '<p>Click the button below to securely save your payment method for automatic monthly billing.</p>' +
-        '<p><a href="' + session.url + '" style="display:inline-block;padding:12px 24px;background:#1a73e8;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;">Set Up Auto-Pay</a></p>' +
-        '<p>Your card information is handled securely by Stripe. We never see or store your card numbers.</p>' +
-        '<p>— Endurance Services</p>'
-    });
+  // Email customer (skip when sign.html redirects directly)
+  if (!data.skipEmail) {
+    var email = contract.contactEmail || contract.customerEmail;
+    if (email) {
+      MailApp.sendEmail({
+        to: email,
+        subject: 'Set Up Auto-Pay — Endurance Services',
+        htmlBody: '<h2>Set Up Auto-Pay</h2>' +
+          '<p>Hi ' + (contract.contactName || contract.customerName || '') + ',</p>' +
+          '<p>Click the button below to securely save your payment method for automatic monthly billing.</p>' +
+          '<p><a href="' + session.url + '" style="display:inline-block;padding:12px 24px;background:#1a73e8;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;">Set Up Auto-Pay</a></p>' +
+          '<p>Your payment information is handled securely by Stripe. We never see or store your payment details.</p>' +
+          '<p>— Endurance Services</p>'
+      });
+    }
   }
 
   return { success: true, sessionId: session.id, url: session.url };
 }
 
 function ensureContractAutoPayColumns(sheet, headers) {
-  var needed = ['autoPay', 'stripeCustomerId', 'stripePaymentMethodId', 'stripeSetupSessionId'];
+  var needed = ['autoPay', 'stripeCustomerId', 'stripePaymentMethodId', 'stripeSetupSessionId', 'autoPayMethod'];
   needed.forEach(function(col) {
     if (headers.indexOf(col) < 0) {
       var lastCol = sheet.getLastColumn();
@@ -4155,17 +4161,26 @@ function checkAutoPaySetup(data) {
 
 function chargeAutoPayInvoice(contract, amount, invoiceId) {
   try {
+    var chargeAmount = amount;
+    var surcharge = 0;
+    if (contract.autoPayMethod === 'card') {
+      surcharge = amount * 0.029;
+      chargeAmount = amount + surcharge;
+    }
     var result = stripeRequest('payment_intents', {
-      'amount': Math.round(amount * 100),
+      'amount': Math.round(chargeAmount * 100),
       'currency': 'usd',
       'customer': contract.stripeCustomerId,
       'payment_method': contract.stripePaymentMethodId,
       'off_session': 'true',
       'confirm': 'true',
       'metadata[invoiceId]': invoiceId,
-      'metadata[contractId]': contract.contractId
+      'metadata[contractId]': contract.contractId,
+      'metadata[baseAmount]': amount.toFixed(2),
+      'metadata[surcharge]': surcharge.toFixed(2),
+      'metadata[paymentMethod]': contract.autoPayMethod || 'card'
     });
-    return { success: true, paymentIntentId: result.id };
+    return { success: true, paymentIntentId: result.id, surcharge: surcharge };
   } catch (err) {
     return { success: false, error: err.toString() };
   }

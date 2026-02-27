@@ -71,8 +71,14 @@
   var isSetup = params.get('setup') === 'true';
 
   if (isSetup) {
-    document.getElementById('title').textContent = 'Auto-Pay Setup Complete';
-    document.getElementById('message').textContent = 'Your payment method has been saved securely. Future invoices will be charged automatically.';
+    var method = params.get('method');
+    var methodLabel = method === 'ach' ? 'Bank Transfer' : method === 'card' ? 'Credit Card' : '';
+    document.getElementById('title').textContent = 'Auto-Pay Setup Complete' + (methodLabel ? ' — ' + methodLabel : '');
+    var msg = 'Your payment method has been saved securely. Future invoices will be charged automatically.';
+    if (method === 'card') {
+      msg += '<br><br><span style="font-size:13px;color:#999;">A 2.9% convenience fee will be applied to each monthly charge.</span>';
+    }
+    document.getElementById('message').innerHTML = msg;
     return;
   }
 

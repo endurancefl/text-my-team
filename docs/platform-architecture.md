@@ -48,10 +48,12 @@ The platform supports four divisions, each representing a distinct revenue strea
 text-my-team/
 ├── index.html                     # Customer service request portal (~3,100 lines)
 ├── crew.html                      # Crew leader app (~9,768 lines HTML/JS)
-├── estimate.html                  # Bidding & estimating tool (~16,033 lines HTML/JS)
+├── estimate.html                  # Bidding & estimating tool (~16,231 lines HTML/JS)
 ├── payment-success.html           # Stripe payment success redirect
 ├── payment-cancel.html            # Stripe payment cancel redirect
-├── sign.html                      # Standalone contract e-signature page (~250 lines)
+├── sign.html                      # Standalone contract e-signature page (~686 lines)
+├── .nojekyll                      # Prevents Jekyll processing on GitHub Pages
+├── _config.yml                    # Jekyll config — excludes cloud-function/ and backend/ from build
 ├── css/
 │   ├── crew.css                   # All CSS for crew.html (~4,511 lines)
 │   └── estimate.css               # All CSS for estimate.html (~5,533 lines)
@@ -64,7 +66,7 @@ text-my-team/
 │       ├── iceberg-icon.png
 │       └── 26__Endurace_Icon_Green_LightBackground.png
 ├── backend/
-│   └── combined-apps-script.js    # Google Apps Script backend (~5,111 lines)
+│   └── combined-apps-script.js    # Google Apps Script backend (~5,146 lines)
 ├── cloud-function/                # AWS Lambda PDF generation
 │   ├── pdf_generator.py           # PDF library (WeasyPrint + ReportLab)
 │   ├── lambda_function.py         # AWS Lambda handler
@@ -73,8 +75,13 @@ text-my-team/
 │   ├── templates/                 # Jinja2 HTML/CSS templates for PDFs
 │   │   ├── base.html
 │   │   ├── invoice.html
+│   │   ├── contract_residential.html  # Residential contract (3 pages, conditional e-signature)
+│   │   ├── contract_commercial.html   # Commercial contract (5-6 pages, conditional e-signature)
 │   │   └── styles/
-│   ├── assets/logo.png
+│   │       └── contract.css       # @font-face Dancing Script, .signature-typed class
+│   ├── assets/
+│   │   ├── logo.png
+│   │   └── fonts/DancingScript-Bold.ttf  # Cursive font for e-signature rendering
 │   └── deploy/
 │       ├── template.yaml          # SAM template (Lambda + API Gateway)
 │       └── deploy.sh
@@ -151,7 +158,7 @@ text-my-team/
 - iOS design system: SF Pro typography, exact system colors, dark mode, frosted glass tab bar with `backdrop-filter`, iOS spring animations, 44px touch targets, `prefers-reduced-motion` support
 - Bottom tab bar: Schedule (home) | Requests | Report Issue | Reports
 
-**estimate.html + estimate.css — Bidding & Estimating Tool (~16,030+ lines HTML/JS + ~5,530+ lines CSS)**
+**estimate.html + estimate.css — Bidding & Estimating Tool (~16,231 lines HTML/JS + ~5,530+ lines CSS)**
 - **Division: Maintenance (MNT) fully built** — Irrigation, Construction, and Enhancement divisions planned, will reuse the same engine with division-specific catalogs and takeoffs
 - **Job Type Selection** ✅ **BUILT**: When creating a new estimate, the user first picks a job type via the Job Type Picker modal:
   - **Recurring Service** — Ongoing contract with scheduled visits throughout the year (existing flow, unchanged)
@@ -260,20 +267,24 @@ text-my-team/
   - Once a PDF URL is stored, header shows "View PDF" button (opens Drive link in new tab) + small "Regenerate" button
   - When opening a saved finalized estimate, the contract's `pdfUrl` is loaded from `allContracts` (or fetched) so the View PDF button persists across sessions
   - **Signed PDF generation**: When `signedName` and `signedAt` are included in metadata, the signature is rendered in Dancing Script cursive font above the customer signature line. Both ReportLab and WeasyPrint engines support signature rendering. Output filename appended with `-signed` suffix.
-- **Typed E-Signature Flow**: Full contract signing workflow without DocuSign or login:
+- **Typed E-Signature Flow (ESIGN Act / UETA compliant)**: Full contract signing workflow without DocuSign or login:
   1. Estimator finalizes estimate → generates contract PDF → clicks "Send Contract" button
-  2. Backend generates UUID token, sends email to customer with PDF attached + "Review & Sign" link
+  2. Backend generates UUID token, sends HTML email with PDF attachment + "Review & Sign" link to customer. Prioritizes frontend-provided email over stored contract email (`data.contactEmail || contract['Contact Email']`)
   3. Customer opens `sign.html?token=<uuid>` — standalone page (no login required)
-  4. Page shows contract summary (property, services, totals, dates), embedded Google Drive PDF viewer, and typed signature input with live Dancing Script cursive preview
-  5. Customer types name, checks consent box, clicks "Sign & Accept"
-  6. Backend records `signedName`, `signedAt`, `signedIP`, `signedUserAgent`, sets `signingStatus = 'signed'`
+  4. Page shows contract summary (property, services, totals, dates), embedded Google Drive PDF viewer with download fallback, and typed signature input with live Dancing Script cursive preview
+  5. Customer types name, checks consent checkbox ("I agree that my typed name above constitutes my electronic signature and that I have reviewed and accept the terms of this contract."), clicks "Sign & Accept"
+  6. Backend records `signedName`, `signedAt` (server-side ISO timestamp), `signedIP`, `signedUserAgent`, `consentText` (verbatim), computes `pdfHash` (SHA-256 of contract PDF from Drive), sets `signingStatus = 'signed'`
   7. estimate.html shows green "Signed" badge, "Generate Signed PDF" button
-  8. Signed PDF re-generates contract with cursive signature rendered on signature page
-  - **Signing status lifecycle**: `unsent` → `sent` (email sent) → `signed` (customer signed)
-  - **Double-sign prevention**: `sign.html` shows "Already Signed" state if contract already signed
-  - **Header buttons in estimate.html**: When no PDF → no send button; PDF exists but unsent → "Send Contract"; sent/viewed → amber "Awaiting Signature" badge; signed → green "Signed" badge + "Generate Signed PDF" or "View Signed PDF"
-  - **Contracts sheet columns**: `signingToken`, `signingStatus`, `signedName`, `signedAt`, `signedIP`, `signedUserAgent`, `signedPdfUrl`, `signedPdfFileId` (auto-created by `ensureSigningColumns()`)
-  - **sign.html**: Standalone page following `payment-success.html` pattern — single file, inline CSS/JS, no frameworks. Google Font (Dancing Script 700) for cursive preview. Mobile responsive. States: loading, error, already-signed, signing, success.
+  8. "Generate Signed PDF" calls Lambda with `signedName`/`signedAt` in metadata, uploads to Drive via `contractPdf` endpoint using `pdfBase64` and `property` fields
+  9. Signed PDF re-generates contract with cursive signature rendered on signature page
+  - **Legal enforceability (ESIGN Act / UETA compliance)**: The system records seven elements: (1) **Intent to sign** — consent checkbox + "Sign & Accept" button click, (2) **Consent text** — stored verbatim in `consentText` column, (3) **Identity** — signedName, signedIP, signedUserAgent, (4) **Timestamp** — server-side ISO timestamp in `signedAt`, (5) **Document integrity** — SHA-256 hash of contract PDF computed at signing time stored in `pdfHash` (format: `SHA-256:<hex>`), (6) **Association** — UUID `signingToken` ties signature to specific contract, (7) **Record retention** — all data in Sheets + signed PDF on Drive
+  - **Signing status lifecycle**: `unsent` → `sent` (email sent) → `viewed` (opened page) → `signed` (customer signed)
+  - **Double-sign prevention**: `sign.html` shows "Already Signed" state if contract already signed; backend `recordSignature` validates token exists and rejects if already signed
+  - **Header buttons in estimate.html**: When no PDF → no send button; PDF exists but unsent → "Send Contract"; sent/viewed → amber "Awaiting Signature" badge; signed → green "Signed" badge; signed but no signedPdfUrl → "Generate Signed PDF" button; signedPdfUrl exists → "View Signed PDF" button. `sendContractForSigning()` checks contact picker dropdown first, then `currentContact`, then stored `contactId`
+  - **Contracts sheet columns** (auto-created by `ensureSigningColumns()`): `signingToken` (UUID for stateless auth), `signingStatus` (`unsent | sent | viewed | signed`), `signedName` (typed name), `signedAt` (ISO timestamp, server-side), `signedIP` (client IP), `signedUserAgent` (browser user agent), `signedPdfUrl` (Drive URL), `signedPdfFileId` (Drive file ID), `consentText` (exact consent acknowledgment text), `pdfHash` (SHA-256 hash, format: `SHA-256:<hex>`)
+  - **Signed PDF timestamp format**: The `signedAt` timestamp is formatted as "Feb 26, 2026 at 9:35 PM Eastern" on PDFs (both ReportLab and WeasyPrint paths), converted from UTC via `_format_signed_at()` helper in both `main.py` and `pdf_generator.py`
+  - **sign.html** (~686 lines): Standalone page following `payment-success.html` pattern — single file, inline CSS/JS, no frameworks. Google Fonts CDN for Dancing Script 700 cursive preview. Google Drive iframe PDF viewer with download fallback. IP capture via api.ipify.org. Sends `consentText` with signature recording. Mobile responsive. States: loading → error | already-signed | signing → success. **Post-signing auto-pay setup**: Success screen includes optional auto-pay section with two tile buttons — "Pay by Bank (ACH)" at base monthly rate, "Pay by Card" at base + 2.9% convenience fee. Clicking either POSTs to `setupAutoPay` with `paymentMethodType` (`us_bank_account` or `card`), `autoPayMethod` (`ach` or `card`), and `skipEmail: true` (direct redirect, no email), then redirects to Stripe Checkout. "Skip for now" link hides the section. Monthly amounts calculated from `contractData.monthlyPayment`
+  - **Apps Script permissions**: `MailApp.sendEmail` scope (`https://www.googleapis.com/auth/script.send_mail`) must be added to `appsscript.json` oauthScopes and authorized for email sending to work
 - **Estimate Revision & Re-Finalize Workflow**: Three-status lifecycle (Draft → Finalized → Revision → Finalized). When a finalized estimate is reopened and edited, status transitions to "Revision" (amber badge) instead of resetting to Draft. Re-finalizing updates the existing contract row and regenerates only future scheduled tickets — completed, skipped, and today's tickets are never touched. `revisionCount` tracks how many times a contract has been revised. The "Revise Estimate" button enters revision mode explicitly; "Update Contract" opens the finalize modal with revision-aware text ("Update Contract & Regenerate Tickets"). First-time finalization is unchanged.
 - **Finalization Contact Validation**: Before finalizing, linked contact must have both email address and billing address populated. Shows toast error if missing. Prevents creating contracts without essential invoicing data.
 - **Weekly Reports**: per-property visit summaries with services performed, dates, notes, customer email — send individually or batch send to all customers
@@ -307,7 +318,7 @@ text-my-team/
 
 **payment-success.html — Stripe Payment Success Redirect**
 - Receives `session_id` from Stripe Checkout redirect, shows success confirmation
-- Also handles auto-pay setup success (`?setup=true`) with different messaging
+- Also handles auto-pay setup success (`?setup=true`) with different messaging. Reads `&method=ach|card` to display "Auto-Pay Setup Complete — Bank Transfer" or "Auto-Pay Setup Complete — Credit Card". Card method shows note: "A 2.9% convenience fee will be applied to each monthly charge."
 - Minimal standalone page, no framework dependency
 
 **payment-cancel.html — Stripe Payment Cancel Redirect**
@@ -315,20 +326,21 @@ text-my-team/
 - No backend calls needed
 
 ### Backend & Infrastructure
-- **Backend** — Single consolidated Google Apps Script (Code.gs) serving both Estimating and Crew endpoints from one "Estimating" spreadsheet
+- **Backend** — Single consolidated Google Apps Script (Code.gs) serving Estimating, Crew, Invoicing, and Signing endpoints from one "Estimating" spreadsheet
 - **PDF Generation** — AWS Lambda + API Gateway (Python/WeasyPrint container image, ReportLab fallback). Rich text HTML from Quill.js editors rendered natively by WeasyPrint via `.rich-text-content` CSS class. Template variable resolution via `_resolve_template_vars()` for T&C placeholders.
-- **Hosting** — GitHub Pages (endurancefl.github.io)
+- **Hosting** — GitHub Pages (endurancefl.github.io). `.nojekyll` file + `_config.yml` (excludes `cloud-function/` and `backend/` dirs) prevent Jekyll from processing Jinja2 template syntax (`{% if %}`, `{{ }}`) in `cloud-function/templates/` which caused build failures
 - **Auth** — Crew leaders: phone number against Crew Members sheet (Role = "Leader"). Customers: 4-digit PIN against Properties sheet.
 - **Data storage** — Google Sheets as database, Google Drive for files (estimates JSON, photos, site reports, invoice PDFs), localStorage for auto-save
 - **Invoices Sheet** — Auto-provisioned. Columns: invoiceId (INV-0001), contractId, propertyAddress, contactName, contactEmail, billingAddress, invoiceDate, dueDate, billingPeriodStart, billingPeriodEnd, invoiceType (fixed_monthly/work_ticket/deposit), status (draft/finalized/sent/partial/paid/overdue/void), subtotal, taxRate, taxAmount, total, paidAmount, balanceDue, paymentTerms, payLinkToken, stripeSessionId, stripePaymentUrl, pdfUrl, pdfFileId, lineItemsJson (JSON column), createdAt, updatedAt
 - **Payments Sheet** — Auto-provisioned. Columns: paymentId (PAY-0001), invoiceId, paymentDate, paymentMethod (card/ach/check/cash), amount, stripePaymentIntentId, stripeSessionId, status, notes, createdAt
-- **Contracts Sheet (new columns for auto-pay)**: autoPay (YES/NO), stripeCustomerId, stripePaymentMethodId, stripeSetupSessionId — added dynamically by `ensureContractAutoPayColumns()`
+- **Contracts Sheet (new columns for auto-pay)**: autoPay (YES/NO), stripeCustomerId, stripePaymentMethodId, stripeSetupSessionId, autoPayMethod (`card` or `ach` — determines surcharge logic) — added dynamically by `ensureContractAutoPayColumns()`
+- **Contracts Sheet (signing columns)**: signingToken (UUID), signingStatus (`unsent | sent | viewed | signed`), signedName, signedAt (ISO timestamp), signedIP, signedUserAgent, signedPdfUrl, signedPdfFileId, consentText (verbatim consent acknowledgment), pdfHash (`SHA-256:<hex>`) — added dynamically by `ensureSigningColumns()`
 - **Reminders Sheet** — Auto-provisioned by `ensureRemindersSheet()`. Columns: reminderId (REM-0001), propertyAddress, propertyId, description, scheduledDate, isPermanent (TRUE/FALSE), status (active/completed/cancelled), createdBy, createdByPhone, assignedCrew, photoUrl, createdAt, completedAt. Supports both one-off date-scheduled reminders and permanent reminders that show every visit. `getRemindersForCrew(crewName, dateStr)` returns `{ scheduled: [...], permanent: [...] }` filtered by crew + active status + date match.
-- **Stripe Integration** — API calls via `UrlFetchApp.fetch()`, secret key in Script Properties (`STRIPE_SECRET_KEY`). No webhooks (Apps Script limitation) — uses polling from frontend + redirect pages. Zero card data touches our system (SAQ A PCI). Checkout flows: payment mode (one-time Pay Now) and setup mode (save card for auto-pay)
+- **Stripe Integration** — API calls via `UrlFetchApp.fetch()`, secret key in Script Properties (`STRIPE_SECRET_KEY`). No webhooks (Apps Script limitation) — uses polling from frontend + redirect pages. Zero card data touches our system (SAQ A PCI). Checkout flows: payment mode (one-time Pay Now) and setup mode (save payment method for auto-pay). Setup mode supports two `payment_method_types`: `card` and `us_bank_account` (ACH). Card auto-pay charged with 2.9% surcharge via `chargeAutoPayInvoice()`; ACH charged at base amount
 
 #### Combined Apps Script Endpoints
 
-**GET endpoints (26):**
+**GET endpoints (30):**
 | Endpoint | Source | Description |
 |----------|--------|-------------|
 | `getInitData` | Estimating | **Bulk init** — returns all estimating data in a single request (itemCatalog, bidSettings, bids, templates, serviceCatalog, contacts, properties, propertyContacts, subContractors, reminders). Reduces 10+ network round-trips to 1. |
@@ -360,10 +372,11 @@ text-my-team/
 | `getServiceOffers` | Estimating | Loads offers for a property or report |
 | `getInvoices` | Invoicing | Returns all invoices, optional filters (status, contractId). Auto-creates Invoices sheet if missing |
 | `getPayments` | Invoicing | Returns payments for a specific invoiceId. Auto-creates Payments sheet if missing |
+| `getContractForSigning` | Signing | Takes `token` param, returns customer-safe contract data (no markups/margins). Used by `sign.html` |
 
 `getInitData` bulk response also includes `reminders: getReminders()` so estimate.html gets all reminders on load.
 
-**POST endpoints (46):**
+**POST endpoints (48):**
 | Endpoint | Source | Description |
 |----------|--------|-------------|
 | `saveReminder` | Reminders | Creates a reminder in the Reminders sheet with auto-generated REM-0001 format ID. Fields: propertyAddress, propertyId, description, scheduledDate, isPermanent, createdBy, createdByPhone, assignedCrew, photoUrl |
@@ -420,12 +433,11 @@ text-my-team/
 | `recordPayment` | Invoicing | Appends to Payments sheet, updates invoice paidAmount/balanceDue/status (→ `partial` or `paid`) |
 | `sendInvoice` | Invoicing | Creates Stripe Checkout Session (payment mode), generates PDF via HtmlService, uploads to Drive, emails customer with PDF + Pay Now link, updates invoice status → `sent` |
 | `createStripeCheckoutSession` | Invoicing | Creates Stripe Checkout Session in `payment` mode. Returns `{ sessionId, url }` |
-| `setupAutoPay` | Invoicing | Creates Stripe Customer + Checkout Session in `setup` mode, emails customer setup link. Adds `autoPay`, `stripeCustomerId`, `stripePaymentMethodId`, `stripeSetupSessionId` columns to Contracts sheet |
+| `setupAutoPay` | Invoicing | Creates Stripe Customer + Checkout Session in `setup` mode. Accepts `paymentMethodType` (`card` or `us_bank_account`), `autoPayMethod` (`card` or `ach`), `skipEmail` (boolean). Emails customer setup link unless `skipEmail: true` (used by sign.html direct redirect). Stores `autoPayMethod` on contract row. Adds `autoPay`, `stripeCustomerId`, `stripePaymentMethodId`, `stripeSetupSessionId`, `autoPayMethod` columns to Contracts sheet |
 | `checkAutoPaySetup` | Invoicing | Polls Stripe setup session, stores payment method + customer ID on contract when complete |
 | `checkStripePayment` | Invoicing | Polls Stripe payment session, auto-records payment if paid. Returns `{ paid, status }` |
-| `sendContractForSigning` | Signing | Generates UUID token, stores on contract, sends HTML email with PDF + signing link to customer. Sets `signingStatus = 'sent'` |
-| `getContractForSigning` | Signing (GET) | Takes `token` param, returns customer-safe contract data (no markups/margins). Used by `sign.html` |
-| `recordSignature` | Signing | Records `signedName`, `signedAt`, `signedIP`, `signedUserAgent`. Sets `signingStatus = 'signed'`. Validates token exists and not already signed |
+| `sendContractForSigning` | Signing | Generates UUID token, stores on contract, sends HTML email with PDF attachment + signing link to customer. Prioritizes frontend-provided email over stored contract email. Sets `signingStatus = 'sent'`. Requires `MailApp.sendEmail` scope |
+| `recordSignature` | Signing | Validates token, prevents double-signing, records `signedName`, `signedAt` (server-side), `signedIP`, `signedUserAgent`, `consentText`. Computes PDF SHA-256 hash from Drive file, stores in `pdfHash`. Sets `signingStatus = 'signed'` |
 
 ### What Works Well
 - The UX patterns and workflows are production-quality — crew uses them daily
@@ -460,7 +472,7 @@ text-my-team/
 | Production Rates View | Built — catalog vs field comparison | Low-Medium |
 | Site Reports / Before-After | Built — full wizard + PDF generation | Medium |
 | Reminders System | Built — crew + office creation | Low |
-| Backend (Apps Script) | 75 endpoints (27 GET + 48 POST), functional | Medium |
+| Backend (Apps Script) | 78 endpoints (30 GET + 48 POST), functional | Medium |
 
 **What's not built yet:**
 
@@ -474,7 +486,7 @@ text-my-team/
 | 3 additional divisions (IRR/CON/ENH) | Medium | Catalogs, items, services need creation |
 | HubSpot CRM integration | Medium | Planned but not started |
 | QuickBooks integration | Medium | Planned but not started |
-| E-Signature (built-in typed signature) | Medium | **Built** — typed e-signature via sign.html, Dancing Script cursive, signed PDF generation. DocuSign integration not started |
+| E-Signature (built-in typed signature) | Medium | **Built** — typed e-signature via sign.html (~510 lines), ESIGN Act/UETA compliant (consent text, SHA-256 hash, IP, user agent), Dancing Script cursive, signed PDF generation (ReportLab + WeasyPrint). DocuSign integration not started |
 | Email/SMS (SendGrid + Twilio) | Medium | Not started |
 | Overhead tracking / true P&L | Medium | Schema designed, not built |
 | Google Calendar sync | Low | Optional, not started |
@@ -586,22 +598,24 @@ Both apps live in the same monorepo, share the component library (`packages/ui`)
 - **ReportLab engine** (`main.py`): Original coordinate-based PDF generation (~2,193 lines). **Currently the active engine for all PDF types** (see deployment note below).
 - `lambda_function.py` — Lambda handler: parses multipart boundary from API Gateway event, extracts metadata JSON + photo blobs, selects rendering engine, routes by `metadata.type`: `invoice` → `generate_invoice_pdf()` (WeasyPrint only), `contract` → `generate_contract_pdf()`, `before_after` → `generate_before_after_report()`, `standard` → `generate_standard_report()`
 - Lambda config: Python 3.11, **512MB memory**, **60s timeout**
-- **Deployment**: **Zip package** (not Docker container). The `Dockerfile` and SAM `template.yaml` (with `PackageType: Image`) exist in the repo for a future container-based deployment, but the Lambda has always been deployed as a zip via `aws lambda update-function-code --zip-file`. Redeployment: build a zip with Python deps (`pip install --platform manylinux2014_x86_64 --target . --only-binary=:all:`) + app code/templates/assets, then upload with the AWS CLI.
-- **WeasyPrint is NOT active**: WeasyPrint requires system-level C libraries (pango, cairo, gobject) that can only be installed via a Linux package manager. These are not available in a zip deployment. The `lambda_function.py` import catches `OSError` and sets `WEASYPRINT_AVAILABLE = False`, so all PDF generation falls back to ReportLab. To enable WeasyPrint, the Lambda would need to be deployed as a Docker container image (using the existing Dockerfile) which requires Docker Desktop installed locally. ReportLab has full feature parity for all current PDF types including e-signature rendering.
+- **Deployment**: **Zip package** (not Docker container). The `Dockerfile` and SAM `template.yaml` (with `PackageType: Image`) exist in the repo for a future container-based deployment, but the Lambda has always been deployed as a zip via `aws lambda update-function-code --zip-file`. Redeployment: `pip3 install --target /tmp/lambda-pkg --platform manylinux2014_x86_64 --only-binary=:all: --implementation cp --python-version 3.11 reportlab Pillow`, then zip app code + deps + templates + assets and upload with `aws lambda update-function-code --function-name <name> --zip-file fileb://lambda-package.zip`.
+- **Function name**: `endurance-pdf-generator-PdfGeneratorFunction-Fkf9GxUQ6X7z`
+- **AWS CLI location** (macOS/Homebrew): `/opt/homebrew/Cellar/awscli/2.33.28/libexec/bin/aws`
+- **WeasyPrint is NOT active**: WeasyPrint requires system-level C libraries (pango, cairo, gobject) that can only be installed via a Linux package manager. These are not available in a zip deployment. The `lambda_function.py` import catches `(ImportError, OSError)` and sets `WEASYPRINT_AVAILABLE = False`, so all PDF generation falls back to ReportLab. To enable WeasyPrint, the Lambda would need to be deployed as a Docker container image (using the existing Dockerfile) which requires Docker Desktop installed locally. ReportLab has full feature parity for all current PDF types including e-signature rendering.
 - **Template structure**:
   ```
   cloud-function/templates/
     base.html                   # Shared @page rules, CSS vars, footer
     site_report.html            # Photo grid report
     before_after.html           # Comparison report
-    contract_residential.html   # 3-page residential contract
-    contract_commercial.html    # 5-6 page commercial contract
+    contract_residential.html   # 3-page residential contract (conditional e-signature via Jinja2 {% if signed_name %})
+    contract_commercial.html    # 5-6 page commercial contract (conditional e-signature via Jinja2 {% if signed_name %})
     invoice.html                # Invoice PDF template with line items, totals, pay link
     styles/
       common.css                # Shared print CSS (header, info box, category bars)
       site_report.css           # 2-column CSS grid, photo frames, note boxes
       before_after.css          # BEFORE/AFTER paired layout
-      contract.css              # Tables, signatures, terms, payment schedule, @font-face Dancing Script for e-signatures
+      contract.css              # Tables, signatures, terms, payment schedule, @font-face Dancing Script for e-signatures, .signature-typed class
       invoice.css               # Invoice table, totals, bill-to, details box
   ```
 - **Color palette** (CSS variables in `base.html`): `--green: #3A5F4B`, `--dark: #1A2E24`, `--gray-header: #666666`, `--light-gray: #CCCCCC`, `--contract-light-gray: #F5F5F5`, `--contract-red: #C62828`, `--before-red: #DC2626`, `--after-green: #16A34A`
@@ -672,9 +686,9 @@ Both apps live in the same monorepo, share the component library (`packages/ui`)
 - Two views: QBO for "did we make money?" (cash accounting) / Platform for "are we on track?" (operational)
 
 ### E-Signature
-**Built-in signature pad (default) + optional DocuSign**
-- Default: HTML5 Canvas signature capture — finger, stylus, or mouse. Zero cost, no external dependency.
-- Optional: tenants who want DocuSign connect their own account via OAuth. One toggle to enable.
+**Built-in typed signature (default, BUILT) + optional DocuSign (future)**
+- **Current (built)**: Typed e-signature via `sign.html` — customer types name, previewed in Dancing Script cursive. No cost, no external dependency. ESIGN Act / UETA compliant: records intent to sign, consent text, identity (name/IP/user agent), server-side timestamp, document integrity (SHA-256 hash), association (UUID token), and retains all records in Sheets + Drive. Signed PDF regenerated with cursive signature on signature page via ReportLab (or WeasyPrint when available).
+- **Future**: tenants who want DocuSign connect their own account via OAuth. One toggle to enable.
 - Both paths produce the same outcome: a signed PDF and a contract activation trigger.
 
 ---
@@ -1782,13 +1796,13 @@ The platform doesn't care which path was taken — the outcome is the same: a si
 - [ ] Stripe account setup (set `STRIPE_SECRET_KEY` in Script Properties)
 - [x] Stripe Checkout Sessions via API — `createStripeCheckoutSession()` in Apps Script, payment mode for one-time + setup mode for auto-pay
 - [x] Credit card payments via Stripe Checkout (payment mode)
-- [ ] ACH bank transfer payments (0.8% capped at $5) — future Stripe Checkout configuration
+- [x] ACH bank transfer payments — supported as auto-pay setup option via `us_bank_account` payment method type in Stripe Checkout setup mode. Available on sign.html post-signing and via `setupAutoPay` endpoint
 - [x] Stripe payment polling via `checkStripePayment()` — no webhooks needed (Apps Script limitation), uses redirect pages + frontend polling instead
 - [x] Auto-mark invoices as paid when polling confirms payment
 - [x] Invoice metadata attached to Checkout Session for routing
 - [x] **No sensitive payment data touches the platform** — Stripe Checkout hosted page handles all card/bank input (SAQ A PCI compliance)
-- [x] Auto-pay setup via Stripe Checkout (setup mode) — `setupAutoPay()` creates customer + saves payment method
-- [x] Auto-pay charging via Stripe PaymentIntents API — `chargeAutoPayInvoice()` in `generateInvoiceBatch()`
+- [x] Auto-pay setup via Stripe Checkout (setup mode) — `setupAutoPay()` creates customer + saves payment method. Two entry points: estimate.html (sends email with link) and sign.html (direct redirect after contract signing, `skipEmail: true`). Supports `payment_method_types`: `card` and `us_bank_account` (ACH)
+- [x] Auto-pay charging via Stripe PaymentIntents API — `chargeAutoPayInvoice()` in `generateInvoiceBatch()`. Card payments include 2.9% surcharge (`amount * 1.029`); ACH charges base amount. Surcharge stored in PaymentIntent metadata (`baseAmount`, `surcharge`, `paymentMethod`)
 
 #### Credit Card Fee Strategy (Decided: Gross Up Contract Price)
 

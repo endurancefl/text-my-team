@@ -227,11 +227,99 @@
     to { transform: scale(1); opacity: 1; }
   }
 
+  /* Auto-pay section */
+  .autopay-section {
+    margin-top: 24px;
+    text-align: left;
+  }
+  .autopay-section h3 {
+    font-size: 17px;
+    color: #1a2e24;
+    margin-bottom: 4px;
+    text-align: center;
+  }
+  .autopay-section .autopay-subtitle {
+    font-size: 14px;
+    color: #888;
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  .autopay-options {
+    display: flex;
+    gap: 12px;
+  }
+  .autopay-tile {
+    flex: 1;
+    background: #f8f9fa;
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 20px 16px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    text-align: center;
+    position: relative;
+  }
+  .autopay-tile:hover { border-color: #1e8e3e; background: #f0faf2; }
+  .autopay-tile:active { background: #e4f5e8; }
+  .autopay-tile.disabled {
+    opacity: 0.6;
+    pointer-events: none;
+  }
+  .autopay-tile-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 12px;
+  }
+  .autopay-tile-icon.ach { background: rgba(26, 115, 232, 0.1); color: #1a73e8; }
+  .autopay-tile-icon.card-icon { background: rgba(156, 39, 176, 0.1); color: #9c27b0; }
+  .autopay-tile-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #1a2e24;
+    margin-bottom: 8px;
+  }
+  .autopay-tile-price {
+    font-size: 18px;
+    font-weight: 700;
+    color: #1a2e24;
+    margin-bottom: 4px;
+  }
+  .autopay-tile-note {
+    font-size: 12px;
+    color: #888;
+    line-height: 1.4;
+  }
+  .autopay-tile .tile-spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid #ddd;
+    border-top-color: #1e8e3e;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    display: inline-block;
+    margin-top: 8px;
+  }
+  .autopay-skip {
+    display: block;
+    text-align: center;
+    margin-top: 16px;
+    font-size: 13px;
+    color: #999;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .autopay-skip:hover { color: #666; }
+
   @media (max-width: 480px) {
     .container { padding: 16px 12px 40px; }
     .card { padding: 20px 16px; }
     .pdf-viewer { height: 360px; }
     .sig-preview-text { font-size: 26px; }
+    .autopay-options { flex-direction: column; }
   }
 </style>
 </head>
@@ -328,6 +416,37 @@
       <h2>Contract Signed!</h2>
       <p>Thank you for signing. A confirmation has been recorded and your signed contract will be available shortly.</p>
       <p id="success-details" style="margin-top:16px;font-size:14px;color:#888;"></p>
+    </div>
+
+    <!-- Auto-Pay Setup (optional, shown after signing) -->
+    <div class="card" id="autopay-card" style="display:none;">
+      <div class="autopay-section">
+        <h3>Set Up Auto-Pay (Optional)</h3>
+        <p class="autopay-subtitle">Save a payment method for automatic monthly billing.</p>
+        <div class="autopay-options">
+          <div class="autopay-tile" id="tile-ach" onclick="startAutoPay('ach')">
+            <div class="autopay-tile-icon ach">
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="1" y="6" width="22" height="14" rx="2"/><path d="M1 10h22"/>
+              </svg>
+            </div>
+            <div class="autopay-tile-title">Pay by Bank (ACH)</div>
+            <div class="autopay-tile-price" id="ach-price"></div>
+            <div class="autopay-tile-note">No additional fees</div>
+          </div>
+          <div class="autopay-tile" id="tile-card" onclick="startAutoPay('card')">
+            <div class="autopay-tile-icon card-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/>
+              </svg>
+            </div>
+            <div class="autopay-tile-title">Pay by Card</div>
+            <div class="autopay-tile-price" id="card-price"></div>
+            <div class="autopay-tile-note" id="card-fee-note">Includes 2.9% convenience fee</div>
+          </div>
+        </div>
+        <a class="autopay-skip" id="autopay-skip" onclick="skipAutoPay()">Skip for now</a>
+      </div>
     </div>
   </div>
 </div>
@@ -486,6 +605,7 @@ async function submitSignature() {
       document.getElementById('success-details').textContent = 'Signed by ' + signedName + ' on ' +
         new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
       showState('success');
+      showAutoPaySection();
     } else {
       btn.classList.remove('loading');
       btn.textContent = 'Sign & Accept';
@@ -498,6 +618,66 @@ async function submitSignature() {
     btn.disabled = false;
     alert('Network error. Please check your connection and try again.');
   }
+}
+
+function showAutoPaySection() {
+  if (!contractData || !contractData.monthlyPayment) return;
+  var monthly = parseFloat(contractData.monthlyPayment) || 0;
+  if (monthly <= 0) return;
+
+  var cardFee = monthly * 0.029;
+  var cardTotal = monthly + cardFee;
+
+  document.getElementById('ach-price').textContent = formatCurrency(monthly) + '/month';
+  document.getElementById('card-price').textContent = formatCurrency(cardTotal) + '/month';
+  document.getElementById('card-fee-note').textContent =
+    formatCurrency(monthly) + ' + ' + formatCurrency(cardFee) + ' fee (2.9%)';
+  document.getElementById('autopay-card').style.display = 'block';
+}
+
+async function startAutoPay(method) {
+  var achTile = document.getElementById('tile-ach');
+  var cardTile = document.getElementById('tile-card');
+
+  achTile.classList.add('disabled');
+  cardTile.classList.add('disabled');
+
+  var activeTile = method === 'ach' ? achTile : cardTile;
+  activeTile.innerHTML += '<div class="tile-spinner"></div>';
+
+  try {
+    var resp = await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        setupAutoPay: true,
+        contractId: contractData.contractId,
+        paymentMethodType: method === 'ach' ? 'us_bank_account' : 'card',
+        autoPayMethod: method,
+        skipEmail: true
+      })
+    });
+
+    var result = await resp.json();
+    if (result.success && result.url) {
+      window.location.href = result.url;
+    } else {
+      achTile.classList.remove('disabled');
+      cardTile.classList.remove('disabled');
+      var spinner = activeTile.querySelector('.tile-spinner');
+      if (spinner) spinner.remove();
+      alert(result.error || 'Failed to set up auto-pay. Please try again.');
+    }
+  } catch (err) {
+    achTile.classList.remove('disabled');
+    cardTile.classList.remove('disabled');
+    var spinner = activeTile.querySelector('.tile-spinner');
+    if (spinner) spinner.remove();
+    alert('Network error. Please check your connection and try again.');
+  }
+}
+
+function skipAutoPay() {
+  document.getElementById('autopay-card').style.display = 'none';
 }
 
 init();
