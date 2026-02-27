@@ -4886,7 +4886,7 @@ function getRemindersForCrew(crewName, dateStr) {
 // ═══════════════════════════════════════════════════════════════
 
 function ensureSigningColumns(sheet, headers) {
-  var needed = ['signingToken', 'signingStatus', 'signedName', 'signedAt', 'signedIP', 'signedUserAgent', 'signedPdfUrl', 'signedPdfFileId'];
+  var needed = ['signingToken', 'signingStatus', 'signedName', 'signedAt', 'signedIP', 'signedUserAgent', 'signedPdfUrl', 'signedPdfFileId', 'consentText', 'pdfHash'];
   needed.forEach(function(col) {
     if (headers.indexOf(col) < 0) {
       var lastCol = sheet.getLastColumn();
@@ -5094,7 +5094,9 @@ function recordSignature(data) {
         signedName: headers.indexOf('signedName'),
         signedAt: headers.indexOf('signedAt'),
         signedIP: headers.indexOf('signedIP'),
-        signedUserAgent: headers.indexOf('signedUserAgent')
+        signedUserAgent: headers.indexOf('signedUserAgent'),
+        consentText: headers.indexOf('consentText'),
+        pdfHash: headers.indexOf('pdfHash')
       };
 
       if (cols.signingStatus >= 0) sheet.getRange(row, cols.signingStatus + 1).setValue('signed');
@@ -5102,6 +5104,24 @@ function recordSignature(data) {
       if (cols.signedAt >= 0) sheet.getRange(row, cols.signedAt + 1).setValue(new Date().toISOString());
       if (cols.signedIP >= 0) sheet.getRange(row, cols.signedIP + 1).setValue(data.signedIP || '');
       if (cols.signedUserAgent >= 0) sheet.getRange(row, cols.signedUserAgent + 1).setValue(data.signedUserAgent || '');
+      if (cols.consentText >= 0) sheet.getRange(row, cols.consentText + 1).setValue(data.consentText || '');
+
+      // Compute SHA-256 hash of the contract PDF at signing time
+      if (cols.pdfHash >= 0) {
+        var pdfFileIdCol = headers.indexOf('pdfFileId');
+        var pdfFileId = pdfFileIdCol >= 0 ? allData[i][pdfFileIdCol] : '';
+        if (pdfFileId) {
+          try {
+            var file = DriveApp.getFileById(String(pdfFileId));
+            var bytes = file.getBlob().getBytes();
+            var rawHash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, bytes);
+            var hash = rawHash.map(function(b) { return ('0' + (b < 0 ? b + 256 : b).toString(16)).slice(-2); }).join('');
+            sheet.getRange(row, cols.pdfHash + 1).setValue('SHA-256:' + hash);
+          } catch (e) {
+            sheet.getRange(row, cols.pdfHash + 1).setValue('error: ' + e.message);
+          }
+        }
+      }
 
       return { success: true };
     }
