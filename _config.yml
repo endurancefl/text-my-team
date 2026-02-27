@@ -1,0 +1,6 @@
+exclude:
+  - cloud-function
+  - backend
+  - "*.py"
+  - Dockerfile
+  - requirements.txt
