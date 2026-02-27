@@ -16080,8 +16080,11 @@ async function sendContractForSigning() {
     return;
   }
 
-  // Find contact email
-  const ct = currentContact || (currentEstimate.contactId ? contacts.find(c => c.contactId === currentEstimate.contactId) : null);
+  // Find contact email — prefer current picker selection over stored contactId
+  const pickerVal = document.getElementById('estimate-contact-picker')?.value;
+  const ct = (pickerVal ? contacts.find(c => c.contactId === pickerVal) : null)
+    || currentContact
+    || (currentEstimate.contactId ? contacts.find(c => c.contactId === currentEstimate.contactId) : null);
   const email = ct?.email || currentEstimate.contactEmail || '';
   if (!email) {
     showToast('No email address on the contact. Add one first.', 'error');

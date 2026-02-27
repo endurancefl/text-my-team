@@ -4927,7 +4927,7 @@ function sendContractForSigning(data) {
 
   if (contractRow < 0) return { success: false, error: 'Contract not found' };
 
-  var email = contract['Contact Email'] || data.contactEmail;
+  var email = data.contactEmail || contract['Contact Email'];
   if (!email) return { success: false, error: 'No email address on contact' };
 
   // Generate signing token
