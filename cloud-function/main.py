@@ -2,6 +2,20 @@ import io
 import json
 import os
 from collections import OrderedDict
+from datetime import datetime, timedelta, timezone
+
+
+def _format_signed_at(iso_str):
+    """Convert ISO timestamp to 'Feb 26, 2026 at 9:35 PM Eastern'."""
+    if not iso_str:
+        return ""
+    try:
+        dt = datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
+        eastern = timezone(timedelta(hours=-5))
+        dt_eastern = dt.astimezone(eastern)
+        return dt_eastern.strftime("%b %-d, %Y at %-I:%M %p") + " Eastern"
+    except Exception:
+        return iso_str
 
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
@@ -1569,7 +1583,7 @@ def _generate_residential_contract(metadata):
 
     # Right column — Customer
     signed_name = metadata.get("signedName", "")
-    signed_at = metadata.get("signedAt", "")
+    signed_at = _format_signed_at(metadata.get("signedAt", ""))
     if signed_name and _HAS_DANCING_SCRIPT:
         c.setFont("DancingScript", 18)
         c.setFillColor(CONTRACT_DARK)
@@ -2095,7 +2109,7 @@ def _generate_commercial_contract(metadata, service_map_buffer=None):
 
     # Right column — Customer
     signed_name = metadata.get("signedName", "")
-    signed_at = metadata.get("signedAt", "")
+    signed_at = _format_signed_at(metadata.get("signedAt", ""))
     c.setFont("Helvetica-Bold", 9)
     c.setFillColor(CONTRACT_GRAY)
     c.drawString(mid + 10, sig_y + 30, "By")

@@ -12,6 +12,20 @@ from datetime import datetime
 from jinja2 import Environment, FileSystemLoader
 from weasyprint import HTML
 
+
+def _format_signed_at(iso_str):
+    """Convert ISO timestamp to 'Feb 26, 2026 at 9:35 PM Eastern'."""
+    if not iso_str:
+        return ""
+    try:
+        from datetime import timedelta, timezone
+        dt = datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
+        eastern = timezone(timedelta(hours=-5))
+        dt_eastern = dt.astimezone(eastern)
+        return dt_eastern.strftime("%b %-d, %Y at %-I:%M %p") + " Eastern"
+    except Exception:
+        return iso_str
+
 # Re-export CORS helpers from main.py so lambda_function.py can import from either module
 from main import (
     ALLOWED_ORIGINS,
@@ -279,7 +293,7 @@ def _generate_residential_contract(metadata):
         "custom_terms_html": custom_terms_html,
         "clauses": clause_list,
         "signed_name": metadata.get("signedName", ""),
-        "signed_at": metadata.get("signedAt", ""),
+        "signed_at": _format_signed_at(metadata.get("signedAt", "")),
     }
 
     pdf_bytes = _render_pdf("contract_residential.html", context)
@@ -386,7 +400,7 @@ def _generate_commercial_contract(metadata, service_map_buffer=None):
         "generated_date": generated_date,
         "contract_id": contract_id,
         "signed_name": metadata.get("signedName", ""),
-        "signed_at": metadata.get("signedAt", ""),
+        "signed_at": _format_signed_at(metadata.get("signedAt", "")),
     }
 
     pdf_bytes = _render_pdf("contract_commercial.html", context)
