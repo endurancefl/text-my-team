@@ -175,6 +175,48 @@ def _fetch_s3_photos(s3, bucket, keys):
     return parse_photo_buffers(raw_files)
 
 
+# API Gateway payload limit is 10MB (base64 adds ~33% overhead)
+# So ~7MB raw PDF is the safe threshold before base64 pushes it over 10MB
+_PDF_SIZE_THRESHOLD = 7 * 1024 * 1024
+
+
+def _pdf_response(pdf_bytes, filename, allowed):
+    """Return PDF either inline (base64) or via S3 pre-signed URL if too large."""
+    if len(pdf_bytes) < _PDF_SIZE_THRESHOLD:
+        # Small enough — return inline
+        response_headers = cors_headers(allowed)
+        response_headers["Content-Type"] = "application/pdf"
+        response_headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return {
+            "statusCode": 200,
+            "headers": response_headers,
+            "body": base64.b64encode(pdf_bytes).decode("utf-8"),
+            "isBase64Encoded": True,
+        }
+
+    # Too large for API Gateway — write to S3 and return download URL
+    s3 = _get_s3_client()
+    key = f"pdfs/{uuid.uuid4()}/{filename}"
+    s3.put_object(
+        Bucket=PHOTO_BUCKET,
+        Key=key,
+        Body=pdf_bytes,
+        ContentType="application/pdf",
+    )
+    download_url = s3.generate_presigned_url(
+        "get_object",
+        Params={"Bucket": PHOTO_BUCKET, "Key": key},
+        ExpiresIn=3600,  # 1 hour
+    )
+    response_headers = cors_headers(allowed)
+    response_headers["Content-Type"] = "application/json"
+    return {
+        "statusCode": 200,
+        "headers": response_headers,
+        "body": json.dumps({"downloadUrl": download_url, "filename": filename}),
+    }
+
+
 def _handle_generate_pdf(event, allowed, headers):
     """Handle PDF generation — supports both multipart and JSON+S3 flows."""
     try:
@@ -248,17 +290,7 @@ def _handle_json_request(raw_body, allowed):
         gen = wp_generate_standard_report if use_wp else rl_generate_standard_report
         pdf_bytes, filename = gen(metadata, photo_buffers)
 
-    # Return base64-encoded PDF
-    response_headers = cors_headers(allowed)
-    response_headers["Content-Type"] = "application/pdf"
-    response_headers["Content-Disposition"] = f'attachment; filename="{filename}"'
-
-    return {
-        "statusCode": 200,
-        "headers": response_headers,
-        "body": base64.b64encode(pdf_bytes).decode("utf-8"),
-        "isBase64Encoded": True,
-    }
+    return _pdf_response(pdf_bytes, filename, allowed)
 
 
 def _handle_multipart_request(raw_body, content_type, allowed):
@@ -317,17 +349,7 @@ def _handle_multipart_request(raw_body, content_type, allowed):
         gen = wp_generate_standard_report if use_wp else rl_generate_standard_report
         pdf_bytes, filename = gen(metadata, photo_buffers)
 
-    # Return base64-encoded PDF
-    response_headers = cors_headers(allowed)
-    response_headers["Content-Type"] = "application/pdf"
-    response_headers["Content-Disposition"] = f'attachment; filename="{filename}"'
-
-    return {
-        "statusCode": 200,
-        "headers": response_headers,
-        "body": base64.b64encode(pdf_bytes).decode("utf-8"),
-        "isBase64Encoded": True,
-    }
+    return _pdf_response(pdf_bytes, filename, allowed)
 
 
 def _error_response(message, status_code, origin):

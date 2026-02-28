@@ -7556,6 +7556,27 @@
       });
     }
 
+    // Handle Lambda response: either a PDF blob (inline) or JSON with downloadUrl (large PDFs)
+    function handlePdfResponse(resp) {
+      if (!resp.ok) {
+        return resp.text().then(function(text) {
+          throw new Error('Server ' + resp.status + ': ' + text);
+        });
+      }
+      var ct = resp.headers.get('content-type') || '';
+      if (ct.indexOf('application/json') >= 0) {
+        // Large PDF — Lambda wrote it to S3, response has download URL
+        return resp.json().then(function(data) {
+          return fetch(data.downloadUrl).then(function(r) {
+            if (!r.ok) throw new Error('Failed to download PDF from S3');
+            return r.blob();
+          });
+        });
+      }
+      // Normal inline PDF blob
+      return resp.blob();
+    }
+
     function requestS3UploadUrls(params) {
       return fetch(UPLOAD_URLS_ENDPOINT, {
         method: 'POST',
@@ -8756,9 +8777,8 @@
         body: JSON.stringify(payload)
       })
       .then(function(resp) {
-        if (!resp.ok) throw new Error('Server error ' + resp.status);
         srProgressBar.style.width = '90%';
-        return resp.blob();
+        return handlePdfResponse(resp);
       })
       .then(function(blob) {
         srState.generatedPdfBlob = blob;
@@ -9878,13 +9898,7 @@
         body: JSON.stringify(metadata)
       })
         .then(function(response) {
-          baProgressLabel.textContent = 'Response: ' + response.status;
-          if (!response.ok) {
-            return response.text().then(function(text) {
-              throw new Error('Server ' + response.status + ': ' + text);
-            });
-          }
-          return response.blob();
+          return handlePdfResponse(response);
         })
         .then(function(blob) {
           baProgressBar.style.width = '80%';

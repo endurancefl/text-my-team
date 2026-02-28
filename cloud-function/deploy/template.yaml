@@ -17,6 +17,10 @@ Resources:
             Status: Enabled
             ExpirationInDays: 1
             Prefix: uploads/
+          - Id: AutoExpirePdfs
+            Status: Enabled
+            ExpirationInDays: 1
+            Prefix: pdfs/
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
