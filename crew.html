@@ -8671,27 +8671,63 @@
       compositeNext();
     });
 
+    var SR_S3_MAX_RETRIES = 3;
+    var SR_S3_TIMEOUT_MS = 120000; // 2 minutes
+
     function srWaitForS3Uploads() {
+      if (!srState._s3WaitStart) srState._s3WaitStart = Date.now();
+      if (!srState._s3RetryCounts) srState._s3RetryCounts = {};
+
       // Check if all photos have S3 keys
       var allUploaded = srState.photos.every(function(p) { return p.s3Uploaded && p.s3Key; });
       if (allUploaded) {
+        srState._s3WaitStart = null;
+        srState._s3RetryCounts = {};
         srSendToCloudFunction();
         return;
       }
+
+      // Timeout — give up after 2 minutes of waiting
+      if (Date.now() - srState._s3WaitStart > SR_S3_TIMEOUT_MS) {
+        var stillFailed = srState.photos.filter(function(p) { return !p.s3Uploaded; }).length;
+        srState._s3WaitStart = null;
+        srState._s3RetryCounts = {};
+        srProgressLabel.textContent = stillFailed + ' photo(s) failed to upload.';
+        srGenerateBtn.textContent = 'Retry';
+        srGenerateBtn.disabled = false;
+        return;
+      }
+
       // Some still uploading — poll every 500ms
       srProgressLabel.textContent = 'Uploading photos to S3... (' + srState.s3Pending + ' remaining)';
       setTimeout(function() {
         var uploaded = srState.photos.filter(function(p) { return p.s3Uploaded; }).length;
         srProgressBar.style.width = Math.round(30 + (uploaded / srState.photos.length) * 20) + '%';
 
-        // Check for failures
+        // Check for failures — retry up to max
         var failed = srState.photos.filter(function(p) { return p.s3Failed; });
         if (failed.length > 0 && srState.s3Pending === 0) {
-          // Retry failed uploads
-          failed.forEach(function(p) {
-            p.s3Failed = false;
-            srUploadPhotoToS3(p);
+          var retriable = failed.filter(function(p) {
+            var id = srState.photos.indexOf(p);
+            var count = srState._s3RetryCounts[id] || 0;
+            return count < SR_S3_MAX_RETRIES;
           });
+          if (retriable.length > 0) {
+            retriable.forEach(function(p) {
+              var id = srState.photos.indexOf(p);
+              srState._s3RetryCounts[id] = (srState._s3RetryCounts[id] || 0) + 1;
+              p.s3Failed = false;
+              srUploadPhotoToS3(p);
+            });
+          } else {
+            // All retries exhausted
+            srState._s3WaitStart = null;
+            srState._s3RetryCounts = {};
+            srProgressLabel.textContent = failed.length + ' photo(s) failed after retries.';
+            srGenerateBtn.textContent = 'Retry';
+            srGenerateBtn.disabled = false;
+            return;
+          }
         }
         srWaitForS3Uploads();
       }, 500);
