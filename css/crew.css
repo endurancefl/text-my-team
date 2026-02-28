@@ -1968,6 +1968,15 @@
       background: var(--ios-red);
       color: white;
     }
+    .sr-thumb-status.uploading {
+      background: var(--tint);
+      color: white;
+      animation: pulse-upload 1s infinite;
+    }
+    @keyframes pulse-upload {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
 
     /* Step 3 empty state */
     #sr-no-photos {

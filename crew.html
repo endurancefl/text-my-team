@@ -7496,6 +7496,76 @@
 
     // ─── Site Report ───────────────────────────────
     var CLOUD_FUNCTION_URL = 'https://ibjyxrp542.execute-api.us-east-1.amazonaws.com/prod/generate_site_report';
+    var UPLOAD_URLS_ENDPOINT = 'https://ibjyxrp542.execute-api.us-east-1.amazonaws.com/prod/upload-urls';
+
+    // ─── S3 Upload Pool ───────────────────────────────
+    var s3UploadPool = {
+      maxConcurrent: 10,
+      active: 0,
+      queue: [],
+      run: function(fn) {
+        var self = this;
+        return new Promise(function(resolve, reject) {
+          function execute() {
+            self.active++;
+            fn().then(function(result) {
+              self.active--;
+              resolve(result);
+              self._next();
+            }).catch(function(err) {
+              self.active--;
+              reject(err);
+              self._next();
+            });
+          }
+          if (self.active < self.maxConcurrent) {
+            execute();
+          } else {
+            self.queue.push(execute);
+          }
+        });
+      },
+      _next: function() {
+        if (this.queue.length > 0 && this.active < this.maxConcurrent) {
+          var fn = this.queue.shift();
+          fn();
+        }
+      }
+    };
+
+    function s3UploadBlob(blob, url) {
+      return s3UploadPool.run(function() {
+        return fetch(url, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'image/jpeg' },
+          body: blob
+        }).then(function(resp) {
+          if (!resp.ok) throw new Error('S3 PUT failed: ' + resp.status);
+          return true;
+        }).catch(function(err) {
+          // Retry once
+          return fetch(url, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'image/jpeg' },
+            body: blob
+          }).then(function(resp) {
+            if (!resp.ok) throw new Error('S3 PUT retry failed: ' + resp.status);
+            return true;
+          });
+        });
+      });
+    }
+
+    function requestS3UploadUrls(params) {
+      return fetch(UPLOAD_URLS_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params)
+      }).then(function(r) {
+        if (!r.ok) throw new Error('Upload URLs request failed: ' + r.status);
+        return r.json();
+      });
+    }
 
     var srWizard = document.getElementById('site-report-wizard');
     var srBackBtn = document.getElementById('sr-back-btn');
@@ -7555,8 +7625,86 @@
       drawCurrent: null,
       generatedPdfBlob: null,
       photoMode: null,
-      compositedPhotos: []
+      compositedPhotos: [],
+      s3Session: null,       // { urls:[], keys:[], nextIndex:0 }
+      s3Pending: 0           // number of S3 uploads still in flight
     };
+
+    // --- S3 upload-as-you-go for Site Report ---
+    function srEnsureS3Session() {
+      if (srState.s3Session) return Promise.resolve(srState.s3Session);
+      return requestS3UploadUrls({ count: 100 }).then(function(data) {
+        srState.s3Session = {
+          sessionId: data.sessionId,
+          urls: data.urls,
+          keys: data.keys,
+          nextIndex: 0
+        };
+        return srState.s3Session;
+      });
+    }
+
+    function srUploadPhotoToS3(photo) {
+      if (photo.s3Uploading || photo.s3Uploaded) return;
+      photo.s3Uploading = true;
+      srState.s3Pending++;
+
+      srEnsureS3Session().then(function(session) {
+        if (session.nextIndex >= session.urls.length) {
+          // Need more URLs - request another batch
+          return requestS3UploadUrls({ count: 100 }).then(function(data) {
+            // Append to existing session
+            session.urls = session.urls.concat(data.urls);
+            session.keys = session.keys.concat(data.keys);
+            return session;
+          });
+        }
+        return session;
+      }).then(function(session) {
+        var idx = session.nextIndex++;
+        var url = session.urls[idx];
+        photo.s3Key = session.keys[idx];
+
+        // Composite annotations onto photo at full quality for S3
+        var img = new Image();
+        img.onload = function() {
+          var w = photo.imgWidth;
+          var h = photo.imgHeight;
+          var c = document.createElement('canvas');
+          c.width = w; c.height = h;
+          var ctx = c.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          ctx.strokeStyle = 'red';
+          ctx.lineWidth = Math.max(3, Math.round(w / 200));
+          photo.rects.forEach(function(r) {
+            ctx.strokeRect(r.x, r.y, r.w, r.h);
+          });
+          c.toBlob(function(blob) {
+            s3UploadBlob(blob, url).then(function() {
+              photo.s3Uploaded = true;
+              photo.s3Uploading = false;
+              photo.s3Failed = false;
+              photo._lastUploadedRectCount = photo.rects.length;
+              srState.s3Pending--;
+              srRebuildThumbstrip();
+            }).catch(function() {
+              photo.s3Uploaded = false;
+              photo.s3Uploading = false;
+              photo.s3Failed = true;
+              photo.s3Key = null;
+              session.nextIndex--; // reclaim the slot
+              srState.s3Pending--;
+              srRebuildThumbstrip();
+            });
+          }, 'image/jpeg', 0.80);
+        };
+        img.src = photo.originalBase64;
+      }).catch(function() {
+        photo.s3Uploading = false;
+        photo.s3Failed = true;
+        srState.s3Pending--;
+      });
+    }
 
     // --- Site Report localStorage persistence ---
     var SR_DRAFT_KEY = 'srDraft';
@@ -7683,7 +7831,7 @@
         srState = {
           currentStep: 1, selectedProp: null, inspectorName: '', reportDate: '',
           photos: [], currentPhotoIndex: 0, isDrawing: false, drawStart: null, drawCurrent: null, generatedPdfBlob: null,
-          photoMode: null, compositedPhotos: []
+          photoMode: null, compositedPhotos: [], s3Session: null, s3Pending: 0
         };
         srProgressWrap.style.display = 'none';
         srUploadDriveBtn.style.display = 'none';
@@ -7712,7 +7860,7 @@
       srState = {
         currentStep: 1, selectedProp: null, inspectorName: '', reportDate: '',
         photos: [], currentPhotoIndex: 0, isDrawing: false, drawStart: null, drawCurrent: null, generatedPdfBlob: null,
-        photoMode: null, compositedPhotos: []
+        photoMode: null, compositedPhotos: [], s3Session: null, s3Pending: 0
       };
       srPropertyInput.value = '';
       srPropertyInput.style.display = '';
@@ -7920,7 +8068,7 @@
         thumbCtx.drawImage(bitmap, 0, 0, tw, th);
         var thumbBase64 = thumbCanvas.toDataURL('image/jpeg', 0.7);
 
-        srState.photos.push({
+        var newPhoto = {
           originalBase64: base64,
           thumbBase64: thumbBase64,
           imgWidth: w,
@@ -7929,9 +8077,16 @@
           note: '',
           category: '',
           uploaded: false,
-          failed: false
-        });
+          failed: false,
+          s3Uploaded: false,
+          s3Uploading: false,
+          s3Failed: false,
+          s3Key: null
+        };
+        srState.photos.push(newPhoto);
         srSaveDraft();
+        // Upload to S3 immediately (no annotations yet, will re-upload at composite)
+        srUploadPhotoToS3(newPhoto);
         if (callback) callback();
       });
     }
@@ -8018,10 +8173,12 @@
         // Use thumbnail for display (memory optimization for 50+ photos)
         var imgSrc = photo.thumbBase64 || photo.originalBase64;
         var statusIndicator = '';
-        if (photo.uploaded) {
+        if (photo.s3Uploaded) {
           statusIndicator = '<span class="sr-thumb-status uploaded">✓</span>';
-        } else if (photo.failed) {
+        } else if (photo.s3Failed) {
           statusIndicator = '<span class="sr-thumb-status failed">!</span>';
+        } else if (photo.s3Uploading) {
+          statusIndicator = '<span class="sr-thumb-status uploading">↑</span>';
         }
         div.innerHTML = '<img src="' + imgSrc + '" loading="lazy">' + statusIndicator;
         div.addEventListener('click', function() {
@@ -8063,6 +8220,12 @@
         p.category = srCategoryInput.value.trim();
         srRebuildCategoryDatalist();
         srSaveDraft();
+        // Re-upload to S3 if annotations changed since last upload
+        if (p.s3Uploaded && p.rects.length !== (p._lastUploadedRectCount || 0)) {
+          p.s3Uploaded = false;
+          p.s3Key = null;
+          srUploadPhotoToS3(p);
+        }
       }
     }
 
@@ -8459,15 +8622,15 @@
       srProgressLabel.textContent = 'Compositing photos...';
       srProgressBar.style.width = '0%';
 
-      // Composite annotations onto photos as JPEG blobs
-      var composited = [];
+      // Composite full-quality photos for Drive upload
       srState.compositedPhotos = [];
       var total = srState.photos.length;
       var done = 0;
 
       function compositeNext() {
         if (done >= total) {
-          srSendToCloudFunction(composited);
+          // All composited — now ensure S3 uploads are complete
+          srWaitForS3Uploads();
           return;
         }
         var photo = srState.photos[done];
@@ -8492,59 +8655,69 @@
             category: photo.category
           });
 
-          // Smaller canvas for Lambda payload (max 1000px, stays under 6MB Lambda limit with base64)
-          var maxDim = 1000;
-          var w = photo.imgWidth;
-          var h = photo.imgHeight;
-          if (w > maxDim || h > maxDim) {
-            var scale = maxDim / Math.max(w, h);
-            w = Math.round(w * scale);
-            h = Math.round(h * scale);
+          // Re-upload to S3 if annotations changed since last upload
+          if (!photo.s3Uploaded || photo.rects.length !== (photo._lastUploadedRectCount || 0)) {
+            photo.s3Uploaded = false;
+            photo.s3Key = null;
+            srUploadPhotoToS3(photo);
           }
-          var c = document.createElement('canvas');
-          c.width = w; c.height = h;
-          var cx = c.getContext('2d');
-          cx.drawImage(img, 0, 0, w, h);
-          var scaleX = w / photo.imgWidth;
-          var scaleY = h / photo.imgHeight;
-          cx.strokeStyle = 'red';
-          cx.lineWidth = Math.max(3, Math.round(w / 200));
-          photo.rects.forEach(function(r) {
-            cx.strokeRect(r.x * scaleX, r.y * scaleY, r.w * scaleX, r.h * scaleY);
-          });
-          c.toBlob(function(blob) {
-            composited.push({ blob: blob, note: photo.note, category: photo.category });
-            done++;
-            srProgressBar.style.width = Math.round(done / total * 40) + '%';
-            compositeNext();
-          }, 'image/jpeg', 0.55);
+
+          done++;
+          srProgressBar.style.width = Math.round(done / total * 30) + '%';
+          compositeNext();
         };
         img.src = photo.originalBase64;
       }
       compositeNext();
     });
 
-    function srSendToCloudFunction(composited) {
+    function srWaitForS3Uploads() {
+      // Check if all photos have S3 keys
+      var allUploaded = srState.photos.every(function(p) { return p.s3Uploaded && p.s3Key; });
+      if (allUploaded) {
+        srSendToCloudFunction();
+        return;
+      }
+      // Some still uploading — poll every 500ms
+      srProgressLabel.textContent = 'Uploading photos to S3... (' + srState.s3Pending + ' remaining)';
+      setTimeout(function() {
+        var uploaded = srState.photos.filter(function(p) { return p.s3Uploaded; }).length;
+        srProgressBar.style.width = Math.round(30 + (uploaded / srState.photos.length) * 20) + '%';
+
+        // Check for failures
+        var failed = srState.photos.filter(function(p) { return p.s3Failed; });
+        if (failed.length > 0 && srState.s3Pending === 0) {
+          // Retry failed uploads
+          failed.forEach(function(p) {
+            p.s3Failed = false;
+            srUploadPhotoToS3(p);
+          });
+        }
+        srWaitForS3Uploads();
+      }, 500);
+    }
+
+    function srSendToCloudFunction() {
       srProgressLabel.textContent = 'Generating PDF...';
       srProgressBar.style.width = '50%';
 
-      var formData = new FormData();
-      var metadata = {
+      // Collect S3 keys from photos
+      var s3Keys = srState.photos.map(function(p) { return p.s3Key; });
+
+      var payload = {
         address: srState.selectedProp.address,
         inspector: srState.inspectorName,
         date: srState.reportDate,
         fitMode: 'contain',
         categoryStyle: { background: '#6B7280', color: '#FFFFFF' },
-        photos: composited.map(function(c) { return { note: c.note, category: c.category || '' }; })
+        photos: srState.photos.map(function(p) { return { note: p.note, category: p.category || '' }; }),
+        s3Keys: s3Keys
       };
-      formData.append('metadata', JSON.stringify(metadata));
-      composited.forEach(function(c, i) {
-        formData.append('photos', c.blob, 'photo_' + i + '.jpg');
-      });
 
       fetch(CLOUD_FUNCTION_URL, {
         method: 'POST',
-        body: formData
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
       })
       .then(function(resp) {
         if (!resp.ok) throw new Error('Server error ' + resp.status);
@@ -9556,117 +9729,117 @@
     });
 
     function baSendToCloudFunction(pairs) {
-      baProgressBar.style.width = '30%';
-      baProgressLabel.textContent = 'Processing images...';
+      baProgressBar.style.width = '20%';
+      baProgressLabel.textContent = 'Getting upload URLs...';
 
-      // Convert base64 images to blobs using canvas (like Site Report does)
-      var formData = new FormData();
-      var metadata = {
-        address: baState.selectedProp.address,
-        inspector: baState.inspectorName,
-        originalReport: baState.selectedReportName,
-        date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-        type: 'before_after',
-        fitMode: 'contain',
-        newPagePerSection: true,
-        categoryStyle: { background: '#6B7280', color: '#FFFFFF' },
-        photos: pairs.map(function(p) {
-          return {
-            beforeNote: p.beforeNote,
-            beforeCategory: p.beforeCategory,
-            afterNote: p.afterNote
-          };
-        })
-      };
-      formData.append('metadata', JSON.stringify(metadata));
+      // Request S3 URLs for before + after photos
+      requestS3UploadUrls({
+        reportType: 'before_after',
+        beforeCount: pairs.length,
+        afterCount: pairs.length
+      }).then(function(urlData) {
+        baProgressBar.style.width = '30%';
+        baProgressLabel.textContent = 'Uploading photos to S3...';
 
-      var beforeBlobs = [];
-      var afterBlobs = [];
-      var processed = 0;
-      var total = pairs.length * 2;
+        var beforeKeys = urlData.beforeKeys;
+        var afterKeys = urlData.afterKeys;
+        var beforeUrls = urlData.beforeUrls;
+        var afterUrls = urlData.afterUrls;
+        var total = pairs.length * 2;
+        var uploaded = 0;
 
-      function processNext() {
-        var pairIndex = Math.floor(processed / 2);
-        var isAfter = processed % 2 === 1;
+        // Convert base64 to blob and upload to S3
+        function uploadPairPhoto(pairIndex, isAfter) {
+          var pair = pairs[pairIndex];
+          var imgSrc = isAfter ? pair.afterBase64 : (pair.beforeBase64 || pair.beforeUrl);
+          var url = isAfter ? afterUrls[pairIndex] : beforeUrls[pairIndex];
 
-        if (pairIndex >= pairs.length) {
-          // All done, now send
-          beforeBlobs.forEach(function(b, i) {
-            formData.append('before_photos', b, 'before_' + i + '.jpg');
-          });
-          afterBlobs.forEach(function(b, i) {
-            formData.append('after_photos', b, 'after_' + i + '.jpg');
-          });
-          baDoFetch(formData, pairs.length);
-          return;
-        }
-
-        var pair = pairs[pairIndex];
-        var imgSrc;
-        if (isAfter) {
-          imgSrc = pair.afterBase64;
-        } else {
-          // Before photo: prefer base64 (no CORS issues) over URL
-          imgSrc = pair.beforeBase64 || pair.beforeUrl;
-        }
-
-        if (!imgSrc) {
-          baProgressLabel.textContent = 'Error: Missing image data';
-          baGenerateBtn.disabled = false;
-          baGenerateBtn.textContent = 'Retry';
-          return;
-        }
-
-        var img = new Image();
-        img.crossOrigin = 'anonymous'; // Needed for Drive URLs
-        img.onload = function() {
-          // Resize to max 1000px for PDF (side-by-side display doesn't need full res)
-          var maxSize = 1000;
-          var w = img.width;
-          var h = img.height;
-          if (w > maxSize || h > maxSize) {
-            if (w > h) {
-              h = Math.round(h * maxSize / w);
-              w = maxSize;
-            } else {
-              w = Math.round(w * maxSize / h);
-              h = maxSize;
-            }
+          if (!imgSrc) {
+            return Promise.reject(new Error('Missing image data for pair ' + (pairIndex + 1)));
           }
-          var c = document.createElement('canvas');
-          c.width = w;
-          c.height = h;
-          var ctx = c.getContext('2d');
-          ctx.drawImage(img, 0, 0, w, h);
-          c.toBlob(function(blob) {
-            if (isAfter) {
-              afterBlobs.push(blob);
-            } else {
-              beforeBlobs.push(blob);
-            }
-            processed++;
-            baProgressBar.style.width = Math.round(30 + (processed / total) * 20) + '%';
-            processNext();
-          }, 'image/jpeg', 0.75);
-        };
-        img.onerror = function() {
-          baProgressLabel.textContent = 'Error loading image ' + (pairIndex + 1);
-          baGenerateBtn.disabled = false;
-          baGenerateBtn.textContent = 'Retry';
-        };
-        img.src = imgSrc;
-      }
 
-      processNext();
+          return new Promise(function(resolve, reject) {
+            var img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = function() {
+              // Use 1600px max for S3 (higher quality than old 1000px)
+              var maxSize = 1600;
+              var w = img.width;
+              var h = img.height;
+              if (w > maxSize || h > maxSize) {
+                if (w > h) {
+                  h = Math.round(h * maxSize / w);
+                  w = maxSize;
+                } else {
+                  w = Math.round(w * maxSize / h);
+                  h = maxSize;
+                }
+              }
+              var c = document.createElement('canvas');
+              c.width = w; c.height = h;
+              var ctx = c.getContext('2d');
+              ctx.drawImage(img, 0, 0, w, h);
+              c.toBlob(function(blob) {
+                s3UploadBlob(blob, url).then(function() {
+                  uploaded++;
+                  baProgressBar.style.width = Math.round(30 + (uploaded / total) * 20) + '%';
+                  baProgressLabel.textContent = 'Uploading photos ' + uploaded + '/' + total + '...';
+                  resolve();
+                }).catch(reject);
+              }, 'image/jpeg', 0.80);
+            };
+            img.onerror = function() {
+              reject(new Error('Failed to load image ' + (pairIndex + 1)));
+            };
+            img.src = imgSrc;
+          });
+        }
+
+        // Upload all photos (before and after) concurrently via the pool
+        var uploadPromises = [];
+        for (var i = 0; i < pairs.length; i++) {
+          uploadPromises.push(uploadPairPhoto(i, false)); // before
+          uploadPromises.push(uploadPairPhoto(i, true));  // after
+        }
+
+        return Promise.all(uploadPromises).then(function() {
+          // All uploaded — send JSON to Lambda
+          var metadata = {
+            address: baState.selectedProp.address,
+            inspector: baState.inspectorName,
+            originalReport: baState.selectedReportName,
+            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            type: 'before_after',
+            fitMode: 'contain',
+            newPagePerSection: true,
+            categoryStyle: { background: '#6B7280', color: '#FFFFFF' },
+            photos: pairs.map(function(p) {
+              return {
+                beforeNote: p.beforeNote,
+                beforeCategory: p.beforeCategory,
+                afterNote: p.afterNote
+              };
+            }),
+            beforeS3Keys: beforeKeys,
+            afterS3Keys: afterKeys
+          };
+          baDoFetch(metadata, pairs.length);
+        });
+      }).catch(function(err) {
+        baProgressLabel.textContent = 'Error: ' + (err.message || 'Upload failed');
+        baGenerateBtn.disabled = false;
+        baGenerateBtn.textContent = 'Retry';
+      });
     }
 
-    function baDoFetch(formData, pairCount) {
+    function baDoFetch(metadata, pairCount) {
       baProgressBar.style.width = '50%';
-      baProgressLabel.textContent = 'Uploading ' + pairCount + ' pairs...';
+      baProgressLabel.textContent = 'Generating PDF (' + pairCount + ' pairs)...';
 
       fetch(CLOUD_FUNCTION_URL, {
         method: 'POST',
-        body: formData
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(metadata)
       })
         .then(function(response) {
           baProgressLabel.textContent = 'Response: ' + response.status;

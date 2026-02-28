@@ -8,12 +8,45 @@ Globals:
     MemorySize: 2048
 
 Resources:
+  PhotoUploadBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      LifecycleConfiguration:
+        Rules:
+          - Id: AutoExpireUploads
+            Status: Enabled
+            ExpirationInDays: 1
+            Prefix: uploads/
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins:
+              - "https://endurancefl.github.io"
+              - "https://enduranceservices.github.io"
+              - "http://localhost:8000"
+              - "http://127.0.0.1:8000"
+            AllowedMethods:
+              - PUT
+            AllowedHeaders:
+              - Content-Type
+            MaxAge: 3600
+
   PdfGeneratorFunction:
     Type: AWS::Serverless::Function
     Properties:
       PackageType: Image
       Architectures:
         - x86_64
+      Policies:
+        - S3CrudPolicy:
+            BucketName: !Ref PhotoUploadBucket
+      Environment:
+        Variables:
+          PHOTO_BUCKET: !Ref PhotoUploadBucket
       Events:
         GeneratePdf:
           Type: HttpApi
@@ -26,6 +59,18 @@ Resources:
           Properties:
             ApiId: !Ref PdfApi
             Path: /generate_site_report
+            Method: OPTIONS
+        GetUploadUrls:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref PdfApi
+            Path: /upload-urls
+            Method: POST
+        GetUploadUrlsCors:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref PdfApi
+            Path: /upload-urls
             Method: OPTIONS
     Metadata:
       DockerTag: latest
@@ -45,6 +90,7 @@ Resources:
         AllowMethods:
           - POST
           - OPTIONS
+          - PUT
         AllowHeaders:
           - Content-Type
         MaxAge: 3600
@@ -53,6 +99,12 @@ Outputs:
   ApiUrl:
     Description: API Gateway endpoint URL for PDF generation
     Value: !Sub "https://${PdfApi}.execute-api.${AWS::Region}.amazonaws.com/prod/generate_site_report"
+  UploadUrlsEndpoint:
+    Description: API Gateway endpoint URL for pre-signed upload URLs
+    Value: !Sub "https://${PdfApi}.execute-api.${AWS::Region}.amazonaws.com/prod/upload-urls"
+  PhotoBucketName:
+    Description: S3 bucket for temporary photo uploads
+    Value: !Ref PhotoUploadBucket
   FunctionArn:
     Description: Lambda function ARN
     Value: !GetAtt PdfGeneratorFunction.Arn
