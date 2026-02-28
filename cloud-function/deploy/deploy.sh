@@ -19,15 +19,11 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
 echo "Building SAM application (container image)..."
-sam build --template-file template.yaml --use-container
+sam build --template-file template.yaml
 
-if [ -f samconfig.toml ]; then
+if grep -q "image_repositories.*dkr.ecr" samconfig.toml 2>/dev/null; then
     echo "Deploying (using saved config)..."
-    sam deploy --image-repository ""
-    echo ""
-    echo "NOTE: If deploy fails with 'image repository not found', run:"
-    echo "  sam deploy --guided"
-    echo "and accept the ECR repo creation prompt."
+    sam deploy --no-confirm-changeset
 else
     echo "First deployment — running guided setup..."
     echo "  Stack name suggestion: endurance-pdf-generator"

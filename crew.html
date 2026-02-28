@@ -8492,8 +8492,8 @@
             category: photo.category
           });
 
-          // Smaller canvas for Lambda payload (max 1200px, supports 30+ photos under 10MB)
-          var maxDim = 1200;
+          // Smaller canvas for Lambda payload (max 1000px, stays under 6MB Lambda limit with base64)
+          var maxDim = 1000;
           var w = photo.imgWidth;
           var h = photo.imgHeight;
           if (w > maxDim || h > maxDim) {
@@ -8517,7 +8517,7 @@
             done++;
             srProgressBar.style.width = Math.round(done / total * 40) + '%';
             compositeNext();
-          }, 'image/jpeg', 0.65);
+          }, 'image/jpeg', 0.55);
         };
         img.src = photo.originalBase64;
       }

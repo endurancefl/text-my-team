@@ -1,6 +1,7 @@
-FROM public.ecr.aws/lambda/python:3.11
+FROM public.ecr.aws/lambda/python:3.12
 
 # Install system dependencies required by WeasyPrint
+# AL2023 uses dnf and ships Pango 1.54+ (WeasyPrint needs >= 1.44)
 RUN dnf install -y \
     pango \
     cairo \
