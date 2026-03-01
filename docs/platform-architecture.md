@@ -48,7 +48,7 @@ The platform supports four divisions, each representing a distinct revenue strea
 text-my-team/
 ├── index.html                     # Customer service request portal (~3,100 lines)
 ├── crew.html                      # Crew leader app (~9,768 lines HTML/JS)
-├── estimate.html                  # Bidding & estimating tool (~16,220 lines HTML/JS)
+├── estimate.html                  # Bidding & estimating tool (~17,218 lines HTML/JS)
 ├── payment-success.html           # Stripe payment success redirect
 ├── payment-cancel.html            # Stripe payment cancel redirect
 ├── sign.html                      # Standalone contract e-signature page (~686 lines)
@@ -56,7 +56,7 @@ text-my-team/
 ├── _config.yml                    # Jekyll config — excludes cloud-function/ and backend/ from build
 ├── css/
 │   ├── crew.css                   # All CSS for crew.html (~4,511 lines)
-│   └── estimate.css               # All CSS for estimate.html (~5,964 lines)
+│   └── estimate.css               # All CSS for estimate.html (~6,572 lines)
 ├── assets/
 │   ├── manifest.json              # PWA manifest for index.html
 │   ├── manifest-crew.json         # PWA manifest for crew.html
@@ -66,7 +66,7 @@ text-my-team/
 │       ├── iceberg-icon.png
 │       └── 26__Endurace_Icon_Green_LightBackground.png
 ├── backend/
-│   └── combined-apps-script.js    # Google Apps Script backend (~5,146 lines)
+│   └── combined-apps-script.js    # Google Apps Script backend (~5,200 lines)
 ├── cloud-function/                # AWS Lambda PDF generation
 │   ├── pdf_generator.py           # PDF library (WeasyPrint + ReportLab)
 │   ├── lambda_function.py         # AWS Lambda handler
@@ -158,7 +158,7 @@ text-my-team/
 - iOS design system: SF Pro typography, exact system colors, dark mode, frosted glass tab bar with `backdrop-filter`, iOS spring animations, 44px touch targets, `prefers-reduced-motion` support
 - Bottom tab bar: Schedule (home) | Requests | Report Issue | Reports
 
-**estimate.html + estimate.css — Bidding & Estimating Tool (~16,220 lines HTML/JS + ~5,964 lines CSS)**
+**estimate.html + estimate.css — Bidding & Estimating Tool (~17,218 lines HTML/JS + ~6,572 lines CSS)**
 - **Division: Maintenance (MNT) fully built** — Irrigation, Construction, and Enhancement divisions planned, will reuse the same engine with division-specific catalogs and takeoffs
 - **Job Type Selection** ✅ **BUILT**: When creating a new estimate, the user first picks a job type via the Job Type Picker modal:
   - **Recurring Service** — Ongoing contract with scheduled visits throughout the year (existing flow, unchanged)
@@ -247,7 +247,10 @@ text-my-team/
 - **Sub-Contractor Billing**: Property-level subs (with monthlyCost and contract PDF) flow into estimates via "From Subs" tab in the Add Service modal. Creates service with `isSubcontractor: true`, `subCost: monthlyCost * 12`, `billingTier: 'billed'`, `subContractorId` link. Default 10% markup from bid settings; per-service `subMarkupOverride` allows 0% or custom markup. Sub services render in the bid table as a single row showing cost/markup/billed/margin (no line items). Contract PDF upload via `uploadSubContractPdf` to Drive Sub-Contracts folder. Adding a sub to a finalized contract uses existing revision flow. Functions: `renderServicePickerSubs()`, `addSubFromProperty()`, `handleSubContractFileSelect()`, `clearSubContractFile()`
 - **Three-tier billing structure**: Fixed Payment Services (monthly amortized), Services Billed Separately (upon completion), Recommended/Optional (customer opt-in with accepted/pending toggle)
 - **Property Takeoff System** with Attentive.ai Excel import (SheetJS):
-  - Lawn: equipment splits (48" Mower, 21" Mower, String Trimmer) with percentage allocation + difficulty splits (Easy/Med/Hard must sum to 100%)
+  - **Unified Takeoff Grid** (`USE_NEW_TAKEOFF` feature flag, default `true`): Replaces 9 accordion-based takeoff cards with a collapsible section grid. Each section shows a compact **summary row** (dot, label, summary text, total, chevron) that expands to reveal a detail `<table>` with editable inputs. Inputs are direct SF/LF values that back-compute percentages for the old data structure. Section config array (`MNT_DEFAULT_SECTIONS`) maps 9 sections (lawnEquipment, edge, hedgeTrimming, mulchBed, weedControl, perennial, seasonalColor, leafCleanup, mulchSub) with `readRows()`/`readTotal()`/`summaryText()` functions. Lawn Difficulty is NOT a separate section — it's a property-level attribute. `onTakeoffInput()` reverse-computes percentages from SF and writes to `currentEstimate.takeoffs`. `expandedTakeoffSections` Set tracks which sections are open. `toggleTakeoffExpand()` toggles. All existing calculate functions remain unmodified. `validateTakeoffParity()` validates output consistency.
+  - **Configurable Sections**: Company-level section ordering/visibility/custom sections stored as JSON per division in TakeoffSections Google Sheet. `showTakeoffConfigModal()` opens config panel with drag-to-reorder and toggle switches. Custom sections support 3 types: split, value, calc.
+  - **MARVIN AI Section Generator**: Lambda proxy (`/marvin` endpoint) calls Anthropic Claude API to generate section configs from natural language descriptions. Frontend in Add Section modal with "Ask MARVIN" / "Build Manually" tabs.
+  - Lawn: equipment splits (48" Mower, 21" Mower, String Trimmer) with percentage allocation. Difficulty splits (Easy/Med/Hard) are a property-level attribute, not a takeoff section
   - Edge: Hard edge LF + Soft edge LF → Blade Edge line items
   - Mulch Bed: SF × percentage mulched → Mulch Spreading items with depth-adjusted coverage
   - Perennial: percentage of bed area → Perennial Care items
@@ -349,7 +352,7 @@ text-my-team/
 
 #### Combined Apps Script Endpoints
 
-**GET endpoints (30):**
+**GET endpoints (31):**
 | Endpoint | Source | Description |
 |----------|--------|-------------|
 | `getInitData` | Estimating | **Bulk init** — returns all estimating data in a single request (itemCatalog, bidSettings, bids, templates, serviceCatalog, contacts, properties, propertyContacts, subContractors, reminders). Reduces 10+ network round-trips to 1. |
@@ -368,6 +371,7 @@ text-my-team/
 | `getEstimatingProperties` | Estimating | Returns all properties with full fields: address, city, state, zip, propertyType, measurements, difficulty JSON, crew, PIN, timestamps |
 | `getPropertyContacts` | Estimating | Returns all links from PropertyContacts junction sheet (linkId, propertyId, contactId, role) |
 | `getSubContractors` | Estimating | Returns all sub-contractors, optional `propertyId` filter |
+| `getTakeoffSections` | Estimating | Returns takeoff section configuration JSON for a division (default 'MNT') from TakeoffSections sheet |
 | `getSavedReports` | Crew | Returns JSON report files from Drive for a property |
 | `getReportData` | Crew | Reads JSON report data from Drive by fileId |
 | `getPhotoBase64` | Crew | Reads photo from Drive, returns base64 |
@@ -385,7 +389,7 @@ text-my-team/
 
 `getInitData` bulk response also includes `reminders: getReminders()` so estimate.html gets all reminders on load.
 
-**POST endpoints (48):**
+**POST endpoints (49):**
 | Endpoint | Source | Description |
 |----------|--------|-------------|
 | `saveReminder` | Reminders | Creates a reminder in the Reminders sheet with auto-generated REM-0001 format ID. Fields: propertyAddress, propertyId, description, scheduledDate, isPermanent, createdBy, createdByPhone, assignedCrew, photoUrl |
@@ -415,6 +419,7 @@ text-my-team/
 | `saveBidSettings` | Estimating | Saves settings key-value pairs |
 | `saveTemplate` | Estimating | Creates or updates template |
 | `deleteTemplate` | Estimating | Deletes template by ID |
+| `saveTakeoffSections` | Estimating | Upserts takeoff section configuration JSON for a division into TakeoffSections sheet (auto-creates sheet with division/configJSON/lastModified columns) |
 | `deleteBid` | Estimating | Deletes bid by ID |
 | `saveTimeEntry` | Crew | Creates time entry (day_clock, job, indirect, service). Accepts optional `estimatedHours` for service entries (auto-upgrades Estimated Hours column) |
 | `updateTimeEntry` | Crew | Updates existing time entry (fills in clockOut/duration/crewMembers/memberCount). Supports clearing clockOut (empty string) for undo operations. Finds by entryId or by crew+date+type fallback |
@@ -513,6 +518,8 @@ text-my-team/
 - `calculatePaymentSchedule()` → penny distribution algorithm
 - `buildServicesFromTakeoffs()` → master takeoff-to-line-item pipeline
 - All individual takeoff calculators (lawn, edge, mulch bed, perennial, weed control, seasonal color, leaf cleanup)
+- `renderTakeoffGrid()`, `onTakeoffInput()`, `toggleTakeoffExpand()`, `MNT_DEFAULT_SECTIONS` (9 sections) → collapsible unified takeoff grid system
+- `validateTakeoffParity()` → output consistency checker for old vs new takeoff paths
 - Item catalog structure → seed data for `production_rates` table (Maintenance division first, then IRR/CON/ENH)
 - Service catalog → seed data for service templates (per division)
 - `currentEstimate` data model → maps cleanly to PostgreSQL schema + shared TypeScript types
@@ -602,6 +609,7 @@ Both apps live in the same monorepo, share the component library (`packages/ui`)
 **Current: AWS Lambda + API Gateway + S3 (Python/WeasyPrint + ReportLab dual engine) — Container image deployment**
 - Endpoint: `https://ibjyxrp542.execute-api.us-east-1.amazonaws.com/prod/generate_site_report`
 - Upload URLs endpoint: `https://ibjyxrp542.execute-api.us-east-1.amazonaws.com/prod/upload-urls`
+- MARVIN AI endpoint: `https://ibjyxrp542.execute-api.us-east-1.amazonaws.com/prod/marvin`
 - **Architecture**: Two input paths, both produce PDFs via `pdf_generator.py` (WeasyPrint) or `main.py` (ReportLab):
   - **S3 path (primary)**: crew.html → POST `/upload-urls` → Lambda returns pre-signed S3 PUT URLs → crew.html PUTs photos directly to S3 (10 concurrent, upload-as-you-go) → POST `/generate_site_report` with JSON body containing `s3Keys` → Lambda fetches photos from S3 via boto3 → generates PDF
   - **Multipart path (legacy fallback)**: crew.html → POST `/generate_site_report` with `multipart/form-data` containing photo blobs → Lambda parses multipart → generates PDF
@@ -612,7 +620,8 @@ Both apps live in the same monorepo, share the component library (`packages/ui`)
 - **Rendering engines**: Two engines coexist during migration. The `renderer` field in metadata JSON selects the engine (`"weasyprint"` default, `"reportlab"` fallback). `DEFAULT_RENDERER` in `lambda_function.py` controls the global default.
 - **WeasyPrint engine** (`pdf_generator.py`): Jinja2 HTML/CSS templates rendered to PDF via WeasyPrint. Photos embedded as base64 data URIs. Templates live in `cloud-function/templates/`. CSS edits are previewable in a browser via `test_local.py --html`.
 - **ReportLab engine** (`main.py`): Original coordinate-based PDF generation (~2,193 lines). Available as fallback — set `DEFAULT_RENDERER = "reportlab"` in `lambda_function.py` to switch back.
-- `lambda_function.py` — Lambda handler: routes by path (`/upload-urls` → pre-signed URL generation, `/generate_site_report` → PDF generation). PDF path detects content type: `application/json` → S3 flow (looks for `s3Keys`/`beforeS3Keys`/`afterS3Keys`), `multipart/form-data` → legacy multipart flow. Routes by `metadata.type`: `invoice` → `generate_invoice_pdf()` (WeasyPrint only), `contract` → `generate_contract_pdf()`, `before_after` → `generate_before_after_report()`, `standard` → `generate_standard_report()`
+- `lambda_function.py` — Lambda handler: routes by path (`/upload-urls` → pre-signed URL generation, `/marvin` → MARVIN AI section generation, `/generate_site_report` → PDF generation). PDF path detects content type: `application/json` → S3 flow (looks for `s3Keys`/`beforeS3Keys`/`afterS3Keys`), `multipart/form-data` → legacy multipart flow. Routes by `metadata.type`: `invoice` → `generate_invoice_pdf()` (WeasyPrint only), `contract` → `generate_contract_pdf()`, `before_after` → `generate_before_after_report()`, `standard` → `generate_standard_report()`
+- **MARVIN AI endpoint** (`/marvin`): AI-powered takeoff section generator for the estimating tool. Accepts POST with `{ "prompt": "..." }` body. Uses Anthropic Claude API (`claude-sonnet-4-20250514`) to generate section configurations as JSON. Supports 3 section types: `split` (divide total by percentage rows), `value` (single input), `calc` (input x constant = output). API key stored in AWS Secrets Manager (`marvin-api-key`) and resolved at deploy time via `{{resolve:secretsmanager:...}}` in SAM template. `anthropic>=0.40.0` added to `requirements.txt`. Function: `_handle_marvin()` in `lambda_function.py`.
 - Lambda config: Python 3.12, **2048MB memory**, **300s timeout**
 - **Deployment**: **Docker container image on ECR**. SAM builds the Dockerfile locally (requires Docker Desktop running), pushes to ECR, and updates the Lambda. Base image: `public.ecr.aws/lambda/python:3.12` (Amazon Linux 2023). System packages installed via `dnf`: pango 1.54, cairo 1.18, gdk-pixbuf2, harfbuzz 7.0, fontconfig, freetype. Redeployment: `cd cloud-function/deploy && ./deploy-docker.sh` (builds image, pushes to ECR, updates Lambda).
 - **ECR repository**: `598386792755.dkr.ecr.us-east-1.amazonaws.com/endurancepdfgeneratorab3806a9/pdfgeneratorfunctionb84ef44frepo`

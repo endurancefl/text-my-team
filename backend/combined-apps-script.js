@@ -97,6 +97,8 @@ function doGet(e) {
         return jsonResponse(getPropertyContacts());
       case 'getSubContractors':
         return jsonResponse(getSubContractors(e.parameter.propertyId));
+      case 'getTakeoffSections':
+        return jsonResponse(getTakeoffSections(e.parameter.division));
 
       // ─── Invoicing ───
       case 'getInvoices':
@@ -159,6 +161,9 @@ function doPost(e) {
     }
     if (data.deleteTemplate) {
       return jsonResponse(deleteTemplate(data.templateId));
+    }
+    if (data.saveTakeoffSections) {
+      return jsonResponse(saveTakeoffSections(data));
     }
     if (data.deleteBid) {
       return jsonResponse(deleteBid(data.bidId));
@@ -5143,4 +5148,53 @@ function recordSignature(data) {
   }
 
   return { success: false, error: 'Invalid signing token' };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TAKEOFF SECTIONS CONFIGURATION
+// ═══════════════════════════════════════════════════════════════
+
+function getTakeoffSections(division) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('TakeoffSections');
+  if (!sheet) {
+    return { success: true, configJSON: null };
+  }
+
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(division || 'MNT')) {
+      return { success: true, configJSON: data[i][1] };
+    }
+  }
+
+  return { success: true, configJSON: null };
+}
+
+function saveTakeoffSections(data) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('TakeoffSections');
+
+  if (!sheet) {
+    sheet = ss.insertSheet('TakeoffSections');
+    sheet.getRange(1, 1, 1, 3).setValues([['division', 'configJSON', 'lastModified']]);
+    sheet.getRange(1, 1, 1, 3).setFontWeight('bold');
+  }
+
+  var division = data.division || 'MNT';
+  var configJSON = data.configJSON || '{}';
+  var now = new Date().toISOString();
+
+  // Upsert: find existing row for this division
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(division)) {
+      sheet.getRange(i + 1, 2, 1, 2).setValues([[configJSON, now]]);
+      return { success: true };
+    }
+  }
+
+  // Insert new row
+  sheet.appendRow([division, configJSON, now]);
+  return { success: true };
 }

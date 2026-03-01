@@ -88,6 +88,9 @@ def lambda_handler(event, context):
     if "/upload-urls" in path:
         return _handle_upload_urls(event, allowed)
 
+    if "/marvin" in path:
+        return _handle_marvin(event, allowed)
+
     # Default: PDF generation
     return _handle_generate_pdf(event, allowed, headers)
 
@@ -439,3 +442,75 @@ def _parse_multipart(body, boundary):
             result["fields"][name] = body_data.decode("utf-8", errors="replace")
 
     return result
+
+
+def _handle_marvin(event, allowed):
+    """Handle MARVIN AI section generation requests."""
+    try:
+        body = event.get("body", "")
+        is_base64 = event.get("isBase64Encoded", False)
+        if is_base64:
+            body = base64.b64decode(body).decode("utf-8")
+
+        data = json.loads(body)
+        prompt = data.get("prompt", "").strip()
+
+        if not prompt:
+            return _error_response("Missing 'prompt' in request body", 400, allowed)
+
+        # Get API key from environment
+        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        if not api_key:
+            return _error_response("ANTHROPIC_API_KEY not configured", 500, allowed)
+
+        import anthropic
+        client = anthropic.Anthropic(api_key=api_key)
+
+        system_prompt = """You are MARVIN, a takeoff section generator for a landscape maintenance estimating tool.
+
+Given a user description, generate a section configuration as JSON. There are 3 section types:
+
+1. "split" — divides a total into sub-rows by percentage. Example: lawn split by mower type.
+   Config: { "type": "split", "label": "Section Name", "unit": "SF", "rows": ["Row 1", "Row 2", "Row 3"] }
+
+2. "value" — a single input value. Example: number of palm trees.
+   Config: { "type": "value", "label": "Section Name", "unit": "EA" }
+
+3. "calc" — input × constant = output. Example: flowers ÷ 18 = flats.
+   Config: { "type": "calc", "label": "Section Name", "inputLabel": "Input Name", "inputUnit": "EA", "constant": 18, "constantLabel": "per flat", "outputLabel": "Output Name", "outputUnit": "flats" }
+
+Available units: SF, LF, CY, EA, bags, flats, gallons, hours, lbs, tons, pallets
+
+Return ONLY a JSON object with a "sections" array containing one or more section configs. No markdown, no explanation."""
+
+        message = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=1024,
+            system=system_prompt,
+            messages=[{"role": "user", "content": prompt}],
+        )
+
+        result_text = message.content[0].text.strip()
+
+        # Try to parse as JSON
+        try:
+            result_json = json.loads(result_text)
+        except json.JSONDecodeError:
+            # Try to extract JSON from response
+            import re
+            json_match = re.search(r'\{[\s\S]*\}', result_text)
+            if json_match:
+                result_json = json.loads(json_match.group())
+            else:
+                result_json = {"error": "Could not parse AI response", "raw": result_text}
+
+        resp_headers = cors_headers(allowed)
+        resp_headers["Content-Type"] = "application/json"
+        return {
+            "statusCode": 200,
+            "headers": resp_headers,
+            "body": json.dumps({"success": True, "result": result_json}),
+        }
+
+    except Exception as e:
+        return _error_response(f"MARVIN error: {e}", 500, allowed)

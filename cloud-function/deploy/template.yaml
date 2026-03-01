@@ -51,6 +51,7 @@ Resources:
       Environment:
         Variables:
           PHOTO_BUCKET: !Ref PhotoUploadBucket
+          ANTHROPIC_API_KEY: '{{resolve:secretsmanager:marvin-api-key:SecretString:key}}'
       Events:
         GeneratePdf:
           Type: HttpApi
@@ -75,6 +76,18 @@ Resources:
           Properties:
             ApiId: !Ref PdfApi
             Path: /upload-urls
+            Method: OPTIONS
+        Marvin:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref PdfApi
+            Path: /marvin
+            Method: POST
+        MarvinCors:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref PdfApi
+            Path: /marvin
             Method: OPTIONS
     Metadata:
       DockerTag: latest

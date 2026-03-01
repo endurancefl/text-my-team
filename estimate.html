@@ -501,7 +501,10 @@
                     <div class="takeoffs-section">
                       <label class="form-label">Takeoff Tables</label>
 
-                  <!-- Takeoff Cards -->
+                  <!-- Unified Takeoff Grid (new) -->
+                  <div id="takeoff-unified-grid" style="display:none"></div>
+
+                  <!-- Takeoff Cards (legacy) -->
                   <div class="takeoff-card-grid" id="takeoff-card-grid">
 
                     <!-- Lawn Card -->
@@ -2446,6 +2449,13 @@ const OFFICE_PHONE = '4075794403';
 const DEBUG = false;
 function debugLog(...args) { if (DEBUG) console.log(...args); }
 
+// ── Unified Takeoff Grid Feature Flag ──
+const USE_NEW_TAKEOFF = true;
+let companyTakeoffSections = null; // loaded from backend
+let expandedTakeoffSections = new Set(); // which sections are expanded in the grid
+const DEFAULT_DISABLED_SECTIONS = ['mulchBed', 'perennial', 'seasonalColor', 'mulchSub'];
+let takeoffInputMode = {}; // sectionId → 'value' (SF/LF) or 'pct' (percentage)
+
 let _toastTimer = null;
 function showToast(message, type = 'info', duration = 4000) {
   const el = document.getElementById('toast-notification');
@@ -3948,16 +3958,1171 @@ function removeMowerEquipment(idx) {
 // Render all Property Setup tables
 function renderPropertySetupTables() {
   renderPropertyFeatures();
-  renderMowerTable();
-  renderEdgeTable();
-  renderHedgeTrimmingTable();
-  renderSeasonalColorTable();
-  renderMulchBedTable();
-  renderPerennialTable();
-  renderMulchSubTable();
-  renderLeafCleanupTable();
-  renderWeedControlTable();
-  updateTakeoffCardStatuses();
+
+  if (USE_NEW_TAKEOFF) {
+    // Hide old cards, show new grid
+    const oldGrid = document.getElementById('takeoff-card-grid');
+    const newGrid = document.getElementById('takeoff-unified-grid');
+    if (oldGrid) oldGrid.style.display = 'none';
+    if (newGrid) newGrid.style.display = '';
+    renderTakeoffGrid();
+  } else {
+    // Legacy path
+    const oldGrid = document.getElementById('takeoff-card-grid');
+    const newGrid = document.getElementById('takeoff-unified-grid');
+    if (oldGrid) oldGrid.style.display = '';
+    if (newGrid) newGrid.style.display = 'none';
+    renderMowerTable();
+    renderEdgeTable();
+    renderHedgeTrimmingTable();
+    renderSeasonalColorTable();
+    renderMulchBedTable();
+    renderPerennialTable();
+    renderMulchSubTable();
+    renderLeafCleanupTable();
+    renderWeedControlTable();
+    updateTakeoffCardStatuses();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  UNIFIED TAKEOFF GRID — Section Definitions
+// ═══════════════════════════════════════════════════════════════
+
+const MNT_DEFAULT_SECTIONS = [
+  {
+    id: 'lawnEquipment', label: 'Lawn Equipment', type: 'split', unit: 'SF',
+    enabled: true, isDefault: true, order: 0,
+    parentMeasurement: () => currentEstimate.takeoffs?.lawn?.rawSF || 0,
+    readRows(t, f) {
+      const rawSF = t.lawn?.rawSF || 0;
+      return (t.lawn?.equipment || []).map(e => ({
+        label: e.itemName,
+        value: Math.round(rawSF * (e.percentage || 0) / 100),
+        pct: e.percentage || 0,
+        isSelect: true
+      }));
+    },
+    readTotal(t, f) { return t.lawn?.rawSF || 0; },
+    summaryText(t, f) {
+      const rows = (t.lawn?.equipment || []).filter(e => e.percentage > 0);
+      if (rows.length === 0) return '';
+      return rows.map(e => `${e.itemName} ${Math.round(e.percentage)}%`).join(' · ');
+    }
+  },
+  {
+    id: 'edge', label: 'Edge', type: 'value', unit: 'LF',
+    enabled: true, isDefault: true, order: 1,
+    parentMeasurement: () => currentEstimate.features['Total Edge'] || 0,
+    readRows(t, f) {
+      const totalLF = (t.edge?.rawHardLF || 0) + (t.edge?.rawSoftLF || 0);
+      return [
+        { label: 'Total Edge', value: totalLF, field: 'totalEdge' }
+      ];
+    },
+    readTotal(t, f) { return (t.edge?.rawHardLF || 0) + (t.edge?.rawSoftLF || 0); },
+    summaryText(t, f) {
+      const totalLF = (t.edge?.rawHardLF || 0) + (t.edge?.rawSoftLF || 0);
+      if (totalLF === 0) return '';
+      return `${formatNum(totalLF)} LF`;
+    }
+  },
+  {
+    id: 'hedgeTrimming', label: 'Hedge Trimming', type: 'split', unit: 'SF',
+    enabled: true, isDefault: true, order: 2,
+    parentMeasurement: () => currentEstimate.features['Hedge'] || 0,
+    readRows(t, f) {
+      const hedgeSF = f['Hedge'] || 0;
+      return [
+        { label: 'Hedge <4ft',  value: Math.round(hedgeSF * (t.hedgeTrimming?.pctUnder4ft || 0) / 100), pct: t.hedgeTrimming?.pctUnder4ft || 0 },
+        { label: 'Hedge 4-6ft', value: Math.round(hedgeSF * (t.hedgeTrimming?.pct4to6ft || 0) / 100),   pct: t.hedgeTrimming?.pct4to6ft || 0 },
+        { label: 'Hedge 6ft+',  value: Math.round(hedgeSF * (t.hedgeTrimming?.pctOver6ft || 0) / 100),  pct: t.hedgeTrimming?.pctOver6ft || 0 }
+      ];
+    },
+    readTotal(t, f) { return f['Hedge'] || 0; },
+    summaryText(t, f) {
+      const parts = [];
+      if (t.hedgeTrimming?.pctUnder4ft > 0) parts.push(`<4ft ${Math.round(t.hedgeTrimming.pctUnder4ft)}%`);
+      if (t.hedgeTrimming?.pct4to6ft > 0) parts.push(`4-6ft ${Math.round(t.hedgeTrimming.pct4to6ft)}%`);
+      if (t.hedgeTrimming?.pctOver6ft > 0) parts.push(`6ft+ ${Math.round(t.hedgeTrimming.pctOver6ft)}%`);
+      return parts.join(' · ');
+    }
+  },
+  {
+    id: 'mulchBed', label: 'Mulch Bed', type: 'value', unit: 'SF',
+    enabled: true, isDefault: true, order: 3,
+    parentMeasurement: () => (currentEstimate.features['Mulch Bed'] || 0) + (currentEstimate.features['Hedge'] || 0),
+    readRows(t, f) {
+      const totalBed = (f['Mulch Bed'] || 0) + (f['Hedge'] || 0);
+      const mulchArea = Math.round(totalBed * (t.mulchBed?.pctMulched || 0) / 100);
+      return [
+        { label: 'Total Bed Area',  value: totalBed,   readonly: true },
+        { label: 'Area to Mulch',   value: mulchArea,   field: 'mulchArea' },
+        { label: 'Depth (inches)',   value: t.mulchSub?.depthInches || 2, field: 'depthInches', unit: 'in' }
+      ];
+    },
+    readTotal(t, f) {
+      const totalBed = (f['Mulch Bed'] || 0) + (f['Hedge'] || 0);
+      return Math.round(totalBed * (t.mulchBed?.pctMulched || 0) / 100);
+    },
+    summaryText(t, f) {
+      const totalBed = (f['Mulch Bed'] || 0) + (f['Hedge'] || 0);
+      const mulchArea = Math.round(totalBed * (t.mulchBed?.pctMulched || 0) / 100);
+      const depth = t.mulchSub?.depthInches || 2;
+      if (totalBed === 0) return '';
+      return `${formatNum(mulchArea)} of ${formatNum(totalBed)} SF · ${depth}" deep`;
+    }
+  },
+  {
+    id: 'weedControl', label: 'Weed Control', type: 'split', unit: 'SF',
+    enabled: true, isDefault: true, order: 4,
+    parentMeasurement: () => {
+      const f = currentEstimate.features;
+      const t = currentEstimate.takeoffs;
+      const totalBed = (f['Mulch Bed'] || 0) + (f['Hedge'] || 0);
+      return Math.round(totalBed * (t?.weedControl?.pctNeedsTreatment ?? 100) / 100);
+    },
+    readRows(t, f) {
+      const totalBed = (f['Mulch Bed'] || 0) + (f['Hedge'] || 0);
+      const treatable = Math.round(totalBed * (t.weedControl?.pctNeedsTreatment ?? 100) / 100);
+      return [
+        { label: 'Liquid', value: Math.round(treatable * (t.weedControl?.pctLiquid || 0) / 100), pct: t.weedControl?.pctLiquid || 0 },
+        { label: 'Hand',   value: Math.round(treatable * (t.weedControl?.pctHand || 0) / 100),   pct: t.weedControl?.pctHand || 0 }
+      ];
+    },
+    readTotal(t, f) {
+      const totalBed = (f['Mulch Bed'] || 0) + (f['Hedge'] || 0);
+      return Math.round(totalBed * (t.weedControl?.pctNeedsTreatment ?? 100) / 100);
+    },
+    summaryText(t, f) {
+      const parts = [];
+      if (t.weedControl?.pctLiquid > 0) parts.push(`Liquid ${Math.round(t.weedControl.pctLiquid)}%`);
+      if (t.weedControl?.pctHand > 0) parts.push(`Hand ${Math.round(t.weedControl.pctHand)}%`);
+      return parts.join(' · ');
+    }
+  },
+  {
+    id: 'perennial', label: 'Perennial', type: 'value', unit: 'SF',
+    enabled: true, isDefault: true, order: 5,
+    parentMeasurement: () => (currentEstimate.features['Mulch Bed'] || 0) + (currentEstimate.features['Hedge'] || 0),
+    readRows(t, f) {
+      const totalBed = (f['Mulch Bed'] || 0) + (f['Hedge'] || 0);
+      const sf = Math.round(totalBed * (t.perennial?.pctWithPerennials || 0) / 100);
+      return [
+        { label: 'Perennial Area', value: sf, field: 'perennialArea' }
+      ];
+    },
+    readTotal(t, f) {
+      const totalBed = (f['Mulch Bed'] || 0) + (f['Hedge'] || 0);
+      return Math.round(totalBed * (t.perennial?.pctWithPerennials || 0) / 100);
+    },
+    summaryText(t, f) {
+      const totalBed = (f['Mulch Bed'] || 0) + (f['Hedge'] || 0);
+      const sf = Math.round(totalBed * (t.perennial?.pctWithPerennials || 0) / 100);
+      if (sf === 0) return '';
+      const pct = t.perennial?.pctWithPerennials || 0;
+      return `${formatNum(sf)} SF (${Math.round(pct)}% of beds)`;
+    }
+  },
+  {
+    id: 'seasonalColor', label: 'Seasonal Color', type: 'calc', unit: 'EA',
+    enabled: true, isDefault: true, order: 6,
+    parentMeasurement: () => null, // always relevant — no parent feature
+    readRows(t, f) {
+      const flowers = t.seasonalColor?.totalFlowers || 0;
+      const perFlat = t.seasonalColor?.flowersPerFlat || 18;
+      const flats = perFlat > 0 ? Math.ceil(flowers / perFlat) : 0;
+      return [
+        { label: 'Total Flowers',    value: flowers,  field: 'totalFlowers', unit: 'EA' },
+        { label: 'Flowers per Flat',  value: perFlat,  field: 'flowersPerFlat', unit: 'EA', readonly: true },
+        { label: 'Total Flats',       value: flats,    readonly: true, unit: 'flats' }
+      ];
+    },
+    readTotal(t, f) { return t.seasonalColor?.totalFlowers || 0; },
+    summaryText(t, f) {
+      const flowers = t.seasonalColor?.totalFlowers || 0;
+      const perFlat = t.seasonalColor?.flowersPerFlat || 18;
+      const flats = perFlat > 0 ? Math.ceil(flowers / perFlat) : 0;
+      if (flowers === 0) return '';
+      return `${formatNum(flowers)} flowers · ${flats} flats`;
+    }
+  },
+  {
+    id: 'leafCleanup', label: 'Leaf Cleanup', type: 'calc', unit: 'SF',
+    enabled: true, isDefault: true, order: 7,
+    parentMeasurement: () => (currentEstimate.features['Lawn'] || 0) + (currentEstimate.features['Hardscape'] || 0),
+    readRows(t, f) {
+      const lawnSF = f['Lawn'] || 0;
+      const hardSF = f['Hardscape'] || 0;
+      const turfCov = Math.round(lawnSF * (t.leafCleanup?.canopyTurfPct || 0) / 100);
+      const hardCov = Math.round(hardSF * (t.leafCleanup?.canopyHardscapePct || 0) / 100);
+      const totalLeaf = turfCov + hardCov;
+      const bags = (t.leafCleanup?.sfPerBag || 8400) > 0 ? Math.ceil(totalLeaf / (t.leafCleanup?.sfPerBag || 8400)) : 0;
+      return [
+        { label: 'Turf Canopy',      value: turfCov,  field: 'canopyTurf', unit: 'SF' },
+        { label: 'Hardscape Canopy', value: hardCov,  field: 'canopyHard', unit: 'SF' },
+        { label: 'Total Leaf SF',    value: totalLeaf, readonly: true, unit: 'SF' },
+        { label: 'SF per Bag',       value: t.leafCleanup?.sfPerBag || 8400, field: 'sfPerBag', unit: 'SF', readonly: true },
+        { label: 'Total Bags',       value: bags, readonly: true, unit: 'bags' }
+      ];
+    },
+    readTotal(t, f) {
+      const lawnSF = f['Lawn'] || 0;
+      const hardSF = f['Hardscape'] || 0;
+      return Math.round(lawnSF * (t.leafCleanup?.canopyTurfPct || 0) / 100) +
+             Math.round(hardSF * (t.leafCleanup?.canopyHardscapePct || 0) / 100);
+    },
+    summaryText(t, f) {
+      const lawnSF = f['Lawn'] || 0;
+      const hardSF = f['Hardscape'] || 0;
+      const turfCov = Math.round(lawnSF * (t.leafCleanup?.canopyTurfPct || 0) / 100);
+      const hardCov = Math.round(hardSF * (t.leafCleanup?.canopyHardscapePct || 0) / 100);
+      const totalLeaf = turfCov + hardCov;
+      const bags = (t.leafCleanup?.sfPerBag || 8400) > 0 ? Math.ceil(totalLeaf / (t.leafCleanup?.sfPerBag || 8400)) : 0;
+      if (totalLeaf === 0) return '';
+      return `${formatNum(totalLeaf)} SF · ${bags} bags`;
+    }
+  },
+  {
+    id: 'mulchSub', label: 'Mulch Sub', type: 'value', unit: 'CY',
+    enabled: true, isDefault: true, order: 8,
+    parentMeasurement: () => (currentEstimate.features['Mulch Bed'] || 0) + (currentEstimate.features['Hedge'] || 0),
+    readRows(t, f) {
+      const calc = calculateMulchSubTakeoff();
+      return [
+        { label: 'Mulch Area (SF)',   value: Math.round(calc.sf),  field: 'overrideSF' },
+        { label: 'Coverage per CY',   value: calc.coveragePerCY,   field: 'coveragePerCY', readonly: true, unit: 'SF' },
+        { label: 'Cubic Yards',        value: calc.cubicYards,      readonly: true, unit: 'CY' },
+        { label: 'Cost per CY',        value: calc.costPerCY,       field: 'costPerCY', unit: '$' },
+        { label: 'Total Cost',          value: calc.totalCost,       readonly: true, unit: '$' }
+      ];
+    },
+    readTotal(t, f) {
+      const calc = calculateMulchSubTakeoff();
+      return calc.cubicYards;
+    },
+    summaryText(t, f) {
+      const calc = calculateMulchSubTakeoff();
+      if (calc.cubicYards === 0) return '';
+      return `${calc.cubicYards} CY · $${formatNum(calc.totalCost)}`;
+    }
+  }
+];
+
+function getActiveSections() {
+  let sections = MNT_DEFAULT_SECTIONS.slice();
+  if (!companyTakeoffSections) {
+    // No backend config — apply default disabled sections
+    sections = sections.filter(s => !DEFAULT_DISABLED_SECTIONS.includes(s.id));
+    return sections;
+  }
+  if (companyTakeoffSections) {
+    try {
+      const cfg = typeof companyTakeoffSections === 'string' ? JSON.parse(companyTakeoffSections) : companyTakeoffSections;
+      if (cfg.order) {
+        sections.sort((a, b) => {
+          const aIdx = cfg.order.indexOf(a.id);
+          const bIdx = cfg.order.indexOf(b.id);
+          return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
+        });
+      }
+      const disabled = cfg.disabled || DEFAULT_DISABLED_SECTIONS;
+      sections = sections.filter(s => !disabled.includes(s.id));
+      // Add custom sections
+      if (cfg.custom) {
+        cfg.custom.forEach(cs => {
+          sections.push({
+            id: cs.id, label: cs.label, type: cs.type, unit: cs.unit,
+            enabled: true, isDefault: false, order: sections.length,
+            readRows(t, f) {
+              const custom = t.custom?.[cs.id];
+              if (!custom) return cs.rows ? cs.rows.map(r => ({ label: r, value: 0, pct: 0 })) : [{ label: cs.label, value: 0 }];
+              return (custom.rows || []).map(r => ({ label: r.label, value: r.value || 0, pct: r.pct || 0 }));
+            },
+            readTotal(t, f) {
+              const custom = t.custom?.[cs.id];
+              return custom ? (custom.rows || []).reduce((s, r) => s + (r.value || 0), 0) : 0;
+            },
+            customConfig: cs
+          });
+        });
+      }
+    } catch (e) {
+      console.warn('Failed to apply takeoff section config:', e);
+    }
+  }
+  return sections;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  UNIFIED TAKEOFF GRID — Renderer
+// ═══════════════════════════════════════════════════════════════
+
+function renderTakeoffGrid() {
+  initializeTakeoffs();
+  migrateTakeoffData();
+  const container = document.getElementById('takeoff-unified-grid');
+  if (!container) return;
+
+  const t = currentEstimate.takeoffs;
+  const f = currentEstimate.features || {};
+  const sections = getActiveSections();
+
+  let html = `
+    <div class="takeoff">
+      <div class="takeoff-toolbar">
+        <h3>Property Takeoff</h3>
+        <button class="config-btn" onclick="showTakeoffConfigModal()">&#9881; Configure Sections</button>
+      </div>
+      <div class="takeoff-sections">`;
+
+  sections.forEach(sec => {
+    const rows = sec.readRows(t, f);
+    const total = sec.readTotal(t, f);
+    // Dot status: green = complete, red = incomplete (has parent measurement but no data), gray = unused
+    const parentVal = sec.parentMeasurement ? sec.parentMeasurement() : null;
+    const hasParent = parentVal !== null ? parentVal > 0 : true; // sections without parentMeasurement are always relevant
+    const hasData = total > 0 || rows.some(r => r.value > 0 && !r.readonly);
+    let dotClass;
+    if (!hasParent && !hasData) {
+      dotClass = 'dot-gray'; // unused — no parent feature measurement
+    } else if (hasData) {
+      // Check if data is complete (split sections: percentages should sum ~100)
+      if (sec.type === 'split' && sec.parentMeasurement) {
+        const rowSum = rows.reduce((s, r) => s + (r.value || 0), 0);
+        const parent = sec.parentMeasurement();
+        dotClass = parent > 0 && Math.abs(rowSum - parent) <= 1 ? 'dot-on' : 'dot-incomplete';
+      } else {
+        dotClass = 'dot-on'; // has data, not a split with parent — consider complete
+      }
+    } else {
+      dotClass = 'dot-incomplete'; // has parent but no data — needs attention
+    }
+    const isExpanded = expandedTakeoffSections.has(sec.id);
+    const summary = sec.summaryText ? sec.summaryText(t, f) : '';
+
+    // Section card
+    html += `<div class="takeoff-section${isExpanded ? ' expanded' : ''}" data-section="${sec.id}">`;
+
+    // Summary row — always visible, clickable to expand/collapse
+    html += `<div class="takeoff-summary" onclick="toggleTakeoffExpand('${sec.id}')">
+        <span class="takeoff-dot ${dotClass}"></span>
+        <span class="takeoff-sec-label">${sec.label}</span>
+        <span class="takeoff-sec-summary">${summary}</span>
+        <span class="takeoff-sec-total">${hasData ? formatNum(total) + ' ' + sec.unit : '—'}</span>
+        <span class="takeoff-chevron">${isExpanded ? '&#9650;' : '&#9660;'}</span>
+      </div>`;
+
+    // Detail rows — only rendered when expanded
+    if (isExpanded) {
+      html += `<div class="takeoff-detail">`;
+      html += `<table class="takeoff-tbl">
+        <colgroup>
+          <col class="col-del"><col class="col-label"><col class="col-input">
+          <col class="col-unit"><col class="col-pct"><col class="col-action">
+        </colgroup>
+        <tbody>`;
+
+      if (sec.type === 'split') {
+        const mode = takeoffInputMode[sec.id] || 'value'; // 'value' = SF/LF, 'pct' = percentage
+        const isValMode = mode === 'value';
+
+        // Mode toggle
+        html += `<tr class="mode-toggle-row">
+          <td></td>
+          <td colspan="5">
+            <div class="input-mode-toggle">
+              <span class="mode-label${isValMode ? ' active' : ''}" onclick="setTakeoffInputMode('${sec.id}','value')">${sec.unit}</span>
+              <div class="mode-switch${isValMode ? '' : ' pct'}" onclick="setTakeoffInputMode('${sec.id}','${isValMode ? 'pct' : 'value'}')"></div>
+              <span class="mode-label${!isValMode ? ' active' : ''}" onclick="setTakeoffInputMode('${sec.id}','pct')">%</span>
+            </div>
+          </td>
+        </tr>`;
+
+        // Column headers
+        html += `<tr class="col-header">
+          <td></td><td></td>
+          <td style="text-align:right">${isValMode ? sec.unit : '%'}</td>
+          <td></td>
+          <td style="text-align:right">${isValMode ? '%' : sec.unit}</td>
+          <td></td>
+        </tr>`;
+
+        // Data rows
+        rows.forEach((row, idx) => {
+          const pctVal = row.pct !== null && row.pct !== undefined ? Math.round(row.pct) : 0;
+          const sfVal = row.value || 0;
+          if (isValMode) {
+            // Input = SF/LF, display = %
+            html += `<tr class="data-row" data-section="${sec.id}" data-row-index="${idx}">
+              <td>${sec.id === 'lawnEquipment' ? '<button class="del-btn" onclick="onTakeoffDeleteRow(this)" title="Remove">&times;</button>' : ''}</td>
+              <td class="row-label">${row.isSelect ? buildEquipmentSelect(row.label, idx) : row.label}</td>
+              <td><input type="text" class="t-input${sfVal === 0 ? ' zero' : ''}" value="${formatNum(sfVal)}"
+                  data-section="${sec.id}" data-row-index="${idx}" data-field="value" inputmode="numeric"></td>
+              <td class="row-unit">${sec.unit}</td>
+              <td class="row-pct">${pctVal > 0 ? pctVal + '%' : ''}</td>
+              <td></td>
+            </tr>`;
+          } else {
+            // Input = %, display = SF/LF
+            html += `<tr class="data-row" data-section="${sec.id}" data-row-index="${idx}">
+              <td>${sec.id === 'lawnEquipment' ? '<button class="del-btn" onclick="onTakeoffDeleteRow(this)" title="Remove">&times;</button>' : ''}</td>
+              <td class="row-label">${row.isSelect ? buildEquipmentSelect(row.label, idx) : row.label}</td>
+              <td><input type="text" class="t-input${pctVal === 0 ? ' zero' : ''}" value="${pctVal}"
+                  data-section="${sec.id}" data-row-index="${idx}" data-field="pct" inputmode="numeric"></td>
+              <td class="row-unit">%</td>
+              <td class="row-pct">${sfVal > 0 ? formatNum(sfVal) + ' ' + sec.unit : ''}</td>
+              <td></td>
+            </tr>`;
+          }
+        });
+
+        // Total row
+        const totalPct = rows.reduce((s, r) => s + (r.pct || 0), 0);
+        const parentTotal = sec.parentMeasurement ? sec.parentMeasurement() : null;
+        const rowSum = rows.reduce((s, r) => s + (r.value || 0), 0);
+        const mismatch = parentTotal !== null && Math.abs(rowSum - parentTotal) > 1;
+        html += `<tr class="total-row${mismatch ? ' sum-mismatch' : ''}">
+          <td></td>
+          <td class="total-label">Total</td>
+          <td class="total-value">${isValMode ? formatNum(total) : (totalPct > 0 ? Math.round(totalPct) + '%' : '')}</td>
+          <td>${isValMode ? sec.unit : ''}</td>
+          <td class="total-pct">${isValMode ? (totalPct > 0 ? Math.round(totalPct) + '%' : '') : formatNum(total) + ' ' + sec.unit}</td>
+          <td></td>
+        </tr>`;
+
+        // Add row button (only for lawn equipment)
+        if (sec.id === 'lawnEquipment') {
+          html += `<tr class="add-row">
+            <td></td><td colspan="5"><button class="add-btn" onclick="onTakeoffAddRow('${sec.id}')">+ Add Equipment</button></td>
+          </tr>`;
+        }
+      } else {
+        // value / calc sections
+        rows.forEach((row, idx) => {
+          const isRO = row.readonly;
+          html += `<tr class="data-row single-row" data-section="${sec.id}" data-row-index="${idx}">
+            <td></td>
+            <td class="row-label">${row.label}</td>
+            <td><input type="text" class="t-input${isRO ? ' readonly' : ''}${row.value === 0 ? ' zero' : ''}"
+                value="${row.unit === '$' ? '$' + formatNum(row.value) : formatNum(row.value)}"
+                data-section="${sec.id}" data-row-index="${idx}" data-field="${row.field || 'value'}"
+                ${isRO ? 'readonly tabindex="-1"' : 'inputmode="numeric"'}></td>
+            <td class="row-unit">${row.unit || sec.unit}</td>
+            <td></td><td></td>
+          </tr>`;
+        });
+      }
+
+      html += `</tbody></table></div>`;
+    }
+
+    html += `</div>`; // close takeoff-section
+  });
+
+  html += `</div></div>`; // close takeoff-sections + takeoff
+  container.innerHTML = html;
+}
+
+function toggleTakeoffExpand(sectionId) {
+  if (expandedTakeoffSections.has(sectionId)) {
+    expandedTakeoffSections.delete(sectionId);
+  } else {
+    expandedTakeoffSections.add(sectionId);
+  }
+  renderTakeoffGrid();
+}
+
+function setTakeoffInputMode(sectionId, mode) {
+  takeoffInputMode[sectionId] = mode;
+  renderTakeoffGrid();
+}
+
+function buildEquipmentSelect(currentName, idx) {
+  const items = itemCatalog.filter(c => c.category === 'Mowing' || c.item.includes('Mower') || c.item.includes('Trimmer') || c.item === 'Blade Edge');
+  let opts = items.map(it => `<option value="${it.item}"${it.item === currentName ? ' selected' : ''}>${it.item}</option>`).join('');
+  return `<select class="mower-name-select" data-index="${idx}" onchange="updateMowerName(${idx}, this.value)" style="font-size:12px;border:none;background:transparent;max-width:120px;">${opts}</select>`;
+}
+
+function formatNum(n) {
+  if (n === null || n === undefined) return '0';
+  return Math.round(n).toLocaleString('en-US');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  UNIFIED TAKEOFF GRID — Event Handling & Write-Back
+// ═══════════════════════════════════════════════════════════════
+
+let _takeoffGridEventsInitialized = false;
+function initTakeoffGridEvents() {
+  if (_takeoffGridEventsInitialized) return;
+  const grid = document.getElementById('takeoff-unified-grid');
+  if (!grid) return;
+  _takeoffGridEventsInitialized = true;
+
+  grid.addEventListener('change', e => {
+    if (e.target.classList.contains('t-input') && !e.target.readOnly) {
+      onTakeoffInput(e.target);
+    }
+  });
+
+  grid.addEventListener('focusin', e => {
+    if (e.target.classList.contains('t-input') && !e.target.readOnly) {
+      e.target.value = e.target.value.replace(/[,$]/g, '');
+      e.target.select();
+    }
+  });
+
+  grid.addEventListener('focusout', e => {
+    if (e.target.classList.contains('t-input') && !e.target.readOnly) {
+      const val = parseFloat(e.target.value.replace(/[,$]/g, '')) || 0;
+      const field = e.target.dataset.field;
+      if (field === 'pct') {
+        e.target.value = Math.round(val);
+      } else if (field === 'costPerCY' || e.target.closest('[data-section]')?.querySelector('.row-unit')?.textContent === '$') {
+        e.target.value = '$' + formatNum(val);
+      } else {
+        e.target.value = formatNum(val);
+      }
+      e.target.classList.toggle('zero', val === 0);
+    }
+  });
+}
+
+function onTakeoffInput(input) {
+  initializeTakeoffs();
+  const section = input.dataset.section;
+  const rowIdx = parseInt(input.dataset.rowIndex) || 0;
+  const field = input.dataset.field;
+  let rawVal = parseFloat(input.value.replace(/[,$]/g, '')) || 0;
+
+  const t = currentEstimate.takeoffs;
+  const f = currentEstimate.features || {};
+
+  // Cap check for split sections
+  const secDef = MNT_DEFAULT_SECTIONS.find(s => s.id === section);
+  if (secDef && secDef.type === 'split' && secDef.parentMeasurement) {
+    const parentTotal = secDef.parentMeasurement();
+    if (parentTotal > 0 && field === 'pct') {
+      // In pct mode: cap at remaining % (100 - others)
+      const rows = secDef.readRows(t, f);
+      const othersPct = rows.reduce((s, r, i) => s + (i === rowIdx ? 0 : (r.pct || 0)), 0);
+      const maxPct = 100 - othersPct;
+      if (rawVal > maxPct) {
+        rawVal = Math.max(0, Math.round(maxPct));
+        showToast(`Capped at ${rawVal}% — total can't exceed 100%. Update property measurements to increase.`, 'warning', 5000);
+      }
+    } else if (parentTotal > 0 && field === 'value') {
+      // In value mode: cap at remaining SF/LF
+      const rows = secDef.readRows(t, f);
+      const othersSum = rows.reduce((s, r, i) => s + (i === rowIdx ? 0 : (r.value || 0)), 0);
+      const maxForRow = parentTotal - othersSum;
+      if (rawVal > maxForRow) {
+        rawVal = Math.max(0, maxForRow);
+        showToast(`Capped at ${formatNum(rawVal)} — total can't exceed ${formatNum(parentTotal)} ${secDef.unit}. Update property measurements to increase.`, 'warning', 5000);
+      }
+    }
+  }
+
+  switch (section) {
+    case 'lawnEquipment': {
+      const rawSF = t.lawn.rawSF || 0;
+      if (rawSF > 0 && t.lawn.equipment[rowIdx]) {
+        if (field === 'pct') {
+          t.lawn.equipment[rowIdx].percentage = rawVal;
+        } else {
+          t.lawn.equipment[rowIdx].percentage = rawVal / rawSF * 100;
+        }
+      }
+      break;
+    }
+    case 'edge': {
+      // Combined edge — store entire value as hard edge (matches Attentive import)
+      t.edge.rawHardLF = rawVal;
+      t.edge.rawSoftLF = 0;
+      recalcTotalEdge();
+      break;
+    }
+    case 'hedgeTrimming': {
+      const hedgeSF = f['Hedge'] || 0;
+      const pct = field === 'pct' ? rawVal : (hedgeSF > 0 ? rawVal / hedgeSF * 100 : 0);
+      if (rowIdx === 0) t.hedgeTrimming.pctUnder4ft = pct;
+      else if (rowIdx === 1) t.hedgeTrimming.pct4to6ft = pct;
+      else if (rowIdx === 2) t.hedgeTrimming.pctOver6ft = pct;
+      break;
+    }
+    case 'mulchBed': {
+      if (field === 'mulchArea') {
+        const totalBed = (f['Mulch Bed'] || 0) + (f['Hedge'] || 0);
+        t.mulchBed.pctMulched = totalBed > 0 ? rawVal / totalBed * 100 : 0;
+      } else if (field === 'depthInches') {
+        t.mulchSub.depthInches = rawVal;
+      }
+      break;
+    }
+    case 'weedControl': {
+      const totalBed = (f['Mulch Bed'] || 0) + (f['Hedge'] || 0);
+      const treatable = Math.round(totalBed * (t.weedControl.pctNeedsTreatment ?? 100) / 100);
+      const pct = field === 'pct' ? rawVal : (treatable > 0 ? rawVal / treatable * 100 : 0);
+      if (rowIdx === 0) t.weedControl.pctLiquid = pct;
+      else if (rowIdx === 1) t.weedControl.pctHand = pct;
+      break;
+    }
+    case 'perennial': {
+      const totalBed = (f['Mulch Bed'] || 0) + (f['Hedge'] || 0);
+      t.perennial.pctWithPerennials = totalBed > 0 ? rawVal / totalBed * 100 : 0;
+      break;
+    }
+    case 'seasonalColor': {
+      if (field === 'totalFlowers') t.seasonalColor.totalFlowers = rawVal;
+      else if (field === 'flowersPerFlat') t.seasonalColor.flowersPerFlat = rawVal;
+      break;
+    }
+    case 'leafCleanup': {
+      if (field === 'canopyTurf') {
+        const lawnSF = f['Lawn'] || 0;
+        t.leafCleanup.canopyTurfPct = lawnSF > 0 ? rawVal / lawnSF * 100 : 0;
+      } else if (field === 'canopyHard') {
+        const hardSF = f['Hardscape'] || 0;
+        t.leafCleanup.canopyHardscapePct = hardSF > 0 ? rawVal / hardSF * 100 : 0;
+      } else if (field === 'sfPerBag') {
+        t.leafCleanup.sfPerBag = rawVal;
+      }
+      break;
+    }
+    case 'mulchSub': {
+      if (field === 'overrideSF') t.mulchSub.overrideSF = rawVal;
+      else if (field === 'coveragePerCY') t.mulchSub.coveragePerCY = rawVal;
+      else if (field === 'costPerCY') t.mulchSub.costPerCY = rawVal;
+      break;
+    }
+    default: {
+      // Custom sections
+      if (!t.custom) t.custom = {};
+      if (!t.custom[section]) t.custom[section] = { rows: [] };
+      if (t.custom[section].rows[rowIdx]) {
+        t.custom[section].rows[rowIdx].value = rawVal;
+      }
+      break;
+    }
+  }
+
+  buildServicesFromTakeoffs();
+  renderTakeoffGrid();
+  renderTableBody();
+  markEstimateDirty();
+}
+
+function onTakeoffDeleteRow(btn) {
+  const tr = btn.closest('tr');
+  const section = tr.dataset.section;
+  const idx = parseInt(tr.dataset.rowIndex);
+
+  if (section === 'lawnEquipment') {
+    removeLawnEquipment(idx);
+    if (USE_NEW_TAKEOFF) renderTakeoffGrid();
+  }
+}
+
+function onTakeoffAddRow(sectionId) {
+  if (sectionId === 'lawnEquipment') {
+    addLawnEquipment();
+    if (USE_NEW_TAKEOFF) renderTakeoffGrid();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  UNIFIED TAKEOFF GRID — Parity Validation
+// ═══════════════════════════════════════════════════════════════
+
+function validateTakeoffParity() {
+  initializeTakeoffs();
+  const results = {
+    lawn: calculateLawnTakeoffOutputs(),
+    edge: calculateEdgeTakeoffOutputs(),
+    mulchBed: calculateMulchBedTakeoffOutputs(),
+    perennial: calculatePerennialTakeoffOutputs(),
+    seasonalColor: calculateSeasonalColorTakeoffOutputs(),
+    leafCleanup: calculateLeafCleanupTakeoffOutputs(),
+    weedControl: calculateWeedControlTakeoffOutputs(),
+    hedgeTrimming: calculateHedgeTrimmingTakeoffOutputs()
+  };
+
+  console.group('Takeoff Parity Validation');
+  Object.entries(results).forEach(([key, outputs]) => {
+    console.log(`${key}:`, outputs);
+  });
+
+  // Check lawn equipment percentages sum to ~100
+  const lawn = currentEstimate.takeoffs.lawn;
+  if (lawn?.equipment?.length > 0) {
+    const equipPctSum = lawn.equipment.reduce((s, e) => s + (e.percentage || 0), 0);
+    if (Math.abs(equipPctSum - 100) > 0.5 && equipPctSum > 0) {
+      console.warn(`⚠ Lawn equipment percentages sum to ${equipPctSum}%, expected ~100%`);
+    }
+  }
+
+  // Check lawn difficulty percentages
+  if (lawn) {
+    const diffSum = (lawn.diffEasy || 0) + (lawn.diffMedium || 0) + (lawn.diffHard || 0);
+    if (Math.abs(diffSum - 100) > 0.5 && diffSum > 0) {
+      console.warn(`⚠ Lawn difficulty percentages sum to ${diffSum}%, expected ~100%`);
+    }
+  }
+
+  console.groupEnd();
+  return results;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  UNIFIED TAKEOFF GRID — Migration
+// ═══════════════════════════════════════════════════════════════
+
+function migrateTakeoffData() {
+  if (!currentEstimate.takeoffs) return;
+  if (currentEstimate.takeoffs._migrationVersion >= 1) return;
+
+  initializeTakeoffs();
+  const t = currentEstimate.takeoffs;
+  const f = currentEstimate.features || {};
+
+  // Sync lawn.rawSF ↔ features['Lawn']
+  if (t.lawn.rawSF === 0 && f['Lawn'] > 0) {
+    t.lawn.rawSF = f['Lawn'];
+  }
+
+  // Ensure custom object exists
+  if (!t.custom) t.custom = {};
+
+  // Ensure difficulty splits exist
+  if (!currentEstimate.difficultySplits) currentEstimate.difficultySplits = {};
+  if (!currentEstimate.difficultySplits['Hedge']) {
+    currentEstimate.difficultySplits['Hedge'] = { easy: 100, medium: 0, hard: 0 };
+  }
+
+  t._migrationVersion = 1;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  UNIFIED TAKEOFF GRID — Config Modal
+// ═══════════════════════════════════════════════════════════════
+
+function showTakeoffConfigModal() {
+  let overlay = document.getElementById('takeoff-config-overlay');
+  if (!overlay) {
+    // Create modal HTML dynamically
+    const div = document.createElement('div');
+    div.innerHTML = buildTakeoffConfigModalHTML();
+    document.body.appendChild(div.firstElementChild);
+    document.body.appendChild(div.firstElementChild);
+    overlay = document.getElementById('takeoff-config-overlay');
+  }
+
+  renderTakeoffConfigItems();
+  overlay.classList.add('active');
+  document.getElementById('takeoff-config-panel').classList.add('active');
+}
+
+function hideTakeoffConfigModal() {
+  const overlay = document.getElementById('takeoff-config-overlay');
+  const panel = document.getElementById('takeoff-config-panel');
+  if (overlay) overlay.classList.remove('active');
+  if (panel) panel.classList.remove('active');
+}
+
+function buildTakeoffConfigModalHTML() {
+  return `
+    <div class="config-panel-overlay" id="takeoff-config-overlay" onclick="hideTakeoffConfigModal()"></div>
+    <div class="config-panel" id="takeoff-config-panel" onclick="event.stopPropagation()">
+      <div class="config-panel-header">
+        <h3>Takeoff Sections</h3>
+        <button class="config-panel-close" onclick="hideTakeoffConfigModal()">&times;</button>
+      </div>
+      <div class="config-group-label">Default Sections</div>
+      <div id="config-default-sections"></div>
+      <div class="config-group-label">Custom Sections</div>
+      <div id="config-custom-sections"></div>
+      <div class="config-footer">
+        <button class="add-section-btn" onclick="showAddSectionModal()">+ Add Section</button>
+      </div>
+    </div>`;
+}
+
+function renderTakeoffConfigItems() {
+  const defaultContainer = document.getElementById('config-default-sections');
+  const customContainer = document.getElementById('config-custom-sections');
+  if (!defaultContainer || !customContainer) return;
+
+  const cfg = companyTakeoffSections ? (typeof companyTakeoffSections === 'string' ? JSON.parse(companyTakeoffSections) : companyTakeoffSections) : {};
+  const disabled = cfg.disabled || DEFAULT_DISABLED_SECTIONS;
+
+  let defaultHTML = '';
+  MNT_DEFAULT_SECTIONS.forEach(sec => {
+    const isOn = !disabled.includes(sec.id);
+    defaultHTML += `
+      <div class="config-item" draggable="true" data-section-id="${sec.id}">
+        <span class="drag-grip">&#10495;</span>
+        <span class="config-name">${sec.label}</span>
+        <span class="config-type-badge">${sec.type}</span>
+        <div class="config-toggle${isOn ? ' on' : ''}" onclick="toggleTakeoffSection('${sec.id}', this)"></div>
+      </div>`;
+  });
+  defaultContainer.innerHTML = defaultHTML;
+
+  let customHTML = '';
+  if (cfg.custom && cfg.custom.length > 0) {
+    cfg.custom.forEach(cs => {
+      customHTML += `
+        <div class="config-item" data-section-id="${cs.id}">
+          <span class="drag-grip">&#10495;</span>
+          <span class="config-name">${cs.label}</span>
+          <span class="config-type-badge">${cs.type}</span>
+          <button class="del-btn" style="opacity:1" onclick="deleteCustomSection('${cs.id}')" title="Delete">&times;</button>
+        </div>`;
+    });
+  } else {
+    customHTML = '<div style="font-size:12px;color:#999;padding:8px 0;">No custom sections yet</div>';
+  }
+  customContainer.innerHTML = customHTML;
+
+  // Setup drag events
+  setupConfigDragEvents();
+}
+
+function toggleTakeoffSection(sectionId, toggleEl) {
+  if (!companyTakeoffSections) companyTakeoffSections = {};
+  const cfg = typeof companyTakeoffSections === 'string' ? JSON.parse(companyTakeoffSections) : companyTakeoffSections;
+  if (!cfg.disabled) cfg.disabled = DEFAULT_DISABLED_SECTIONS.slice();
+
+  const idx = cfg.disabled.indexOf(sectionId);
+  if (idx >= 0) {
+    cfg.disabled.splice(idx, 1);
+    toggleEl.classList.add('on');
+  } else {
+    cfg.disabled.push(sectionId);
+    toggleEl.classList.remove('on');
+  }
+
+  companyTakeoffSections = cfg;
+  saveTakeoffSectionsToBackend();
+  renderTakeoffGrid();
+}
+
+function deleteCustomSection(sectionId) {
+  if (!confirm('Delete this custom section?')) return;
+  const cfg = typeof companyTakeoffSections === 'string' ? JSON.parse(companyTakeoffSections) : (companyTakeoffSections || {});
+  cfg.custom = (cfg.custom || []).filter(c => c.id !== sectionId);
+  companyTakeoffSections = cfg;
+  saveTakeoffSectionsToBackend();
+  renderTakeoffConfigItems();
+  renderTakeoffGrid();
+}
+
+function setupConfigDragEvents() {
+  const items = document.querySelectorAll('.config-item[draggable]');
+  let draggedEl = null;
+
+  items.forEach(item => {
+    item.addEventListener('dragstart', e => {
+      draggedEl = item;
+      item.style.opacity = '0.4';
+      e.dataTransfer.effectAllowed = 'move';
+    });
+
+    item.addEventListener('dragend', () => {
+      if (draggedEl) draggedEl.style.opacity = '';
+      draggedEl = null;
+    });
+
+    item.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    });
+
+    item.addEventListener('drop', e => {
+      e.preventDefault();
+      if (!draggedEl || draggedEl === item) return;
+      const container = item.parentNode;
+      const children = [...container.children];
+      const dragIdx = children.indexOf(draggedEl);
+      const dropIdx = children.indexOf(item);
+      if (dragIdx < dropIdx) {
+        container.insertBefore(draggedEl, item.nextSibling);
+      } else {
+        container.insertBefore(draggedEl, item);
+      }
+      // Save new order
+      const newOrder = [...container.children].map(c => c.dataset.sectionId);
+      const cfg = typeof companyTakeoffSections === 'string' ? JSON.parse(companyTakeoffSections) : (companyTakeoffSections || {});
+      cfg.order = newOrder;
+      companyTakeoffSections = cfg;
+      saveTakeoffSectionsToBackend();
+      renderTakeoffGrid();
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  UNIFIED TAKEOFF GRID — Add Section Modal (Manual + MARVIN)
+// ═══════════════════════════════════════════════════════════════
+
+function showAddSectionModal() {
+  hideTakeoffConfigModal();
+  let modal = document.getElementById('add-section-modal-overlay');
+  if (!modal) {
+    const div = document.createElement('div');
+    div.innerHTML = buildAddSectionModalHTML();
+    document.body.appendChild(div.firstElementChild);
+    document.body.appendChild(div.firstElementChild);
+    modal = document.getElementById('add-section-modal-overlay');
+  }
+  // Reset state
+  switchAddSectionTab('marvin');
+  document.getElementById('marvin-prompt-input').value = '';
+  const resultArea = document.getElementById('marvin-result-area');
+  if (resultArea) resultArea.innerHTML = '';
+  modal.classList.add('active');
+  document.getElementById('add-section-modal').classList.add('active');
+}
+
+function hideAddSectionModal() {
+  const overlay = document.getElementById('add-section-modal-overlay');
+  const panel = document.getElementById('add-section-modal');
+  if (overlay) overlay.classList.remove('active');
+  if (panel) panel.classList.remove('active');
+}
+
+function buildAddSectionModalHTML() {
+  return `
+    <div class="config-panel-overlay" id="add-section-modal-overlay" onclick="hideAddSectionModal()"></div>
+    <div class="config-panel" id="add-section-modal" onclick="event.stopPropagation()">
+      <div class="config-panel-header">
+        <h3>Add Section</h3>
+        <button class="config-panel-close" onclick="hideAddSectionModal()">&times;</button>
+      </div>
+      <div class="marvin-tab-bar">
+        <button class="marvin-tab active" data-tab="marvin" onclick="switchAddSectionTab('marvin')">Ask MARVIN</button>
+        <button class="marvin-tab" data-tab="manual" onclick="switchAddSectionTab('manual')">Build Manually</button>
+      </div>
+      <div id="add-section-tab-marvin">
+        <textarea id="marvin-prompt-input" class="marvin-textarea" rows="3"
+          placeholder="Describe the section you need, e.g. 'split turf into bermuda and zoysia' or 'each bag covers 2 CY of mulch'"></textarea>
+        <button class="marvin-generate-btn" onclick="generateWithMarvin()">Generate Section</button>
+        <div id="marvin-result-area"></div>
+        <div class="marvin-footer">MARVIN &mdash; Marginally Above Random, Very Impressive Nonetheless</div>
+      </div>
+      <div id="add-section-tab-manual" style="display:none">
+        <div class="add-section-form">
+          <div class="form-row">
+            <label>Section Name</label>
+            <input type="text" id="manual-section-name" placeholder="e.g. Palm Trees">
+          </div>
+          <div class="form-row">
+            <label>Type</label>
+            <select id="manual-section-type" onchange="updateManualTypeFields()">
+              <option value="split">Split (divide into rows)</option>
+              <option value="value">Value (single number)</option>
+              <option value="calc">Calc (input &times; constant = output)</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>Unit</label>
+            <select id="manual-section-unit">
+              <option value="SF">SF</option><option value="LF">LF</option><option value="CY">CY</option>
+              <option value="EA">EA</option><option value="bags">bags</option><option value="flats">flats</option>
+              <option value="gallons">gallons</option><option value="hours">hours</option><option value="lbs">lbs</option>
+              <option value="tons">tons</option><option value="pallets">pallets</option>
+            </select>
+          </div>
+          <div id="manual-type-fields"></div>
+          <div class="form-actions">
+            <button class="btn-save-section" onclick="saveManualSection()">Add Section</button>
+            <button class="btn-cancel-section" onclick="hideAddSectionModal()">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function switchAddSectionTab(tab) {
+  document.querySelectorAll('.marvin-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.getElementById('add-section-tab-marvin').style.display = tab === 'marvin' ? '' : 'none';
+  document.getElementById('add-section-tab-manual').style.display = tab === 'manual' ? '' : 'none';
+}
+
+function updateManualTypeFields() {
+  const type = document.getElementById('manual-section-type').value;
+  const container = document.getElementById('manual-type-fields');
+  if (type === 'split') {
+    container.innerHTML = `<div class="form-row"><label>Row Labels (one per line)</label>
+      <textarea id="manual-split-rows" class="row-labels-input" placeholder="Row 1\nRow 2\nRow 3"></textarea></div>`;
+  } else if (type === 'calc') {
+    container.innerHTML = `
+      <div class="form-row"><label>Input Label</label><input type="text" id="manual-calc-input" placeholder="e.g. Total Flowers"></div>
+      <div class="form-row"><label>Constant</label><input type="number" id="manual-calc-constant" placeholder="e.g. 18"></div>
+      <div class="form-row"><label>Constant Label</label><input type="text" id="manual-calc-const-label" placeholder="e.g. per flat"></div>
+      <div class="form-row"><label>Output Label</label><input type="text" id="manual-calc-output" placeholder="e.g. Total Flats"></div>`;
+  } else {
+    container.innerHTML = '';
+  }
+}
+
+function saveManualSection() {
+  const name = document.getElementById('manual-section-name').value.trim();
+  if (!name) { showToast('Section name is required', 'error'); return; }
+
+  const type = document.getElementById('manual-section-type').value;
+  const unit = document.getElementById('manual-section-unit').value;
+  const id = 'custom_' + name.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Date.now();
+
+  const section = { id, label: name, type, unit };
+
+  if (type === 'split') {
+    const rowsText = document.getElementById('manual-split-rows')?.value || '';
+    section.rows = rowsText.split('\n').map(r => r.trim()).filter(Boolean);
+    if (section.rows.length === 0) { showToast('Add at least one row', 'error'); return; }
+  } else if (type === 'calc') {
+    section.inputLabel = document.getElementById('manual-calc-input')?.value || 'Input';
+    section.constant = parseFloat(document.getElementById('manual-calc-constant')?.value) || 1;
+    section.constantLabel = document.getElementById('manual-calc-const-label')?.value || '';
+    section.outputLabel = document.getElementById('manual-calc-output')?.value || 'Output';
+  }
+
+  addCustomSection(section);
+  hideAddSectionModal();
+  showTakeoffConfigModal();
+}
+
+function addCustomSection(section) {
+  if (!companyTakeoffSections) companyTakeoffSections = {};
+  const cfg = typeof companyTakeoffSections === 'string' ? JSON.parse(companyTakeoffSections) : companyTakeoffSections;
+  if (!cfg.custom) cfg.custom = [];
+  cfg.custom.push(section);
+  companyTakeoffSections = cfg;
+  saveTakeoffSectionsToBackend();
+  renderTakeoffGrid();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  UNIFIED TAKEOFF GRID — MARVIN AI
+// ═══════════════════════════════════════════════════════════════
+
+async function generateWithMarvin() {
+  const prompt = document.getElementById('marvin-prompt-input').value.trim();
+  if (!prompt) { showToast('Describe what you need', 'error'); return; }
+
+  const resultArea = document.getElementById('marvin-result-area');
+  resultArea.innerHTML = '<div class="marvin-loading">MARVIN is thinking...</div>';
+
+  try {
+    const resp = await fetch('https://ibjyxrp542.execute-api.us-east-1.amazonaws.com/prod/marvin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
+    });
+
+    const data = await resp.json();
+
+    if (!data.success || !data.result?.sections?.length) {
+      resultArea.innerHTML = `<div style="color:var(--red);padding:12px;font-size:13px;">
+        MARVIN couldn't generate a section. Try rephrasing your description.</div>`;
+      return;
+    }
+
+    // Show editable preview of first section
+    const sec = data.result.sections[0];
+    let previewHTML = `<div class="marvin-result">
+      <div class="result-field"><label>Name</label>
+        <input type="text" id="marvin-result-name" value="${sec.label || ''}"></div>
+      <div class="result-field"><label>Type</label>
+        <select id="marvin-result-type">
+          <option value="split"${sec.type === 'split' ? ' selected' : ''}>Split</option>
+          <option value="value"${sec.type === 'value' ? ' selected' : ''}>Value</option>
+          <option value="calc"${sec.type === 'calc' ? ' selected' : ''}>Calc</option>
+        </select></div>
+      <div class="result-field"><label>Unit</label>
+        <input type="text" id="marvin-result-unit" value="${sec.unit || 'SF'}"></div>`;
+
+    if (sec.type === 'split' && sec.rows) {
+      previewHTML += `<div class="result-field"><label>Rows</label>
+        <textarea id="marvin-result-rows" class="row-labels-input">${sec.rows.join('\n')}</textarea></div>`;
+    }
+    if (sec.type === 'calc') {
+      previewHTML += `
+        <div class="result-field"><label>Input</label><input type="text" id="marvin-result-input-label" value="${sec.inputLabel || ''}"></div>
+        <div class="result-field"><label>Constant</label><input type="number" id="marvin-result-constant" value="${sec.constant || 1}"></div>
+        <div class="result-field"><label>Output</label><input type="text" id="marvin-result-output-label" value="${sec.outputLabel || ''}"></div>`;
+    }
+
+    previewHTML += `</div>
+      <div class="marvin-actions">
+        <button class="marvin-generate-btn" onclick="saveMarvinSection()">Add Section</button>
+        <button class="btn-cancel-section" onclick="generateWithMarvin()">Ask Again</button>
+      </div>`;
+
+    resultArea.innerHTML = previewHTML;
+
+  } catch (err) {
+    resultArea.innerHTML = `<div style="color:var(--red);padding:12px;font-size:13px;">
+      Could not reach MARVIN. Check your connection and try again.</div>`;
+    console.error('MARVIN error:', err);
+  }
+}
+
+function saveMarvinSection() {
+  const name = document.getElementById('marvin-result-name').value.trim();
+  const type = document.getElementById('marvin-result-type').value;
+  const unit = document.getElementById('marvin-result-unit').value.trim() || 'SF';
+  const id = 'custom_' + name.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Date.now();
+
+  const section = { id, label: name, type, unit };
+
+  if (type === 'split') {
+    const rowsText = document.getElementById('marvin-result-rows')?.value || '';
+    section.rows = rowsText.split('\n').map(r => r.trim()).filter(Boolean);
+  } else if (type === 'calc') {
+    section.inputLabel = document.getElementById('marvin-result-input-label')?.value || 'Input';
+    section.constant = parseFloat(document.getElementById('marvin-result-constant')?.value) || 1;
+    section.outputLabel = document.getElementById('marvin-result-output-label')?.value || 'Output';
+  }
+
+  addCustomSection(section);
+  hideAddSectionModal();
+  showTakeoffConfigModal();
+  showToast('Section added by MARVIN', 'success');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  UNIFIED TAKEOFF GRID — Backend Config Sync
+// ═══════════════════════════════════════════════════════════════
+
+async function loadTakeoffSections() {
+  try {
+    const resp = await fetch(GOOGLE_SHEETS_URL + '?action=getTakeoffSections&division=MNT');
+    const data = await resp.json();
+    if (data.success && data.configJSON) {
+      companyTakeoffSections = typeof data.configJSON === 'string' ? JSON.parse(data.configJSON) : data.configJSON;
+    }
+  } catch (e) {
+    console.warn('Could not load takeoff sections config:', e);
+  }
+}
+
+async function saveTakeoffSectionsToBackend() {
+  try {
+    const cfg = typeof companyTakeoffSections === 'string' ? companyTakeoffSections : JSON.stringify(companyTakeoffSections);
+    await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        saveTakeoffSections: true,
+        division: 'MNT',
+        configJSON: cfg
+      })
+    });
+  } catch (e) {
+    console.warn('Could not save takeoff sections config:', e);
+  }
 }
 
 function confirmDiscardEstimate(callback) {
@@ -5110,6 +6275,12 @@ async function loadAllData() {
     renderMowerTable();
     renderEdgeTable();
 
+    // Unified takeoff grid init
+    if (USE_NEW_TAKEOFF) {
+      initTakeoffGridEvents();
+      loadTakeoffSections().then(() => renderTakeoffGrid());
+    }
+
     debugLog('All data loaded in', Math.round(performance.now() - t0), 'ms');
   } catch (err) {
     console.error('Bulk loadAllData failed, falling back to individual loads:', err);
@@ -5118,6 +6289,10 @@ async function loadAllData() {
     checkForSavedEstimate();
     renderMowerTable();
     renderEdgeTable();
+    if (USE_NEW_TAKEOFF) {
+      initTakeoffGridEvents();
+      loadTakeoffSections().then(() => renderTakeoffGrid());
+    }
     await loadPropertiesFromBackend();
     populateEstimatePropertyPicker();
   }

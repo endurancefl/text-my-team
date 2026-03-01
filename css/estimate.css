@@ -2257,7 +2257,7 @@ select option:checked {
   padding: 8px 16px 16px 16px;
 }
 .features-section { flex: 0 0 auto; }
-.takeoffs-section { flex: 0 0 auto; }
+.takeoffs-section { flex: 1 1 auto; min-width: 0; }
 .mower-section { flex: 0 0 auto; }
 
 /* Takeoff Grid Layout */
@@ -2615,6 +2615,726 @@ select option:checked {
 .mower-add-btn svg {
   width: 12px;
   height: 12px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   UNIFIED TAKEOFF GRID — Collapsible Sections
+   ═══════════════════════════════════════════════════════════════ */
+.takeoff {
+  margin: 0;
+  padding: 0;
+}
+
+.takeoff-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0 12px;
+}
+
+.takeoff-toolbar h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #1a1a1a);
+  margin: 0;
+}
+
+.config-btn {
+  background: none;
+  border: 1px solid var(--border-table, #e0e0e0);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.config-btn:hover {
+  background: var(--bg-table-header, #f8f9fa);
+  color: var(--text-primary, #1a1a1a);
+}
+
+/* ── Section Cards Container ── */
+.takeoff-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border: 1px solid var(--border-table, #e0e0e0);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--border-table, #e0e0e0);
+}
+
+/* ── Individual Section ── */
+.takeoff-section {
+  background: var(--bg-surface, #fff);
+}
+
+/* ── Summary Row (always visible) ── */
+.takeoff-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s;
+  min-height: 32px;
+}
+
+.takeoff-summary:hover {
+  background: var(--bg-table-header, #f8f9fa);
+}
+
+.takeoff-section.expanded .takeoff-summary {
+  background: var(--bg-table-header, #f8f9fa);
+  border-bottom: 1px solid var(--border-table, #e0e0e0);
+}
+
+.takeoff-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.takeoff-dot.dot-on {
+  background: var(--green, #22c55e);
+}
+
+.takeoff-dot.dot-incomplete {
+  background: var(--red, #ef4444);
+}
+
+.takeoff-dot.dot-gray {
+  background: var(--border-table, #d0d0d0);
+}
+
+.takeoff-sec-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary, #1a1a1a);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.takeoff-sec-summary {
+  flex: 1;
+  font-size: 11px;
+  color: var(--text-secondary, #888);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+  min-width: 0;
+}
+
+.takeoff-sec-total {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary, #1a1a1a);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  flex-shrink: 0;
+  text-align: right;
+  min-width: 64px;
+}
+
+.takeoff-chevron {
+  font-size: 9px;
+  color: var(--text-secondary, #aaa);
+  flex-shrink: 0;
+  width: 16px;
+  text-align: center;
+  transition: transform 0.15s;
+}
+
+/* ── Detail (expanded) ── */
+.takeoff-detail {
+  padding: 0;
+}
+
+/* ── Table inside detail ── */
+.takeoff-tbl {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 13px;
+}
+
+.takeoff-tbl colgroup .col-del   { width: 28px; }
+.takeoff-tbl colgroup .col-label { width: auto; }
+.takeoff-tbl colgroup .col-input { width: 96px; }
+.takeoff-tbl colgroup .col-unit  { width: 36px; }
+.takeoff-tbl colgroup .col-pct   { width: 48px; }
+.takeoff-tbl colgroup .col-action { width: 28px; }
+
+/* ── Input Mode Toggle (SF ↔ %) ── */
+.takeoff-tbl .mode-toggle-row td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border-table, #e0e0e0);
+}
+
+.input-mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  float: right;
+}
+
+.input-mode-toggle .mode-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary, #aaa);
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s;
+}
+
+.input-mode-toggle .mode-label.active {
+  color: var(--text-primary, #1a1a1a);
+}
+
+.mode-switch {
+  position: relative;
+  width: 28px;
+  height: 16px;
+  background: var(--blue, #2563eb);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.mode-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.15s;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.mode-switch.pct::after {
+  transform: translateX(12px);
+}
+
+/* ── Column Header Row ── */
+.takeoff-tbl .col-header td {
+  background: var(--bg-surface, #fff);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary, #888);
+  padding: 2px 8px;
+  border-bottom: 1px solid var(--border-table, #e0e0e0);
+}
+
+/* ── Data Row ── */
+.takeoff-tbl .data-row td {
+  padding: 1px 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  vertical-align: middle;
+  height: 28px;
+}
+
+.takeoff-tbl .data-row:last-child td {
+  border-bottom: none;
+}
+
+.takeoff-tbl .data-row .row-label {
+  font-size: 13px;
+  color: var(--text-primary, #1a1a1a);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.takeoff-tbl .data-row .row-unit {
+  font-size: 11px;
+  color: var(--text-secondary, #888);
+}
+
+.takeoff-tbl .data-row .row-pct {
+  font-size: 11px;
+  color: var(--text-secondary, #888);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Total Row ── */
+.takeoff-tbl .total-row td {
+  padding: 3px 8px;
+  border-top: 1px solid var(--border-table, #e0e0e0);
+  font-weight: 600;
+  font-size: 12px;
+  height: 28px;
+  vertical-align: middle;
+}
+
+.takeoff-tbl .total-row .total-label {
+  color: var(--text-secondary, #888);
+  text-transform: uppercase;
+  font-size: 11px;
+}
+
+.takeoff-tbl .total-row .total-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.takeoff-tbl .total-row .total-pct {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary, #888);
+  font-size: 11px;
+}
+
+.takeoff-tbl .total-row.sum-mismatch .total-value,
+.takeoff-tbl .total-row.sum-mismatch .total-pct {
+  color: var(--red, #ef4444);
+}
+
+.takeoff-tbl .total-row.sum-mismatch .total-label::after {
+  content: ' \26A0';
+  color: var(--red, #ef4444);
+}
+
+/* ── Add Row ── */
+.takeoff-tbl .add-row td {
+  padding: 2px 8px;
+  height: 24px;
+}
+
+.add-btn {
+  background: none;
+  border: none;
+  color: var(--blue, #2563eb);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.add-btn:hover {
+  text-decoration: underline;
+}
+
+/* ── Delete Button ── */
+.del-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary, #ccc);
+  cursor: pointer;
+  padding: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.data-row:hover .del-btn {
+  opacity: 0.5;
+}
+
+.del-btn:hover {
+  opacity: 1 !important;
+  color: var(--red, #ef4444);
+}
+
+/* ── Blue Input ── */
+.t-input {
+  width: 100%;
+  height: 24px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: #E8F0FE;
+  padding: 0 6px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--text-primary, #1a1a1a);
+  box-sizing: border-box;
+  outline: none;
+}
+
+.t-input:focus {
+  border-color: var(--blue, #2563eb);
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.t-input.zero {
+  color: var(--text-secondary, #999);
+}
+
+.t-input.readonly {
+  background: #f3f4f6;
+  color: var(--text-secondary, #888);
+  cursor: default;
+}
+
+/* ── Single Row (value/calc sections) ── */
+.takeoff-tbl .single-row td {
+  padding: 3px 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  vertical-align: middle;
+  height: 28px;
+}
+
+/* ── Config Panel (modal) ── */
+.config-panel-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 9998;
+  display: none;
+}
+
+.config-panel-overlay.active {
+  display: block;
+}
+
+.config-panel {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--bg-surface, #fff);
+  border-radius: 12px;
+  padding: 24px;
+  width: 480px;
+  max-width: 90vw;
+  max-height: 80vh;
+  overflow-y: auto;
+  z-index: 9999;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  display: none;
+}
+
+.config-panel.active {
+  display: block;
+}
+
+.config-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--text-primary, #1a1a1a);
+}
+
+.config-panel-header h3 {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.config-panel-close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--text-secondary, #666);
+  padding: 4px;
+  line-height: 1;
+}
+
+.config-panel-close:hover {
+  color: var(--text-primary, #1a1a1a);
+}
+
+.config-group-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 16px 0 8px;
+}
+
+.config-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  cursor: grab;
+}
+
+.config-item:active {
+  cursor: grabbing;
+}
+
+.config-item .drag-grip {
+  color: var(--text-secondary, #ccc);
+  font-size: 14px;
+  cursor: grab;
+  user-select: none;
+}
+
+.config-item .config-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.config-item .config-type-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: #f0f0f0;
+  color: var(--text-secondary, #888);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.config-toggle {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  background: #ccc;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.config-toggle.on {
+  background: var(--green, #22c55e);
+}
+
+.config-toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.config-toggle.on::after {
+  transform: translateX(16px);
+}
+
+.config-footer {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-table, #e0e0e0);
+}
+
+.config-footer .add-section-btn {
+  background: none;
+  border: 1px dashed var(--border-table, #ccc);
+  border-radius: 6px;
+  padding: 8px 16px;
+  width: 100%;
+  font-size: 13px;
+  color: var(--blue, #2563eb);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.config-footer .add-section-btn:hover {
+  background: rgba(37, 99, 235, 0.05);
+}
+
+/* ── MARVIN Chat ── */
+.marvin-tab-bar {
+  display: flex;
+  gap: 0;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border-table, #e0e0e0);
+}
+
+.marvin-tab {
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary, #888);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+
+.marvin-tab.active {
+  color: var(--blue, #2563eb);
+  border-bottom-color: var(--blue, #2563eb);
+}
+
+.marvin-textarea {
+  width: 100%;
+  min-height: 60px;
+  border: 1px solid var(--border-table, #e0e0e0);
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 13px;
+  resize: vertical;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.marvin-textarea:focus {
+  outline: none;
+  border-color: var(--blue, #2563eb);
+}
+
+.marvin-generate-btn {
+  background: var(--blue, #2563eb);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 20px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+.marvin-generate-btn:hover {
+  opacity: 0.9;
+}
+
+.marvin-generate-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.marvin-loading {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-secondary, #888);
+  font-size: 13px;
+  font-style: italic;
+}
+
+.marvin-result {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--border-table, #e0e0e0);
+  border-radius: 6px;
+  background: #f9fafb;
+}
+
+.marvin-result .result-field {
+  margin-bottom: 8px;
+}
+
+.marvin-result .result-field label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary, #888);
+  margin-bottom: 2px;
+  text-transform: uppercase;
+}
+
+.marvin-result .result-field input,
+.marvin-result .result-field select {
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--border-table, #e0e0e0);
+  border-radius: 4px;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+.marvin-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.marvin-footer {
+  margin-top: 16px;
+  font-size: 10px;
+  color: var(--text-secondary, #aaa);
+  text-align: center;
+  font-style: italic;
+}
+
+/* ── Add Section Manual Form ── */
+.add-section-form {
+  padding: 12px 0;
+}
+
+.add-section-form .form-row {
+  margin-bottom: 10px;
+}
+
+.add-section-form .form-row label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary, #888);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.add-section-form .form-row input,
+.add-section-form .form-row select {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border-table, #e0e0e0);
+  border-radius: 4px;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+.add-section-form .row-labels-input {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid var(--border-table, #e0e0e0);
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.add-section-form .form-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.add-section-form .btn-save-section {
+  background: var(--blue, #2563eb);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 20px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.add-section-form .btn-cancel-section {
+  background: none;
+  border: 1px solid var(--border-table, #ccc);
+  border-radius: 6px;
+  padding: 8px 20px;
+  font-size: 13px;
+  color: var(--text-secondary, #666);
+  cursor: pointer;
 }
 
 /* ═══════════════════════════════════════════════════════════════
