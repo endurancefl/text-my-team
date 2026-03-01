@@ -48,7 +48,7 @@ The platform supports four divisions, each representing a distinct revenue strea
 text-my-team/
 ├── index.html                     # Customer service request portal (~3,100 lines)
 ├── crew.html                      # Crew leader app (~9,768 lines HTML/JS)
-├── estimate.html                  # Bidding & estimating tool (~16,231 lines HTML/JS)
+├── estimate.html                  # Bidding & estimating tool (~16,220 lines HTML/JS)
 ├── payment-success.html           # Stripe payment success redirect
 ├── payment-cancel.html            # Stripe payment cancel redirect
 ├── sign.html                      # Standalone contract e-signature page (~686 lines)
@@ -56,7 +56,7 @@ text-my-team/
 ├── _config.yml                    # Jekyll config — excludes cloud-function/ and backend/ from build
 ├── css/
 │   ├── crew.css                   # All CSS for crew.html (~4,511 lines)
-│   └── estimate.css               # All CSS for estimate.html (~5,810 lines)
+│   └── estimate.css               # All CSS for estimate.html (~5,964 lines)
 ├── assets/
 │   ├── manifest.json              # PWA manifest for index.html
 │   ├── manifest-crew.json         # PWA manifest for crew.html
@@ -158,7 +158,7 @@ text-my-team/
 - iOS design system: SF Pro typography, exact system colors, dark mode, frosted glass tab bar with `backdrop-filter`, iOS spring animations, 44px touch targets, `prefers-reduced-motion` support
 - Bottom tab bar: Schedule (home) | Requests | Report Issue | Reports
 
-**estimate.html + estimate.css — Bidding & Estimating Tool (~16,235 lines HTML/JS + ~5,810 lines CSS)**
+**estimate.html + estimate.css — Bidding & Estimating Tool (~16,220 lines HTML/JS + ~5,964 lines CSS)**
 - **Division: Maintenance (MNT) fully built** — Irrigation, Construction, and Enhancement divisions planned, will reuse the same engine with division-specific catalogs and takeoffs
 - **Job Type Selection** ✅ **BUILT**: When creating a new estimate, the user first picks a job type via the Job Type Picker modal:
   - **Recurring Service** — Ongoing contract with scheduled visits throughout the year (existing flow, unchanged)
@@ -233,6 +233,15 @@ text-my-team/
   **Sidebar Rename**: "Work Tickets" sidebar item renamed to "Reminders" to avoid confusion with the new Work Ticket job type.
 
 - Two-panel Google Workspace + Vignelli design system layout (sidebar + main content). **Design system overhaul (Feb 2026)**: Complete CSS redesign following Massimo Vignelli structural principles + Google Workspace density. Design spec: `docs/design-spec-platform.md`. **Key design tokens**: `--rule-heavy: 2px solid #202124` (Vignelli heavy rule under headers/between sections), `--font-display: Google Sans` (page titles only, 22px), `--font-body: Roboto` (everything else), 14px body text, 13px table cells, 32px buttons/inputs, 28px bid builder rows, 48px header. **Sidebar**: 256px, Gmail-style pill nav items (`border-radius: 0 16px 16px 0`), grouped with 11px uppercase section labels (OPERATIONS, FINANCIALS, CONFIGURATION). **Color palette**: Google's exact blue (#1A73E8), semantic badge colors (green-light/red-light/yellow-light/blue-lighter backgrounds), Google's two-layer shadow system. **Spreadsheet-cell editing**: transparent inputs with blue-lighter hover hint, 2px solid blue border on focus (Google Sheets style). **CSS layout chain**: `.app-container` (flex row, 100vh) → `.sidebar` (fixed 256px) + `.main-content` (flex: 1, `display: flex; flex-direction: column`). `.main-header` (48px, `border-bottom: var(--rule-heavy)`, z-index: 2) sits at top. `.main-body` (`position: relative; flex: 1; overflow: hidden`) contains all `.view` panels as direct children. `.view.active` has `height: 100%; overflow-y: auto; padding: 16px` — each view fills main-body and scrolls independently. **Summary panel removed** (Feb 2026) — rate overrides (labor rate, labor markup, material markup, sub markup, travel %) integrated into the contract/project settings card as a collapsible `<details>` section, shared by both recurring and work ticket modes.
+- **Two-Tier Estimate Header** ✅ **BUILT** (Mar 2026): Replaced cluttered single-row header with a state-driven two-tier layout for the builder view:
+  - **Top tier (context)**: Back arrow (`showView('estimates')`) + property address + bid/contract ID + status badges (Draft/Revision/Finalized + signing state)
+  - **Heavy rule**: 2px solid #202124 (Vignelli structural divider)
+  - **Bottom tier (actions)**: State-dependent buttons only — Draft: Save as Template, Save Estimate, Finalize; Revision: Save Draft, View Current PDF, Update Contract; Finalized: Revise Estimate, View Schedule, PDF actions, Send Contract/Generate PDF
+  - **PDF dropdown**: When both contract PDF and signed PDF exist, a dropdown menu consolidates View Contract PDF, View Signed PDF, and Regenerate PDF
+  - **Key function**: `renderEstimateHeader()` — single function reads `currentEstimate.status` and `signingStatus`, renders correct header. `updateHeaderActions()` kept as backward-compatible alias
+  - **Badge colors**: Draft (amber on #FEF7E0), Finalized (blue on #E8F0FE), Revision (amber on #FEF7E0), Signed (green on #E6F4EA), Awaiting Signature (blue on #E8F0FE)
+  - **CSS classes**: `.main-header.two-tier`, `.header-context`, `.header-back`, `.header-address`, `.header-dot`, `.header-id`, `.header-badges`, `.header-rule`, `.header-actions-bar`, `.header-dropdown`, `.header-dropdown-menu`
+  - Non-builder views (Estimates, Contacts, Schedule, etc.) retain the original single-tier header. `showView()` restores single-tier when navigating away from builder.
 - **Bid Builder**: Spreadsheet-style table with columns: Item, OCC, QTY, Unit, P/H, AH, TH, P/P, TP, GM%
 - **Real-time calculation engine**: labor hours from quantities ÷ production rates, material costs from coverage rates, travel time percentage, separate markups for labor/materials/subcontractors. Per-service sub-contractor markup override (`subMarkupOverride`) allows individual services to use 0% or custom markup instead of the estimate-level default — applied in `calculateBidTotals()`, `calculateTierTotals()`, proposal preview, and finalization payload
 - **Sub-Contractor Billing**: Property-level subs (with monthlyCost and contract PDF) flow into estimates via "From Subs" tab in the Add Service modal. Creates service with `isSubcontractor: true`, `subCost: monthlyCost * 12`, `billingTier: 'billed'`, `subContractorId` link. Default 10% markup from bid settings; per-service `subMarkupOverride` allows 0% or custom markup. Sub services render in the bid table as a single row showing cost/markup/billed/margin (no line items). Contract PDF upload via `uploadSubContractPdf` to Drive Sub-Contracts folder. Adding a sub to a finalized contract uses existing revision flow. Functions: `renderServicePickerSubs()`, `addSubFromProperty()`, `handleSubContractFileSelect()`, `clearSubContractFile()`

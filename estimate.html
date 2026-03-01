@@ -150,7 +150,8 @@
 
     <!-- MAIN CONTENT -->
     <div class="main-content">
-      <div class="main-header">
+      <div class="main-header" id="main-header">
+        <!-- Default single-tier header (non-builder views) -->
         <h1 class="header-title" id="header-title">Estimates</h1>
         <span class="header-subtitle" id="header-subtitle"></span>
         <span class="save-status" id="save-status"></span>
@@ -6827,7 +6828,7 @@ function onEstimatePropertySelect(propertyId) {
   currentEstimate.propertyAddress = prop.address;
   currentEstimate.propertyId = prop.propertyId;
   document.getElementById('prop-address').value = prop.address;
-  document.getElementById('header-subtitle').textContent = prop.address;
+  renderEstimateHeader();
 
   // Auto-fill property type
   if (prop.propertyType) {
@@ -8444,49 +8445,55 @@ function showView(viewId) {
     if (mb) mb.scrollTop = 0;
   }, 0);
 
-  // Update header
-  const titles = {
-    'estimates': 'Estimates',
-    'builder': isTemplateMode ? 'Edit Template' : 'New Estimate',
-    'templates': 'Templates',
-    'services': 'Service Catalog',
-    'catalog': 'Item Catalog',
-    'production': 'Production Rates',
-    'schedule': 'Schedule',
-    'contracts': 'Contracts',
-    'reports': 'Weekly Reports',
-    'financials': 'Financials',
-    'contacts': 'Contacts',
-    'properties': 'Properties',
-    'invoices': 'Invoices',
-    'worktickets': 'Reminders',
-    'settings': 'Settings'
-  };
-  document.getElementById('header-title').textContent = titles[viewId] || 'Estimates';
-
-  // Show address in subtitle for builder, or template name in template mode
-  const subtitleEl = document.getElementById('header-subtitle');
+  // Update header — builder uses two-tier, everything else uses single-tier
+  const headerEl = document.getElementById('main-header');
   if (viewId === 'builder') {
-    if (isTemplateMode && currentTemplateId) {
-      const template = savedTemplates.find(t => t.templateId === currentTemplateId);
-      subtitleEl.textContent = template ? template.name : 'New Template';
-    } else if (currentEstimate.propertyAddress) {
-      subtitleEl.textContent = currentEstimate.propertyAddress;
+    // Two-tier header — renderEstimateHeader() will populate it
+    // (called below after rendering tables)
+  } else {
+    // Restore single-tier header if switching away from builder
+    if (headerEl.classList.contains('two-tier')) {
+      headerEl.className = 'main-header';
+      headerEl.innerHTML = `
+        <h1 class="header-title" id="header-title">Estimates</h1>
+        <span class="header-subtitle" id="header-subtitle"></span>
+        <span class="save-status" id="save-status"></span>
+        <div class="header-actions" id="header-actions"></div>
+      `;
+    }
+
+    const titles = {
+      'estimates': 'Estimates',
+      'templates': 'Templates',
+      'services': 'Service Catalog',
+      'catalog': 'Item Catalog',
+      'production': 'Production Rates',
+      'schedule': 'Schedule',
+      'contracts': 'Contracts',
+      'reports': 'Weekly Reports',
+      'financials': 'Financials',
+      'contacts': 'Contacts',
+      'properties': 'Properties',
+      'invoices': 'Invoices',
+      'worktickets': 'Reminders',
+      'settings': 'Settings'
+    };
+    document.getElementById('header-title').textContent = titles[viewId] || 'Estimates';
+
+    const subtitleEl = document.getElementById('header-subtitle');
+    if (viewId === 'contracts') {
+      subtitleEl.textContent = scheduleScope === 'contract' && scheduleContract ? scheduleContract.propertyAddress : '';
+    } else if (viewId === 'contacts') {
+      subtitleEl.textContent = contacts.length + ' contacts';
+    } else if (viewId === 'properties') {
+      subtitleEl.textContent = properties.length + ' properties';
+    } else if (viewId === 'invoices') {
+      subtitleEl.textContent = invoices.length + ' invoices';
+    } else if (viewId === 'worktickets') {
+      subtitleEl.textContent = allReminders.length + ' reminders';
     } else {
       subtitleEl.textContent = '';
     }
-  } else if (viewId === 'contracts') {
-    subtitleEl.textContent = scheduleScope === 'contract' && scheduleContract ? scheduleContract.propertyAddress : '';
-  } else if (viewId === 'contacts') {
-    subtitleEl.textContent = contacts.length + ' contacts';
-  } else if (viewId === 'properties') {
-    subtitleEl.textContent = properties.length + ' properties';
-  } else if (viewId === 'invoices') {
-    subtitleEl.textContent = invoices.length + ' invoices';
-  } else if (viewId === 'worktickets') {
-    subtitleEl.textContent = allReminders.length + ' reminders';
-  } else {
-    subtitleEl.textContent = '';
   }
 
   // Render Property Setup tables when builder view is shown
@@ -8572,73 +8579,10 @@ function showView(viewId) {
     `;
   }
 
-  // Update header actions
+  // Update header actions (builder is handled by renderEstimateHeader above)
   const actionsEl = document.getElementById('header-actions');
   if (viewId === 'builder') {
-    if (isTemplateMode) {
-      actionsEl.innerHTML = `
-        <span class="status-badge" style="background: rgba(59, 130, 246, 0.15); color: var(--blue);">Template</span>
-        <button class="btn btn-primary" onclick="saveTemplateFromBuilder()">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-          </svg>
-          Save Template
-        </button>
-      `;
-    } else if (currentEstimate.status === 'Finalized') {
-      actionsEl.innerHTML = `
-        <span class="status-badge status-finalized">Finalized</span>
-        <span style="color: var(--gw-text-secondary); font-size: 13px; margin-left: 8px;">${currentEstimate.contractId || ''}</span>
-        <button class="btn btn-secondary" onclick="enterRevisionMode()">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-          </svg>
-          Revise Estimate
-        </button>
-        <button class="btn btn-secondary" onclick="openSchedule('${currentEstimate.contractId}', '${(currentEstimate.propertyAddress || '').replace(/'/g, "\\'")}')">
-          View Schedule
-        </button>
-      `;
-    } else if (currentEstimate.status === 'Revision') {
-      actionsEl.innerHTML = `
-        <span class="status-badge status-revision">Revision</span>
-        <span style="color: var(--gw-text-secondary); font-size: 13px; margin-left: 8px;">${currentEstimate.contractId || ''}</span>
-        <button class="btn btn-secondary" onclick="handleSaveBid()">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-          </svg>
-          Save Draft
-        </button>
-        <button class="btn btn-primary" onclick="openFinalizeModal()" style="background: #E8A000;">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-          </svg>
-          Update Contract
-        </button>
-      `;
-    } else {
-      actionsEl.innerHTML = `
-        <span class="status-badge status-draft">Draft</span>
-        <button class="btn btn-secondary" onclick="openSaveTemplateModal()">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6z"/>
-          </svg>
-          Save as Template
-        </button>
-        <button class="btn btn-primary" onclick="handleSaveBid()">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-          </svg>
-          Save Estimate
-        </button>
-        <button class="btn btn-primary" onclick="openFinalizeModal()" style="background: #d32f2f;">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-          </svg>
-          Finalize
-        </button>
-      `;
-    }
+    // Handled by renderEstimateHeader() — no-op here
   } else if (viewId === 'templates') {
     actionsEl.innerHTML = `
       <button class="btn btn-primary" onclick="createNewTemplate()">
@@ -10566,105 +10510,131 @@ function enterRevisionMode() {
   showToast('You can now edit this estimate. Click "Update Contract" when done.', 'info', 5000);
 }
 
-function updateHeaderActions() {
-  const actionsEl = document.getElementById('header-actions');
-  if (!actionsEl) return;
+function renderEstimateHeader() {
+  const headerEl = document.getElementById('main-header');
+  if (!headerEl) return;
 
-  if (currentEstimate.status === 'Finalized') {
-    const pdfButtons = currentEstimate.pdfUrl
-      ? `<button class="btn btn-secondary" onclick="window.open('${currentEstimate.pdfUrl}', '_blank')">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-            <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-          </svg>
-          View PDF
-        </button>
-        <button class="btn btn-secondary" onclick="generateContractPdf()" id="header-generate-pdf-btn" style="font-size: 12px; padding: 4px 10px;">
-          Regenerate
-        </button>`
-      : `<button class="btn btn-secondary" onclick="generateContractPdf()" id="header-generate-pdf-btn">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-          </svg>
-          Contract PDF
-        </button>`;
-    // Signing status badge + buttons
-    let signingHtml = '';
-    const sigStatus = currentEstimate.signingStatus || '';
-    if (sigStatus === 'signed') {
-      signingHtml = `<span class="status-badge" style="background:rgba(30,142,62,0.12);color:#1e8e3e;">Signed</span>`;
-      if (currentEstimate.signedPdfUrl) {
-        signingHtml += `<button class="btn btn-secondary" onclick="window.open('${currentEstimate.signedPdfUrl}', '_blank')" style="font-size:12px;padding:4px 10px;">View Signed PDF</button>`;
-      } else {
-        signingHtml += `<button class="btn btn-secondary" onclick="generateSignedPdf()" id="btn-gen-signed-pdf" style="font-size:12px;padding:4px 10px;">Generate Signed PDF</button>`;
-      }
+  const est = currentEstimate;
+  const status = est.status || 'Draft';
+  const sigStatus = est.signingStatus || '';
+  const address = est.propertyAddress || '';
+  const contractId = est.contractId || '';
+  const bidId = est.bidId || '';
+  const hasPdf = !!est.pdfUrl;
+  const hasSignedPdf = !!est.signedPdfUrl;
+  const isSigned = sigStatus === 'signed';
+
+  // --- Top tier: Context ---
+  const displayAddress = address || 'New Estimate';
+  const displayId = contractId || bidId;
+  const dotHtml = displayId ? '<span class="header-dot">&middot;</span>' : '';
+  const idHtml = displayId ? `<span class="header-id">${displayId}</span>` : '';
+
+  // Badges
+  let badgesHtml = '';
+  if (isTemplateMode) {
+    badgesHtml = '<span class="status-badge status-sent">Template</span>';
+  } else if (status === 'Draft') {
+    badgesHtml = '<span class="status-badge status-draft">Draft</span>';
+  } else if (status === 'Revision') {
+    badgesHtml = '<span class="status-badge status-revision">Revision</span>';
+  } else if (status === 'Finalized') {
+    badgesHtml = '<span class="status-badge status-finalized">Finalized</span>';
+    if (isSigned) {
+      badgesHtml += '<span class="status-badge status-signed">Signed</span>';
     } else if (sigStatus === 'sent' || sigStatus === 'viewed') {
-      signingHtml = `<span class="status-badge" style="background:rgba(232,160,0,0.12);color:#b8860b;">Awaiting Signature</span>`;
-    } else if (currentEstimate.pdfUrl) {
-      signingHtml = `<button class="btn btn-secondary" onclick="sendContractForSigning()" style="font-size:12px;padding:4px 10px;">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-        </svg>
-        Send Contract
-      </button>`;
+      badgesHtml += '<span class="status-badge status-awaiting">Awaiting Signature</span>';
+    }
+  }
+
+  // Save status
+  const ss = document.getElementById('save-status');
+  const saveText = ss ? ss.textContent : '';
+  const saveClass = ss && ss.classList.contains('unsaved') ? 'save-status unsaved' : 'save-status';
+
+  // --- Bottom tier: Actions ---
+  let actionsHtml = '';
+
+  if (isTemplateMode) {
+    actionsHtml = `
+      <button class="btn btn-primary" onclick="saveTemplateFromBuilder()">Save Template</button>
+    `;
+  } else if (status === 'Draft') {
+    actionsHtml = `
+      <button class="btn btn-secondary" onclick="openSaveTemplateModal()">Save as Template</button>
+      <button class="btn btn-secondary" onclick="handleSaveBid()">Save Estimate</button>
+      ${address
+        ? '<button class="btn btn-sm btn-success" onclick="openFinalizeModal()">Finalize</button>'
+        : '<span style="font-size:13px;color:var(--text-tertiary)">Select a property to begin</span>'}
+    `;
+  } else if (status === 'Revision') {
+    actionsHtml += `<button class="btn btn-secondary" onclick="handleSaveBid()">Save Draft</button>`;
+    if (hasPdf) {
+      actionsHtml += `<button class="btn btn-secondary" onclick="window.open('${est.pdfUrl}', '_blank')">View Current PDF</button>`;
+    }
+    actionsHtml += `<button class="btn btn-sm btn-success" onclick="openFinalizeModal()">Update Contract</button>`;
+  } else if (status === 'Finalized') {
+    actionsHtml += `<button class="btn btn-secondary" onclick="enterRevisionMode()">Revise Estimate</button>`;
+    actionsHtml += `<button class="btn btn-secondary" onclick="openContractDetail('${contractId}', '${address.replace(/'/g, "\\'")}')">View Schedule</button>`;
+
+    // PDF actions
+    if (hasPdf && hasSignedPdf) {
+      actionsHtml += `
+        <div class="header-dropdown">
+          <button class="btn btn-secondary" onclick="this.nextElementSibling.classList.toggle('open')">
+            PDF <svg style="width:12px;height:12px;margin-left:2px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="header-dropdown-menu">
+            <button class="header-dropdown-item" onclick="window.open('${est.pdfUrl}', '_blank')">View Contract PDF</button>
+            <button class="header-dropdown-item" onclick="window.open('${est.signedPdfUrl}', '_blank')">View Signed PDF</button>
+            <hr class="header-dropdown-divider">
+            <button class="header-dropdown-item" onclick="generateContractPdf()">Regenerate PDF</button>
+          </div>
+        </div>
+      `;
+    } else if (hasPdf) {
+      actionsHtml += `<button class="btn btn-secondary" onclick="window.open('${est.pdfUrl}', '_blank')">View PDF</button>`;
     }
 
-    actionsEl.innerHTML = `
-      <span class="status-badge status-finalized">Finalized</span>
-      <span style="color: var(--gw-text-secondary); font-size: 13px; margin-left: 8px;">${currentEstimate.contractId || ''}</span>
-      ${pdfButtons}
-      ${signingHtml}
-      <button class="btn btn-secondary" onclick="enterRevisionMode()">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-        </svg>
-        Revise Estimate
-      </button>
-      <button class="btn btn-secondary" onclick="openSchedule('${currentEstimate.contractId}', '${(currentEstimate.propertyAddress || '').replace(/'/g, "\\'")}')">
-        View Schedule
-      </button>
-    `;
-  } else if (currentEstimate.status === 'Revision') {
-    actionsEl.innerHTML = `
-      <span class="status-badge status-revision">Revision</span>
-      <span style="color: var(--gw-text-secondary); font-size: 13px; margin-left: 8px;">${currentEstimate.contractId || ''}</span>
-      <button class="btn btn-secondary" onclick="handleSaveBid()">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-        </svg>
-        Save Draft
-      </button>
-      <button class="btn btn-primary" onclick="openFinalizeModal()" style="background: #E8A000;">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-        </svg>
-        Update Contract
-      </button>
-    `;
-  } else {
-    // Draft
-    actionsEl.innerHTML = `
-      <span class="status-badge status-draft">Draft</span>
-      <button class="btn btn-secondary" onclick="openSaveTemplateModal()">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6z"/>
-        </svg>
-        Save as Template
-      </button>
-      <button class="btn btn-primary" onclick="handleSaveBid()">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-        </svg>
-        Save Estimate
-      </button>
-      <button class="btn btn-primary" onclick="openFinalizeModal()" style="background: #d32f2f;">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-        </svg>
-        Finalize
-      </button>
-    `;
+    // Primary action
+    if (!hasPdf) {
+      actionsHtml += `<button class="btn btn-sm btn-primary" onclick="generateContractPdf()">Generate PDF</button>`;
+    } else if (!isSigned && sigStatus !== 'sent' && sigStatus !== 'viewed') {
+      actionsHtml += `<button class="btn btn-sm btn-primary" onclick="sendContractForSigning()">Send Contract</button>`;
+    } else if (isSigned && !hasSignedPdf) {
+      actionsHtml += `<button class="btn btn-sm btn-primary" onclick="generateSignedPdf()">Generate Signed PDF</button>`;
+    }
   }
+
+  // Build the full two-tier header
+  headerEl.className = 'main-header two-tier';
+  headerEl.innerHTML = `
+    <div class="header-context">
+      <div class="header-context-left">
+        <button class="header-back" onclick="showView('estimates')" title="Back to Estimates">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+          </svg>
+        </button>
+        <span class="header-address">${displayAddress}</span>
+        ${dotHtml}
+        ${idHtml}
+        <span class="${saveClass}" id="save-status">${saveText}</span>
+      </div>
+      <div class="header-badges">
+        ${badgesHtml}
+      </div>
+    </div>
+    <hr class="header-rule">
+    <div class="header-actions-bar" id="header-actions">
+      ${actionsHtml}
+    </div>
+  `;
+}
+
+// Backward-compatible alias — all existing call sites use this name
+function updateHeaderActions() {
+  renderEstimateHeader();
 }
 
 function previewTickets() {
@@ -13496,7 +13466,7 @@ document.addEventListener('DOMContentLoaded', function() {
       document.getElementById('prop-lot-size').value = result.lotSize > 0 ? result.lotSize.toLocaleString('en-US') : '';
       document.getElementById('file-upload-zone').classList.add('has-file');
       document.getElementById('file-upload-text').textContent = file.name;
-      document.getElementById('header-subtitle').textContent = result.address;
+      renderEstimateHeader();
 
       // Update Property Setup tables display
       renderPropertySetupTables();
@@ -13669,7 +13639,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // Property inputs
   document.getElementById('prop-address').addEventListener('input', function() {
     currentEstimate.propertyAddress = this.value;
-    document.getElementById('header-subtitle').textContent = this.value;
+    renderEstimateHeader();
     markEstimateDirty();
   });
 
@@ -16070,6 +16040,13 @@ document.addEventListener('click', function(e) {
 document.getElementById('wt-search')?.addEventListener('input', function() {
   wtSearchQuery = this.value.trim();
   renderWorkTickets();
+});
+
+// Close header dropdown on outside click
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.header-dropdown')) {
+    document.querySelectorAll('.header-dropdown-menu.open').forEach(m => m.classList.remove('open'));
+  }
 });
 
 // ═══════════════════════════════════════════════════════════════

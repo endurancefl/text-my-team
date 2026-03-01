@@ -401,6 +401,158 @@ body {
   box-shadow: none;
 }
 
+/* Two-tier header for estimate builder view */
+.main-header.two-tier {
+  height: auto;
+  min-height: auto;
+  padding: 0;
+  display: block;
+  border-bottom: none;
+}
+
+.header-context {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 44px;
+  padding: 0 16px;
+}
+
+.header-context-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.header-back {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  transition: background 0.15s;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.header-back:hover {
+  background: var(--bg-table-row-hover);
+}
+
+.header-address {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.header-dot {
+  color: var(--border-default);
+  font-size: 13px;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.header-id {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.header-badges {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-left: 16px;
+  align-items: center;
+}
+
+.header-rule {
+  border: none;
+  border-top: var(--rule-heavy);
+  margin: 0;
+}
+
+.header-actions-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  height: 44px;
+  padding: 0 16px;
+  gap: 8px;
+}
+
+.header-actions-spacer {
+  flex: 1;
+}
+
+/* Save status within two-tier header */
+.header-context .save-status {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+.header-context .save-status.unsaved { color: var(--yellow); }
+
+/* Header dropdown for PDF actions */
+.header-dropdown {
+  position: relative;
+  display: inline-flex;
+}
+
+.header-dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  box-shadow: var(--shadow-2);
+  min-width: 180px;
+  z-index: 100;
+  padding: 4px 0;
+}
+
+.header-dropdown-menu.open {
+  display: block;
+}
+
+.header-dropdown-item {
+  display: block;
+  width: 100%;
+  padding: 8px 16px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--text-primary);
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.header-dropdown-item:hover {
+  background: var(--bg-table-row-hover);
+}
+
+.header-dropdown-divider {
+  border: none;
+  border-top: 1px solid var(--border-light);
+  margin: 4px 0;
+}
+
 .header-title {
   font-family: var(--font-display);
   font-size: 22px;
@@ -511,12 +663,14 @@ body {
   white-space: nowrap;
 }
 
-.status-draft { background: #E8EAED; color: var(--text-secondary); }
+.status-draft { background: var(--yellow-light); color: #B06000; }
 .status-sent { background: var(--blue-lighter); color: var(--blue-primary); }
 .status-accepted { background: var(--green-light); color: var(--green); }
 .status-rejected { background: var(--red-light); color: var(--red); }
-.status-finalized { background: var(--red-light); color: var(--red); }
+.status-finalized { background: var(--blue-lighter); color: var(--blue-primary); }
 .status-revision { background: var(--yellow-light); color: #B06000; }
+.status-signed { background: var(--green-light); color: var(--green); }
+.status-awaiting { background: var(--blue-lighter); color: var(--blue-primary); }
 
 /* ═══════════════════════════════════════════════════════════════ */
 /*  SCHEDULE VIEW                                                  */
