@@ -619,10 +619,12 @@ def _parse_chat_response(text):
     except json.JSONDecodeError:
         pass
 
-    # Case 2: Mixed response — natural text followed by a JSON action block.
-    # Find the last top-level JSON object in the text by scanning for the
-    # outermost { ... } that contains "action".
-    last_json_start = None
+    # Case 2: Mixed response — natural text with a JSON action block anywhere.
+    # Find the last top-level JSON object in the text that contains "action".
+    # Track both start (j) and end (i) positions so text before AND after
+    # the JSON block is captured as the message.
+    json_start = None
+    json_end = None
     for i in range(len(text) - 1, -1, -1):
         if text[i] == '}':
             # Walk backwards to find the matching opening brace
@@ -635,23 +637,23 @@ def _parse_chat_response(text):
                 if depth == 0:
                     candidate = text[j:i+1]
                     if '"action"' in candidate:
-                        last_json_start = j
+                        json_start = j
+                        json_end = i
                     break
-            if last_json_start is not None:
+            if json_start is not None:
                 break
 
-    if last_json_start is not None:
-        json_str = text[last_json_start:]
-        preamble = text[:last_json_start].strip()
+    if json_start is not None:
+        json_str = text[json_start:json_end+1]
+        preamble = text[:json_start].strip()
+        postamble = text[json_end+1:].strip()
         try:
             parsed = json.loads(json_str)
             if isinstance(parsed, dict) and "action" in parsed:
-                # Merge preamble text with the action's message
-                action_msg = parsed.get("message", "")
-                if preamble:
-                    # Use the conversational preamble as the message,
-                    # keep action_msg as fallback
-                    parsed["message"] = preamble
+                # Combine text before and after JSON as the message
+                parts = [p for p in (preamble, postamble) if p]
+                if parts:
+                    parsed["message"] = "\n\n".join(parts)
                 return parsed
         except json.JSONDecodeError:
             pass
