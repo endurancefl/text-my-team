@@ -6581,18 +6581,18 @@ select option:checked {
   height: 48px;
   border-radius: 50%;
   border: none;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #10b981, #3b82f6);
   color: #fff;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
   transition: transform 0.2s, box-shadow 0.2s;
 }
 .marvin-fab:hover {
   transform: scale(1.08);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5);
 }
 .marvin-fab .material-icons-outlined {
   font-size: 22px;
@@ -6601,7 +6601,7 @@ select option:checked {
   position: absolute;
   inset: -4px;
   border-radius: 50%;
-  border: 2px solid rgba(102, 126, 234, 0.5);
+  border: 2px solid rgba(16, 185, 129, 0.5);
   animation: marvin-pulse 2s ease-out infinite;
   pointer-events: none;
 }
@@ -6651,7 +6651,7 @@ select option:checked {
 }
 .marvin-panel-icon {
   font-size: 24px;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #10b981, #3b82f6);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -6718,14 +6718,14 @@ select option:checked {
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #667eea20, #764ba220);
+  background: linear-gradient(135deg, #10b98120, #3b82f620);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .marvin-welcome-icon .material-icons-outlined {
   font-size: 28px;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #10b981, #3b82f6);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -6798,11 +6798,11 @@ select option:checked {
   margin-top: 2px;
 }
 .marvin-msg.assistant .marvin-msg-avatar {
-  background: linear-gradient(135deg, #667eea20, #764ba220);
+  background: linear-gradient(135deg, #10b98120, #3b82f620);
 }
 .marvin-msg.assistant .marvin-msg-avatar .material-icons-outlined {
   font-size: 16px;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #10b981, #3b82f6);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -6998,14 +6998,14 @@ select option:checked {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #667eea20, #764ba220);
+  background: linear-gradient(135deg, #10b98120, #3b82f620);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .marvin-typing-avatar .material-icons-outlined {
   font-size: 16px;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #10b981, #3b82f6);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -7063,7 +7063,7 @@ select option:checked {
   height: 36px;
   border-radius: 50%;
   border: none;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #10b981, #3b82f6);
   color: #fff;
   cursor: pointer;
   display: flex;
