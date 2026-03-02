@@ -6965,6 +6965,16 @@ select option:checked {
   color: var(--text-primary);
   border-bottom-left-radius: 4px;
 }
+.marvin-msg-bubble ul, .marvin-msg-bubble ol {
+  margin: 4px 0;
+  padding-left: 18px;
+}
+.marvin-msg-bubble li {
+  margin-bottom: 2px;
+}
+.marvin-msg-bubble strong {
+  font-weight: 600;
+}
 
 /* Action Cards */
 .marvin-action-card {

@@ -5285,6 +5285,24 @@ function autoGrowMarvinInput(el) {
   el.style.height = Math.min(el.scrollHeight, 120) + 'px';
 }
 
+function formatMarvinText(text) {
+  // Light markdown rendering for assistant messages
+  let html = escapeHtml(text);
+  // Bold: **text** → <strong>text</strong>
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  // Bullet lists: lines starting with - or •
+  html = html.replace(/^[-•]\s+(.+)$/gm, '<li>$1</li>');
+  html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
+  // Numbered lists: lines starting with 1. 2. etc.
+  html = html.replace(/^\d+\.\s+(.+)$/gm, '<li>$1</li>');
+  // Line breaks for remaining newlines (not inside lists)
+  html = html.replace(/\n/g, '<br>');
+  // Clean up double breaks inside lists
+  html = html.replace(/<br><\/li>/g, '</li>');
+  html = html.replace(/<\/ul><br>/g, '</ul>');
+  return html;
+}
+
 function appendMarvinMessage(role, content, action) {
   // Hide welcome screen on first message
   const welcome = document.getElementById('marvin-welcome');
@@ -5295,12 +5313,13 @@ function appendMarvinMessage(role, content, action) {
   msgDiv.className = `marvin-msg ${role}`;
 
   if (role === 'assistant') {
+    const rendered = formatMarvinText(content);
     msgDiv.innerHTML = `
       <div class="marvin-msg-avatar">
         <span class="material-icons-outlined">auto_awesome</span>
       </div>
       <div>
-        <div class="marvin-msg-bubble">${escapeHtml(content)}</div>
+        <div class="marvin-msg-bubble">${rendered}</div>
         ${action ? renderMarvinActionCard(action) : ''}
       </div>`;
   } else {
@@ -5373,21 +5392,97 @@ function buildMarvinContext() {
   };
 
   if (hasActiveEstimate()) {
+    // Property info
     ctx.property = {
       address: currentEstimate.propertyAddress || '(not set)',
       type: currentEstimate.propertyType || 'Residential',
-      lotSizeSF: currentEstimate.lotSizeSF || 0
+      lotSizeSF: currentEstimate.lotSizeSF || 0,
+      contactName: currentEstimate.contactName || ''
     };
-    ctx.travelPercent = currentEstimate.travelPercent;
-    ctx.services = (currentEstimate.services || []).map(s =>
-      typeof s === 'string' ? s : (s.serviceName || s.proposalName || s.name || '')
-    ).filter(Boolean);
+
+    // Features / measurements from Attentive
+    if (currentEstimate.features && Object.keys(currentEstimate.features).length) {
+      ctx.measurements = currentEstimate.features;
+    }
+
+    // Takeoff data
+    ctx.takeoffs = currentEstimate.takeoffs;
+
+    // Services with full detail
+    ctx.services = (currentEstimate.services || []).map(s => {
+      if (typeof s === 'string') return { name: s };
+      const svc = {
+        name: s.serviceName || s.proposalName || s.name || '',
+        billingTier: s.billingTier || 'fixed',
+        visits: s.visits || 0,
+        isSubcontractor: !!s.isSubcontractor
+      };
+      if (s.isSubcontractor) svc.subCost = s.subCost || 0;
+      if (s.accepted !== undefined) svc.accepted = s.accepted;
+      // Include line items summary (name + quantity + computed values)
+      if (s.lineItems && s.lineItems.length) {
+        svc.lineItems = s.lineItems.map(li => ({
+          item: li.itemName,
+          qty: li.quantity || li.value || 0,
+          unit: li.unit || ''
+        }));
+      }
+      return svc;
+    });
+
+    // Contract settings
     ctx.contract = { ...currentEstimate.contract };
-    ctx.laborRate = currentEstimate.laborRate;
-    ctx.laborMarkup = currentEstimate.laborMarkup;
-    ctx.materialMarkup = currentEstimate.materialMarkup;
-    ctx.subMarkup = currentEstimate.subMarkup;
+    delete ctx.contract.termsAndConditionsHtml; // too large
+
+    // Rate settings (effective)
+    ctx.travelPercent = currentEstimate.travelPercent;
+    ctx.rateOverrides = {
+      laborRate: currentEstimate.laborRate,
+      laborMarkup: currentEstimate.laborMarkup,
+      materialMarkup: currentEstimate.materialMarkup,
+      subMarkup: currentEstimate.subMarkup
+    };
+
+    // Calculated totals
+    try {
+      const totals = calculateBidTotals();
+      ctx.totals = {
+        totalLaborHours: Math.round(totals.totalLaborHours * 100) / 100,
+        travelHours: Math.round(totals.travelHours * 100) / 100,
+        laborCost: Math.round(totals.laborCost * 100) / 100,
+        laborBilled: Math.round(totals.laborBilled * 100) / 100,
+        materialCost: Math.round(totals.totalMaterialCost * 100) / 100,
+        materialBilled: Math.round(totals.materialBilled * 100) / 100,
+        subCost: Math.round(totals.totalSubCost * 100) / 100,
+        subBilled: Math.round(totals.subBilled * 100) / 100,
+        bidTotal: Math.round(totals.bidTotal * 100) / 100,
+        internalCost: Math.round(totals.internalCost * 100) / 100,
+        profit: Math.round(totals.profit * 100) / 100,
+        margin: Math.round(totals.margin * 10) / 10,
+        monthlyPrice: Math.round(totals.monthlyPrice * 100) / 100,
+        totalVisits: totals.totalVisits,
+        effectiveRates: totals.rates
+      };
+    } catch (e) { /* no totals if calculation fails */ }
+
+    // Tier breakdown
+    try {
+      const tiers = calculateTierTotals();
+      ctx.tierTotals = {
+        fixed: tiers.fixed.total,
+        billed: tiers.billed.total,
+        recommended: tiers.recommended.total
+      };
+    } catch (e) { /* skip */ }
   }
+
+  // Bid settings defaults (always useful)
+  ctx.bidDefaults = {
+    laborRate: bidSettings.laborRate,
+    residentialLaborMarkup: bidSettings.residentialLaborMarkup,
+    residentialMaterialMarkup: bidSettings.residentialMaterialMarkup,
+    defaultTravelTime: bidSettings.defaultTravelTime
+  };
 
   ctx.availableViews = Object.entries(MARVIN_VIEW_MAP).map(([id, label]) => ({ id, label }));
   return ctx;
