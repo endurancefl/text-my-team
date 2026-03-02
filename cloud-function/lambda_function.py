@@ -600,35 +600,59 @@ estimates, builder, catalog, services, production, settings, contacts, contracts
 
 
 def _parse_chat_response(text):
-    """Parse a chat-mode response. Could be plain text or JSON action."""
+    """Parse a chat-mode response. Could be plain text, JSON action, or mixed."""
     import re
     # Strip markdown fences if present
     text = re.sub(r'^```(?:json)?\s*', '', text, flags=re.MULTILINE)
     text = re.sub(r'\s*```\s*$', '', text, flags=re.MULTILINE)
     text = text.strip()
 
-    # Try to parse as JSON first (action responses)
+    # Case 1: Pure JSON response (action only)
     try:
         parsed = json.loads(text)
-        # Validate it looks like an action response
         if isinstance(parsed, dict) and ("type" in parsed or "action" in parsed):
             return parsed
     except json.JSONDecodeError:
         pass
 
-    # Check if there's a JSON object embedded in the text (model sometimes wraps)
-    json_match = re.search(r'\{[^{}]*"type"\s*:\s*"action"[^{}]*\{[\s\S]*?\}\s*\}', text)
-    if not json_match:
-        json_match = re.search(r'\{[\s\S]*"action"[\s\S]*\}', text)
-    if json_match:
+    # Case 2: Mixed response — natural text followed by a JSON action block.
+    # Find the last top-level JSON object in the text by scanning for the
+    # outermost { ... } that contains "action".
+    last_json_start = None
+    for i in range(len(text) - 1, -1, -1):
+        if text[i] == '}':
+            # Walk backwards to find the matching opening brace
+            depth = 0
+            for j in range(i, -1, -1):
+                if text[j] == '}':
+                    depth += 1
+                elif text[j] == '{':
+                    depth -= 1
+                if depth == 0:
+                    candidate = text[j:i+1]
+                    if '"action"' in candidate:
+                        last_json_start = j
+                    break
+            if last_json_start is not None:
+                break
+
+    if last_json_start is not None:
+        json_str = text[last_json_start:]
+        preamble = text[:last_json_start].strip()
         try:
-            parsed = json.loads(json_match.group())
+            parsed = json.loads(json_str)
             if isinstance(parsed, dict) and "action" in parsed:
+                # Merge preamble text with the action's message
+                action_msg = parsed.get("message", "")
+                if preamble:
+                    # Use the conversational preamble as the message,
+                    # keep action_msg as fallback
+                    parsed["message"] = preamble
                 return parsed
         except json.JSONDecodeError:
             pass
 
-    # Plain text response — this is the normal case for conversational answers
+    # Case 3: Plain text response — the normal conversational case
     return {"type": "text", "message": text}
 
 
