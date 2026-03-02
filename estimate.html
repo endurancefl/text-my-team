@@ -1177,6 +1177,20 @@
               </div>
             </div>
           </div>
+          <div class="settings-card" style="grid-column: 1 / -1;">
+            <div class="settings-card-header">
+              <span class="material-icons-outlined" style="font-size: 18px; vertical-align: middle; margin-right: 6px; background: linear-gradient(135deg, #667eea, #764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">auto_awesome</span>
+              MARVIN Knowledge Base
+            </div>
+            <div class="settings-card-body">
+              <p style="font-size: 12px; color: var(--text-secondary); margin: 0 0 10px 0; line-height: 1.5;">
+                Persistent instructions for MARVIN. These are included in every conversation so MARVIN knows your company's preferences, pricing, and standards without being told each time.
+              </p>
+              <textarea class="settings-input" id="setting-marvin-kb" rows="10"
+                style="width: 100%; min-height: 160px; resize: vertical; font-family: 'Roboto Mono', monospace; font-size: 12px; line-height: 1.6; padding: 12px;"
+                placeholder="- Minimum monthly contract: $350 residential, $800 commercial&#10;- Always use 48&quot; mowers on residential under 20,000 SF&#10;- Our mulch supplier charges $42/CY&#10;- Standard travel time: 25% for Winter Park, 35% for Clermont&#10;- Seasonal color: petunias in spring, mums in fall"></textarea>
+            </div>
+          </div>
           <div style="margin-top: 20px;">
             <button class="btn btn-primary" id="save-settings-btn">Save Settings</button>
           </div>
@@ -2566,7 +2580,8 @@ let bidSettings = {
   commercialMaterialMarkup: 100,
   commercialSubMarkup: 10,
   defaultTravelTime: 30,
-  division: 'Maintenance'
+  division: 'Maintenance',
+  marvinKnowledgeBase: ''
 };
 let savedBids = [];
 let savedTemplates = [];
@@ -5483,6 +5498,11 @@ function buildMarvinContext() {
     residentialMaterialMarkup: bidSettings.residentialMaterialMarkup,
     defaultTravelTime: bidSettings.defaultTravelTime
   };
+
+  // Company knowledge base (persistent MARVIN instructions)
+  if (bidSettings.marvinKnowledgeBase) {
+    ctx.knowledgeBase = bidSettings.marvinKnowledgeBase;
+  }
 
   ctx.availableViews = Object.entries(MARVIN_VIEW_MAP).map(([id, label]) => ({ id, label }));
   return ctx;
@@ -10609,6 +10629,8 @@ function renderSettingsForm() {
   document.getElementById('setting-com-material-markup').value = bidSettings.commercialMaterialMarkup;
   document.getElementById('setting-com-sub-markup').value = bidSettings.commercialSubMarkup;
   document.getElementById('setting-travel-time').value = bidSettings.defaultTravelTime;
+  const kbEl = document.getElementById('setting-marvin-kb');
+  if (kbEl) kbEl.value = bidSettings.marvinKnowledgeBase || '';
 }
 
 function renderTableBody() {
@@ -15566,6 +15588,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
 
+  // MARVIN knowledge base textarea — text, not numeric
+  const kbInput = document.getElementById('setting-marvin-kb');
+  if (kbInput) {
+    kbInput.addEventListener('input', function() {
+      bidSettings.marvinKnowledgeBase = this.value;
+    });
+  }
+
   // Save settings to Google Sheets
   document.getElementById('save-settings-btn').addEventListener('click', async function() {
     const settings = {
@@ -15578,7 +15608,8 @@ document.addEventListener('DOMContentLoaded', function() {
       commercialSubMarkup: bidSettings.commercialSubMarkup,
       defaultTravelTime: bidSettings.defaultTravelTime,
       defaultMulchDepth: bidSettings.defaultMulchDepth,
-      defaultMulchPricePerYard: bidSettings.defaultMulchPricePerYard
+      defaultMulchPricePerYard: bidSettings.defaultMulchPricePerYard,
+      marvinKnowledgeBase: bidSettings.marvinKnowledgeBase || ''
     };
 
     const result = await saveBidSettings(settings);

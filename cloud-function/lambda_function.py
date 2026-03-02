@@ -534,7 +534,22 @@ When the user asks you to refine or change a previous result, generate the updat
 
 def _build_chat_system_prompt(context):
     """Build the conversational system prompt with injected context."""
+    # Extract knowledge base before serializing context (keep context JSON clean)
+    knowledge_base = ""
+    if isinstance(context, dict):
+        kb = context.pop("knowledgeBase", "")
+        if kb and kb.strip():
+            knowledge_base = kb.strip()
     ctx_str = json.dumps(context, indent=2) if context else "{}"
+
+    # Build the knowledge base section
+    kb_section = ""
+    if knowledge_base:
+        kb_section = f"""
+
+## Company Knowledge Base (from Settings — always follow these)
+{knowledge_base}
+"""
 
     return f"""You are MARVIN, an expert landscape maintenance estimating assistant for Endurance Services, a commercial and residential landscape company in Central Florida.
 
@@ -589,14 +604,15 @@ estimates, builder, catalog, services, production, settings, contacts, contracts
 
 ## Current estimate context
 {ctx_str}
-
+{kb_section}
 ## Guidelines
 - When answering questions about the estimate, reference specific numbers from the context. "Your lot is 12,500 SF" not "the lot size is whatever it's set to."
 - If the user asks "what should I set travel to?" — give an actual recommendation based on the property type and your knowledge, don't just list options.
 - For section creation, suggest good row names based on common landscape categories.
 - If you notice something that looks off in the estimate (e.g., 0% travel, missing services, unusually high/low margins), mention it proactively.
 - Keep action messages short (1 sentence). Conversational answers can be longer but stay focused.
-- You can discuss pricing strategy, suggest services to add, explain how markups affect margins, compare to industry benchmarks — be a real estimating partner."""
+- You can discuss pricing strategy, suggest services to add, explain how markups affect margins, compare to industry benchmarks — be a real estimating partner.
+- The Company Knowledge Base (if present) contains the owner's specific preferences and standards. Always follow those over generic defaults. For example, if the KB says "minimum $350/month", flag any estimate below that threshold."""
 
 
 def _parse_chat_response(text):
