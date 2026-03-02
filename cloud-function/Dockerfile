@@ -20,6 +20,7 @@ RUN pip install --no-cache-dir -r ${LAMBDA_TASK_ROOT}/requirements.txt
 COPY lambda_function.py ${LAMBDA_TASK_ROOT}/
 COPY main.py ${LAMBDA_TASK_ROOT}/
 COPY pdf_generator.py ${LAMBDA_TASK_ROOT}/
+COPY marvin-knowledge.md ${LAMBDA_TASK_ROOT}/
 
 # Copy assets and templates
 COPY assets/ ${LAMBDA_TASK_ROOT}/assets/

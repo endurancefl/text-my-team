@@ -69,7 +69,8 @@ text-my-team/
 │   └── combined-apps-script.js    # Google Apps Script backend (~5,200 lines)
 ├── cloud-function/                # AWS Lambda PDF generation
 │   ├── pdf_generator.py           # PDF library (WeasyPrint + ReportLab)
-│   ├── lambda_function.py         # AWS Lambda handler
+│   ├── lambda_function.py         # AWS Lambda handler (~675 lines)
+│   ├── marvin-knowledge.md        # MARVIN AI knowledge base (~423 lines, loaded at cold start)
 │   ├── Dockerfile                 # WeasyPrint container image
 │   ├── requirements.txt
 │   ├── templates/                 # Jinja2 HTML/CSS templates for PDFs
@@ -626,6 +627,7 @@ Both apps live in the same monorepo, share the component library (`packages/ui`)
 - **MARVIN AI endpoint** (`/marvin`): Dual-mode AI endpoint for the estimating tool. Uses Anthropic Claude API (`claude-sonnet-4-20250514`). API key stored in AWS Secrets Manager (`marvin-api-key`) and resolved at deploy time via `{{resolve:secretsmanager:...}}` in SAM template. `anthropic>=0.40.0` added to `requirements.txt`. Function: `_handle_marvin()` in `lambda_function.py`.
   - **Section mode** (`mode:'section'`, default): Original behavior. Accepts `{ "prompt": "...", "history": [] }`. Returns `{ "success": true, "result": { "sections": [...] } }`. System prompt: section-only JSON generator. 1024 max tokens.
   - **Chat mode** (`mode:'chat'`): Conversational assistant. Accepts `{ "prompt": "...", "history": [], "mode": "chat", "context": {...} }`. Context includes current view, property info, services, contract settings, available views. Returns structured JSON: `{ "type": "text|action", "message": "...", "action": { "type": "setField|createSection|navigate", "data": {...} } }`. System prompt: general-purpose assistant with field IDs, view IDs, section types. 2048 max tokens. Helper functions: `_build_chat_system_prompt(context)`, `_build_section_system_prompt()`, `_parse_chat_response(text)`, `_parse_section_response(text)`.
+  - **Knowledge file** (`cloud-function/marvin-knowledge.md`, ~423 lines): Local markdown file loaded once at Lambda cold start into the `_MARVIN_KNOWLEDGE` global variable. Injected into the chat system prompt as the "Platform & Industry Knowledge" section. Contains: platform overview, all views and their field IDs, full item catalog with production rates, service catalog, calculation formulas, billing tiers, takeoff sections, bid settings, contract system, crew operations, customer portal, backend schemas, and industry benchmarks. Replaces the ~60 lines of hardcoded knowledge that was previously inline in the Lambda. Must be updated whenever the codebase changes (same discipline as `platform-architecture.md`). Redeploy Lambda after changes.
 - Lambda config: Python 3.12, **2048MB memory**, **300s timeout**
 - **Deployment**: **Docker container image on ECR**. SAM builds the Dockerfile locally (requires Docker Desktop running), pushes to ECR, and updates the Lambda. Base image: `public.ecr.aws/lambda/python:3.12` (Amazon Linux 2023). System packages installed via `dnf`: pango 1.54, cairo 1.18, gdk-pixbuf2, harfbuzz 7.0, fontconfig, freetype. Redeployment: `cd cloud-function/deploy && ./deploy-docker.sh` (builds image, pushes to ECR, updates Lambda).
 - **ECR repository**: `598386792755.dkr.ecr.us-east-1.amazonaws.com/endurancepdfgeneratorab3806a9/pdfgeneratorfunctionb84ef44frepo`
