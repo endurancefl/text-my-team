@@ -3185,8 +3185,11 @@ function clearSavedEstimate() {
 }
 
 function hasActiveEstimate() {
-  // Check if estimate has meaningful data
+  // Check if estimate has meaningful data or the builder is open
   if (!currentEstimate) return false;
+
+  // Builder view is open — user is actively working on an estimate
+  if (currentView === 'builder') return true;
 
   // Has property address
   if (currentEstimate.propertyAddress && currentEstimate.propertyAddress.trim()) return true;
@@ -5289,8 +5292,28 @@ function renderMarvinActionCard(action) {
   }
 
   let detail = '';
+  let detailIsHtml = false;
   if (action.type === 'setField' && action.data?.fieldLabel) {
     detail = `${action.data.fieldLabel} → ${action.data.value}`;
+  } else if (action.type === 'createSection' && action.data?.sections?.length) {
+    detail = action.data.sections.map(sec => {
+      const typeLabel = sec.type === 'split' ? 'Split' : sec.type === 'calc' ? 'Calc' : 'Value';
+      let html = `<div class="marvin-section-preview">
+        <div class="section-preview-name">${escapeHtml(sec.label || 'Untitled')}</div>
+        <div class="section-preview-meta">${typeLabel} · ${escapeHtml(sec.unit || 'SF')}</div>`;
+      if (sec.type === 'split' && sec.rows?.length) {
+        html += `<div class="section-preview-rows">${sec.rows.map(r => `<span class="section-preview-tag">${escapeHtml(r)}</span>`).join('')}</div>`;
+      }
+      if (sec.type === 'calc') {
+        const inp = escapeHtml(sec.inputLabel || 'Input');
+        const out = escapeHtml(sec.outputLabel || 'Output');
+        const c = sec.constant || 1;
+        html += `<div class="section-preview-calc">${inp} × ${c} = ${out}</div>`;
+      }
+      html += '</div>';
+      return html;
+    }).join('');
+    detailIsHtml = true;
   } else if (action.type === 'updateKnowledgeBase') {
     const entries = action.data?.entries || action.data?.remove || [];
     detail = entries.join('\n');
@@ -5313,7 +5336,7 @@ function renderMarvinActionCard(action) {
         </div>
         <span class="marvin-action-label">${labelMap[action.type] || ''}</span>
       </div>
-      ${detail ? `<div class="marvin-action-detail">${escapeHtml(detail)}</div>` : ''}
+      ${detail ? `<div class="marvin-action-detail">${detailIsHtml ? detail : escapeHtml(detail)}</div>` : ''}
       <button class="marvin-action-btn ${btnClass}" onclick="applyMarvinAction('${actionId}', this)">
         <span class="material-icons-outlined">${action.type === 'navigate' ? 'arrow_forward' : 'check'}</span>
         ${btnText}
