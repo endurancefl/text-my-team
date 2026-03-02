@@ -445,7 +445,7 @@ def _parse_multipart(body, boundary):
 
 
 def _handle_marvin(event, allowed):
-    """Handle MARVIN AI section generation requests."""
+    """Handle MARVIN AI requests — section generation (mode='section') and chat (mode='chat')."""
     try:
         body = event.get("body", "")
         is_base64 = event.get("isBase64Encoded", False)
@@ -454,6 +454,8 @@ def _handle_marvin(event, allowed):
 
         data = json.loads(body)
         prompt = data.get("prompt", "").strip()
+        history = data.get("history", [])
+        mode = data.get("mode", "section")
 
         if not prompt:
             return _error_response("Missing 'prompt' in request body", 400, allowed)
@@ -466,7 +468,51 @@ def _handle_marvin(event, allowed):
         import anthropic
         client = anthropic.Anthropic(api_key=api_key)
 
-        system_prompt = """You are MARVIN, a takeoff section generator for a landscape maintenance estimating tool.
+        if mode == "chat":
+            system_prompt = _build_chat_system_prompt(data.get("context", {}))
+            max_tokens = 2048
+        else:
+            system_prompt = _build_section_system_prompt()
+            max_tokens = 1024
+
+        # Build messages: include conversation history for iterative refinement
+        messages = []
+        for msg in history:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            if role in ("user", "assistant") and content:
+                messages.append({"role": role, "content": content})
+        messages.append({"role": "user", "content": prompt})
+
+        message = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=max_tokens,
+            system=system_prompt,
+            messages=messages,
+        )
+
+        result_text = message.content[0].text.strip()
+
+        if mode == "chat":
+            result_json = _parse_chat_response(result_text)
+        else:
+            result_json = _parse_section_response(result_text)
+
+        resp_headers = cors_headers(allowed)
+        resp_headers["Content-Type"] = "application/json"
+        return {
+            "statusCode": 200,
+            "headers": resp_headers,
+            "body": json.dumps({"success": True, "result": result_json}),
+        }
+
+    except Exception as e:
+        return _error_response(f"MARVIN error: {e}", 500, allowed)
+
+
+def _build_section_system_prompt():
+    """Original section-only system prompt for backward compatibility."""
+    return """You are MARVIN, a takeoff section generator for a landscape maintenance estimating tool.
 
 Given a user description, generate a section configuration as JSON. There are 3 section types:
 
@@ -481,36 +527,99 @@ Given a user description, generate a section configuration as JSON. There are 3 
 
 Available units: SF, LF, CY, EA, bags, flats, gallons, hours, lbs, tons, pallets
 
-Return ONLY a JSON object with a "sections" array containing one or more section configs. No markdown, no explanation."""
+Return ONLY a JSON object with a "sections" array containing one or more section configs. No markdown, no explanation.
 
-        message = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=1024,
-            system=system_prompt,
-            messages=[{"role": "user", "content": prompt}],
-        )
+When the user asks you to refine or change a previous result, generate the updated section config incorporating their feedback."""
 
-        result_text = message.content[0].text.strip()
 
-        # Try to parse as JSON
-        try:
-            result_json = json.loads(result_text)
-        except json.JSONDecodeError:
-            # Try to extract JSON from response
-            import re
-            json_match = re.search(r'\{[\s\S]*\}', result_text)
-            if json_match:
-                result_json = json.loads(json_match.group())
-            else:
-                result_json = {"error": "Could not parse AI response", "raw": result_text}
+def _build_chat_system_prompt(context):
+    """Build the conversational system prompt with injected context."""
+    ctx_str = json.dumps(context, indent=2) if context else "{}"
 
-        resp_headers = cors_headers(allowed)
-        resp_headers["Content-Type"] = "application/json"
-        return {
-            "statusCode": 200,
-            "headers": resp_headers,
-            "body": json.dumps({"success": True, "result": result_json}),
-        }
+    return f"""You are MARVIN (Marginally Above Random, Very Impressive Nonetheless), an AI assistant for a landscape maintenance estimating platform built by Endurance Services.
 
-    except Exception as e:
-        return _error_response(f"MARVIN error: {e}", 500, allowed)
+You help users build estimates, adjust settings, answer questions, and navigate the app. Be concise, helpful, and friendly. Use landscape industry terminology naturally.
+
+## Response Format
+
+You MUST respond with a single JSON object (no markdown fences, no explanation outside the JSON). Use one of these formats:
+
+1. Plain text response (for questions, chat, information):
+{{"type": "text", "message": "Your response here"}}
+
+2. Set a field value:
+{{"type": "action", "message": "Description of what you're doing", "action": {{"type": "setField", "data": {{"field": "fieldId", "value": newValue, "fieldLabel": "Human Label"}}}}}}
+
+3. Create takeoff section(s):
+{{"type": "action", "message": "Description of what you're creating", "action": {{"type": "createSection", "data": {{"sectionName": "Name", "sections": [{{"type": "split|value|calc", "label": "Name", "unit": "SF", "rows": ["Row1"]}}]}}}}}}
+
+4. Navigate to a view:
+{{"type": "action", "message": "Taking you there", "action": {{"type": "navigate", "data": {{"viewId": "viewIdHere", "viewLabel": "View Name"}}}}}}
+
+## Available Field IDs
+- propertyAddress, propertyType, lotSizeSF
+- travelPercent (0-100, percentage of labor time for travel)
+- laborRate, laborMarkup, materialMarkup, subMarkup
+- contractStart, contractEnd, contractDuration
+- paymentMonths, priceIncrease, paymentTerms, ccFee
+
+## Available View IDs
+- estimates (list), builder (estimate editor), catalog (service catalog)
+- services, production (rates), settings, contacts, contracts
+- properties, schedule, invoices, financials, reports, templates, worktickets
+
+## Section Types
+- "split": divides total into sub-rows by percentage. Config needs: type, label, unit, rows (array of row names)
+- "value": single input value. Config needs: type, label, unit
+- "calc": input × constant = output. Config needs: type, label, inputLabel, inputUnit, constant, constantLabel, outputLabel, outputUnit
+
+Available units: SF, LF, CY, EA, bags, flats, gallons, hours, lbs, tons, pallets
+
+## Current Context
+{ctx_str}
+
+## Rules
+- When the user asks to change a field, use setField action with the correct fieldId.
+- When the user asks to create/add a section, use createSection action.
+- When the user asks to go/navigate/show a page, use navigate action.
+- For questions, information, or anything else, use text type.
+- If the user's request is ambiguous, ask a clarifying question using text type.
+- Keep messages concise — 1-3 sentences max for actions, can be longer for explanations.
+- Always respond with valid JSON. Never include markdown code fences."""
+
+
+def _parse_chat_response(text):
+    """Parse a chat-mode response, extracting JSON with type/message/action."""
+    import re
+    # Strip markdown fences if present
+    text = re.sub(r'^```(?:json)?\s*', '', text, flags=re.MULTILINE)
+    text = re.sub(r'\s*```\s*$', '', text, flags=re.MULTILINE)
+    text = text.strip()
+
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        # Try to find JSON object in the response
+        json_match = re.search(r'\{[\s\S]*\}', text)
+        if json_match:
+            try:
+                return json.loads(json_match.group())
+            except json.JSONDecodeError:
+                pass
+        # Fallback: return as plain text
+        return {"type": "text", "message": text}
+
+
+def _parse_section_response(text):
+    """Parse a section-mode response (original behavior)."""
+    import re
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        json_match = re.search(r'\{[\s\S]*\}', text)
+        if json_match:
+            try:
+                return json.loads(json_match.group())
+            except json.JSONDecodeError:
+                return {"error": "Could not parse AI response", "raw": text}
+        return {"error": "Could not parse AI response", "raw": text}

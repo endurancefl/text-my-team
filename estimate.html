@@ -12,7 +12,7 @@
   <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.js"></script>
-  <link rel="stylesheet" href="css/estimate.css?v=worktickets3">
+  <link rel="stylesheet" href="css/estimate.css?v=marvin-panel">
 </head>
 <body>
 
@@ -1729,10 +1729,64 @@
         </div>
 
       </div>
+
+      <!-- MARVIN FAB Button -->
+      <button class="marvin-fab" id="marvin-fab" onclick="toggleMarvinPanel()" title="Ask MARVIN">
+        <span class="material-icons-outlined">auto_awesome</span>
+        <span class="marvin-fab-pulse"></span>
+      </button>
+
     </div>
 
-    <!-- RIGHT SUMMARY PANEL -->
-    <!-- Summary panel removed — rate overrides integrated into contract/project settings -->
+    <!-- MARVIN Conversational AI Panel -->
+    <aside class="marvin-panel" id="marvin-panel">
+      <div class="marvin-panel-header">
+        <div class="marvin-panel-title">
+          <span class="marvin-panel-icon material-icons-outlined">auto_awesome</span>
+          <div>
+            <div class="marvin-panel-name">MARVIN</div>
+            <div class="marvin-panel-subtitle">AI Assistant</div>
+          </div>
+        </div>
+        <div class="marvin-panel-actions">
+          <button class="marvin-panel-btn" onclick="clearMarvinChat()" title="New conversation">
+            <span class="material-icons-outlined">add_comment</span>
+          </button>
+          <button class="marvin-panel-btn" onclick="toggleMarvinPanel()" title="Close">
+            <span class="material-icons-outlined">close</span>
+          </button>
+        </div>
+      </div>
+      <div class="marvin-panel-messages" id="marvin-panel-messages">
+        <div class="marvin-welcome" id="marvin-welcome">
+          <div class="marvin-welcome-icon">
+            <span class="material-icons-outlined">auto_awesome</span>
+          </div>
+          <h3>Hi, I'm MARVIN</h3>
+          <p>I can help you build estimates, adjust settings, and answer questions about your project.</p>
+          <div class="marvin-suggestions">
+            <button class="marvin-chip" onclick="marvinQuickPrompt('Create a mulch section split by bed type')">Create a mulch section</button>
+            <button class="marvin-chip" onclick="marvinQuickPrompt('Show me the current services on this estimate')">Show current services</button>
+            <button class="marvin-chip" onclick="marvinQuickPrompt('Set travel time to 25%')">Adjust travel time</button>
+            <button class="marvin-chip" onclick="marvinQuickPrompt('What is the lot size for this property?')">What's the lot size?</button>
+          </div>
+        </div>
+      </div>
+      <div class="marvin-typing" id="marvin-typing" style="display: none;">
+        <div class="marvin-typing-avatar">
+          <span class="material-icons-outlined">auto_awesome</span>
+        </div>
+        <div class="marvin-typing-dots">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
+      <div class="marvin-panel-input">
+        <textarea id="marvin-chat-input" placeholder="Ask MARVIN anything..." rows="1" onkeydown="handleMarvinKeydown(event)" oninput="autoGrowMarvinInput(this)"></textarea>
+        <button class="marvin-send-btn" id="marvin-send-btn" onclick="sendMarvinMessage()">
+          <span class="material-icons-outlined">send</span>
+        </button>
+      </div>
+    </aside>
 
   </div>
 
@@ -5007,9 +5061,19 @@ function addCustomSection(section) {
 //  UNIFIED TAKEOFF GRID — MARVIN AI
 // ═══════════════════════════════════════════════════════════════
 
-async function generateWithMarvin() {
-  const prompt = document.getElementById('marvin-prompt-input').value.trim();
+let marvinHistory = [];       // conversation history [{role, content}]
+let marvinLastRawJSON = null; // last raw JSON response for context
+
+async function generateWithMarvin(isRefinement) {
+  const inputId = isRefinement ? 'marvin-refine-input' : 'marvin-prompt-input';
+  const prompt = document.getElementById(inputId).value.trim();
   if (!prompt) { showToast('Describe what you need', 'error'); return; }
+
+  // On fresh prompt, reset history
+  if (!isRefinement) {
+    marvinHistory = [];
+    marvinLastRawJSON = null;
+  }
 
   const resultArea = document.getElementById('marvin-result-area');
   resultArea.innerHTML = '<div class="marvin-loading">MARVIN is thinking...</div>';
@@ -5018,46 +5082,43 @@ async function generateWithMarvin() {
     const resp = await fetch('https://ibjyxrp542.execute-api.us-east-1.amazonaws.com/prod/marvin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt })
+      body: JSON.stringify({ prompt, history: marvinHistory })
     });
 
     const data = await resp.json();
 
     if (!data.success || !data.result?.sections?.length) {
       resultArea.innerHTML = `<div style="color:var(--red);padding:12px;font-size:13px;">
-        MARVIN couldn't generate a section. Try rephrasing your description.</div>`;
+        MARVIN couldn't generate a section. Try rephrasing your description.</div>
+        <div class="marvin-refine-area">
+          <textarea id="marvin-refine-input" class="marvin-textarea" rows="2"
+            placeholder="Tell MARVIN what to change..."></textarea>
+          <button class="marvin-generate-btn" onclick="generateWithMarvin(true)">Refine</button>
+        </div>`;
+      // Still track the failed attempt in history
+      marvinHistory.push({ role: 'user', content: prompt });
       return;
     }
 
+    // Track conversation history
+    const rawJSON = JSON.stringify(data.result);
+    marvinHistory.push({ role: 'user', content: prompt });
+    marvinHistory.push({ role: 'assistant', content: rawJSON });
+    marvinLastRawJSON = rawJSON;
+
     // Show editable preview of first section
     const sec = data.result.sections[0];
-    let previewHTML = `<div class="marvin-result">
-      <div class="result-field"><label>Name</label>
-        <input type="text" id="marvin-result-name" value="${sec.label || ''}"></div>
-      <div class="result-field"><label>Type</label>
-        <select id="marvin-result-type">
-          <option value="split"${sec.type === 'split' ? ' selected' : ''}>Split</option>
-          <option value="value"${sec.type === 'value' ? ' selected' : ''}>Value</option>
-          <option value="calc"${sec.type === 'calc' ? ' selected' : ''}>Calc</option>
-        </select></div>
-      <div class="result-field"><label>Unit</label>
-        <input type="text" id="marvin-result-unit" value="${sec.unit || 'SF'}"></div>`;
+    let previewHTML = renderMarvinPreview(sec);
 
-    if (sec.type === 'split' && sec.rows) {
-      previewHTML += `<div class="result-field"><label>Rows</label>
-        <textarea id="marvin-result-rows" class="row-labels-input">${sec.rows.join('\n')}</textarea></div>`;
-    }
-    if (sec.type === 'calc') {
-      previewHTML += `
-        <div class="result-field"><label>Input</label><input type="text" id="marvin-result-input-label" value="${sec.inputLabel || ''}"></div>
-        <div class="result-field"><label>Constant</label><input type="number" id="marvin-result-constant" value="${sec.constant || 1}"></div>
-        <div class="result-field"><label>Output</label><input type="text" id="marvin-result-output-label" value="${sec.outputLabel || ''}"></div>`;
-    }
-
-    previewHTML += `</div>
+    previewHTML += `
       <div class="marvin-actions">
         <button class="marvin-generate-btn" onclick="saveMarvinSection()">Add Section</button>
-        <button class="btn-cancel-section" onclick="generateWithMarvin()">Ask Again</button>
+        <button class="btn-cancel-section" onclick="resetMarvin()">Start Over</button>
+      </div>
+      <div class="marvin-refine-area">
+        <textarea id="marvin-refine-input" class="marvin-textarea" rows="2"
+          placeholder="Tell MARVIN what to change..."></textarea>
+        <button class="marvin-refine-btn" onclick="generateWithMarvin(true)">Refine</button>
       </div>`;
 
     resultArea.innerHTML = previewHTML;
@@ -5067,6 +5128,41 @@ async function generateWithMarvin() {
       Could not reach MARVIN. Check your connection and try again.</div>`;
     console.error('MARVIN error:', err);
   }
+}
+
+function renderMarvinPreview(sec) {
+  let html = `<div class="marvin-result">
+    <div class="result-field"><label>Name</label>
+      <input type="text" id="marvin-result-name" value="${sec.label || ''}"></div>
+    <div class="result-field"><label>Type</label>
+      <select id="marvin-result-type">
+        <option value="split"${sec.type === 'split' ? ' selected' : ''}>Split</option>
+        <option value="value"${sec.type === 'value' ? ' selected' : ''}>Value</option>
+        <option value="calc"${sec.type === 'calc' ? ' selected' : ''}>Calc</option>
+      </select></div>
+    <div class="result-field"><label>Unit</label>
+      <input type="text" id="marvin-result-unit" value="${sec.unit || 'SF'}"></div>`;
+
+  if (sec.type === 'split' && sec.rows) {
+    html += `<div class="result-field"><label>Rows</label>
+      <textarea id="marvin-result-rows" class="row-labels-input">${sec.rows.join('\n')}</textarea></div>`;
+  }
+  if (sec.type === 'calc') {
+    html += `
+      <div class="result-field"><label>Input</label><input type="text" id="marvin-result-input-label" value="${sec.inputLabel || ''}"></div>
+      <div class="result-field"><label>Constant</label><input type="number" id="marvin-result-constant" value="${sec.constant || 1}"></div>
+      <div class="result-field"><label>Output</label><input type="text" id="marvin-result-output-label" value="${sec.outputLabel || ''}"></div>`;
+  }
+
+  html += `</div>`;
+  return html;
+}
+
+function resetMarvin() {
+  marvinHistory = [];
+  marvinLastRawJSON = null;
+  document.getElementById('marvin-prompt-input').value = '';
+  document.getElementById('marvin-result-area').innerHTML = '';
 }
 
 function saveMarvinSection() {
@@ -5090,6 +5186,354 @@ function saveMarvinSection() {
   hideAddSectionModal();
   showTakeoffConfigModal();
   showToast('Section added by MARVIN', 'success');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MARVIN CONVERSATIONAL AI PANEL
+// ═══════════════════════════════════════════════════════════════
+
+let marvinChatHistory = [];   // [{role, content}] for panel conversations
+let marvinPanelOpen = false;
+let marvinIsThinking = false;
+
+const MARVIN_CHAT_URL = 'https://ibjyxrp542.execute-api.us-east-1.amazonaws.com/prod/marvin';
+
+// Field map: fieldId → { domId, path in currentEstimate, label }
+const MARVIN_FIELD_MAP = {
+  propertyAddress: { domId: 'prop-address', path: 'propertyAddress', label: 'Property Address' },
+  propertyType:    { domId: 'prop-type', path: 'propertyType', label: 'Property Type' },
+  lotSizeSF:       { domId: 'lot-size-sf', path: 'lotSizeSF', label: 'Lot Size (SF)' },
+  travelPercent:   { domId: 'travel-percent', path: 'travelPercent', label: 'Travel %' },
+  laborRate:       { domId: 'labor-rate-override', path: 'laborRate', label: 'Labor Rate' },
+  laborMarkup:     { domId: 'labor-markup-override', path: 'laborMarkup', label: 'Labor Markup' },
+  materialMarkup:  { domId: 'material-markup-override', path: 'materialMarkup', label: 'Material Markup' },
+  subMarkup:       { domId: 'sub-markup-override', path: 'subMarkup', label: 'Sub Markup' },
+  contractStart:   { domId: 'contract-start', path: 'contract.startDate', label: 'Contract Start' },
+  contractEnd:     { domId: 'contract-end', path: 'contract.endDate', label: 'Contract End' },
+  contractDuration:{ domId: 'contract-duration', path: 'contract.duration', label: 'Contract Duration' },
+  paymentMonths:   { domId: 'payment-months', path: 'contract.paymentMonths', label: 'Payment Months' },
+  priceIncrease:   { domId: 'price-increase', path: 'contract.priceIncrease', label: 'Price Increase %' },
+  paymentTerms:    { domId: 'payment-terms', path: 'contract.paymentTerms', label: 'Payment Terms' },
+  ccFee:           { domId: 'cc-fee-percent', path: 'contract.ccFeePercent', label: 'CC Fee %' }
+};
+
+// View map for navigation
+const MARVIN_VIEW_MAP = {
+  estimates: 'Estimates List',
+  builder: 'Estimate Builder',
+  catalog: 'Service Catalog',
+  services: 'Services',
+  production: 'Production Rates',
+  settings: 'Settings',
+  contacts: 'Contacts',
+  contracts: 'Contracts',
+  properties: 'Properties',
+  schedule: 'Schedule',
+  invoices: 'Invoices',
+  financials: 'Financials',
+  reports: 'Reports',
+  templates: 'Templates',
+  worktickets: 'Work Tickets'
+};
+
+function toggleMarvinPanel() {
+  const panel = document.getElementById('marvin-panel');
+  const fab = document.getElementById('marvin-fab');
+  marvinPanelOpen = !marvinPanelOpen;
+  panel.classList.toggle('open', marvinPanelOpen);
+  fab.classList.toggle('hidden', marvinPanelOpen);
+  if (marvinPanelOpen) {
+    const input = document.getElementById('marvin-chat-input');
+    setTimeout(() => input.focus(), 350);
+  }
+}
+
+function clearMarvinChat() {
+  marvinChatHistory = [];
+  const messages = document.getElementById('marvin-panel-messages');
+  messages.innerHTML = `
+    <div class="marvin-welcome" id="marvin-welcome">
+      <div class="marvin-welcome-icon">
+        <span class="material-icons-outlined">auto_awesome</span>
+      </div>
+      <h3>Hi, I'm MARVIN</h3>
+      <p>I can help you build estimates, adjust settings, and answer questions about your project.</p>
+      <div class="marvin-suggestions">
+        <button class="marvin-chip" onclick="marvinQuickPrompt('Create a mulch section split by bed type')">Create a mulch section</button>
+        <button class="marvin-chip" onclick="marvinQuickPrompt('Show me the current services on this estimate')">Show current services</button>
+        <button class="marvin-chip" onclick="marvinQuickPrompt('Set travel time to 25%')">Adjust travel time</button>
+        <button class="marvin-chip" onclick="marvinQuickPrompt('What is the lot size for this property?')">What's the lot size?</button>
+      </div>
+    </div>`;
+}
+
+function marvinQuickPrompt(text) {
+  const input = document.getElementById('marvin-chat-input');
+  input.value = text;
+  sendMarvinMessage();
+}
+
+function handleMarvinKeydown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMarvinMessage();
+  }
+}
+
+function autoGrowMarvinInput(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+function appendMarvinMessage(role, content, action) {
+  // Hide welcome screen on first message
+  const welcome = document.getElementById('marvin-welcome');
+  if (welcome) welcome.style.display = 'none';
+
+  const messages = document.getElementById('marvin-panel-messages');
+  const msgDiv = document.createElement('div');
+  msgDiv.className = `marvin-msg ${role}`;
+
+  if (role === 'assistant') {
+    msgDiv.innerHTML = `
+      <div class="marvin-msg-avatar">
+        <span class="material-icons-outlined">auto_awesome</span>
+      </div>
+      <div>
+        <div class="marvin-msg-bubble">${escapeHtml(content)}</div>
+        ${action ? renderMarvinActionCard(action) : ''}
+      </div>`;
+  } else {
+    msgDiv.innerHTML = `
+      <div>
+        <div class="marvin-msg-bubble">${escapeHtml(content)}</div>
+      </div>`;
+  }
+
+  messages.appendChild(msgDiv);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+// Store pending actions for safe retrieval by button clicks
+const _marvinPendingActions = {};
+
+function renderMarvinActionCard(action) {
+  const actionId = 'marvin-action-' + Date.now() + Math.random().toString(36).slice(2, 6);
+  _marvinPendingActions[actionId] = action;
+
+  let iconName, iconClass, btnText, btnClass;
+
+  switch (action.type) {
+    case 'setField':
+      iconName = 'edit';
+      iconClass = 'set-field';
+      btnText = 'Apply';
+      btnClass = 'apply';
+      break;
+    case 'createSection':
+      iconName = 'add_circle';
+      iconClass = 'create-section';
+      btnText = 'Add to Estimate';
+      btnClass = 'add-section';
+      break;
+    case 'navigate':
+      iconName = 'open_in_new';
+      iconClass = 'navigate';
+      btnText = 'Go';
+      btnClass = 'navigate';
+      break;
+    default:
+      return '';
+  }
+
+  const detail = action.data?.fieldLabel
+    ? `${action.data.fieldLabel} → ${action.data.value}`
+    : action.data?.viewLabel || action.data?.sectionName || '';
+
+  return `
+    <div class="marvin-action-card">
+      <div class="marvin-action-header">
+        <div class="marvin-action-icon ${iconClass}">
+          <span class="material-icons-outlined">${iconName}</span>
+        </div>
+        <span class="marvin-action-label">${action.type === 'setField' ? 'Update Field' : action.type === 'createSection' ? 'New Section' : 'Navigate'}</span>
+      </div>
+      ${detail ? `<div class="marvin-action-detail">${escapeHtml(detail)}</div>` : ''}
+      <button class="marvin-action-btn ${btnClass}" onclick="applyMarvinAction('${actionId}', this)">
+        <span class="material-icons-outlined">${action.type === 'navigate' ? 'arrow_forward' : 'check'}</span>
+        ${btnText}
+      </button>
+    </div>`;
+}
+
+function buildMarvinContext() {
+  const ctx = {
+    currentView: currentView || 'estimates',
+    hasActiveEstimate: hasActiveEstimate(),
+  };
+
+  if (hasActiveEstimate()) {
+    ctx.property = {
+      address: currentEstimate.propertyAddress || '(not set)',
+      type: currentEstimate.propertyType || 'Residential',
+      lotSizeSF: currentEstimate.lotSizeSF || 0
+    };
+    ctx.travelPercent = currentEstimate.travelPercent;
+    ctx.services = (currentEstimate.services || []).map(s =>
+      typeof s === 'string' ? s : (s.serviceName || s.proposalName || s.name || '')
+    ).filter(Boolean);
+    ctx.contract = { ...currentEstimate.contract };
+    ctx.laborRate = currentEstimate.laborRate;
+    ctx.laborMarkup = currentEstimate.laborMarkup;
+    ctx.materialMarkup = currentEstimate.materialMarkup;
+    ctx.subMarkup = currentEstimate.subMarkup;
+  }
+
+  ctx.availableViews = Object.entries(MARVIN_VIEW_MAP).map(([id, label]) => ({ id, label }));
+  return ctx;
+}
+
+async function sendMarvinMessage() {
+  const input = document.getElementById('marvin-chat-input');
+  const text = input.value.trim();
+  if (!text || marvinIsThinking) return;
+
+  // Show user message
+  appendMarvinMessage('user', text);
+  marvinChatHistory.push({ role: 'user', content: text });
+  input.value = '';
+  input.style.height = 'auto';
+
+  // Show typing indicator
+  marvinIsThinking = true;
+  document.getElementById('marvin-typing').style.display = 'flex';
+  const messages = document.getElementById('marvin-panel-messages');
+  messages.scrollTop = messages.scrollHeight;
+
+  try {
+    const context = buildMarvinContext();
+    const resp = await fetch(MARVIN_CHAT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: text,
+        history: marvinChatHistory.slice(0, -1), // exclude current message (already in prompt)
+        mode: 'chat',
+        context
+      })
+    });
+
+    const data = await resp.json();
+    if (!data.success) throw new Error(data.error || 'Request failed');
+
+    const result = data.result;
+    const message = result.message || result.raw || 'I couldn\'t generate a response.';
+    const action = result.action || null;
+
+    appendMarvinMessage('assistant', message, action);
+    marvinChatHistory.push({ role: 'assistant', content: message });
+
+  } catch (err) {
+    console.error('MARVIN chat error:', err);
+    appendMarvinMessage('assistant', 'Sorry, I had trouble processing that. Please try again.');
+    marvinChatHistory.push({ role: 'assistant', content: 'Sorry, I had trouble processing that.' });
+  } finally {
+    marvinIsThinking = false;
+    document.getElementById('marvin-typing').style.display = 'none';
+  }
+}
+
+function applyMarvinAction(actionId, btn) {
+  const action = _marvinPendingActions[actionId];
+  if (!action) {
+    showToast('Action not found', 'error');
+    return;
+  }
+
+  switch (action.type) {
+    case 'setField':
+      applyMarvinFieldUpdate(action.data);
+      break;
+    case 'createSection':
+      applyMarvinCreateSection(action.data);
+      break;
+    case 'navigate':
+      applyMarvinNavigate(action.data);
+      break;
+    default:
+      showToast('Unknown action type', 'error');
+      return;
+  }
+
+  // Mark button as applied
+  btn.className = 'marvin-action-btn applied';
+  btn.innerHTML = '<span class="material-icons-outlined">check_circle</span> Applied';
+  btn.onclick = null;
+}
+
+function applyMarvinFieldUpdate(data) {
+  const mapping = MARVIN_FIELD_MAP[data.field];
+  if (!mapping) {
+    showToast(`Unknown field: ${data.field}`, 'error');
+    return;
+  }
+
+  // Update DOM element
+  const el = document.getElementById(mapping.domId);
+  if (el) {
+    el.value = data.value;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  // Update currentEstimate via dot-path
+  const parts = mapping.path.split('.');
+  let obj = currentEstimate;
+  for (let i = 0; i < parts.length - 1; i++) {
+    obj = obj[parts[i]];
+    if (!obj) break;
+  }
+  if (obj) {
+    const key = parts[parts.length - 1];
+    obj[key] = data.value;
+  }
+
+  if (typeof renderTableBody === 'function') renderTableBody();
+  if (typeof markEstimateDirty === 'function') markEstimateDirty();
+  showToast(`${mapping.label} updated to ${data.value}`, 'success');
+}
+
+function applyMarvinCreateSection(data) {
+  if (!data || !data.sections || !data.sections.length) {
+    showToast('No section data received', 'error');
+    return;
+  }
+
+  data.sections.forEach(sec => {
+    const id = 'custom_' + (sec.label || 'section').toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Date.now();
+    const section = { id, label: sec.label, type: sec.type, unit: sec.unit || 'SF' };
+    if (sec.type === 'split' && sec.rows) section.rows = sec.rows;
+    if (sec.type === 'calc') {
+      section.inputLabel = sec.inputLabel || 'Input';
+      section.constant = sec.constant || 1;
+      section.outputLabel = sec.outputLabel || 'Output';
+    }
+    if (typeof addCustomSection === 'function') addCustomSection(section);
+  });
+
+  if (typeof renderTableBody === 'function') renderTableBody();
+  if (typeof markEstimateDirty === 'function') markEstimateDirty();
+  showToast(`${data.sections.length} section(s) added`, 'success');
+}
+
+function applyMarvinNavigate(data) {
+  const viewId = data.viewId;
+  if (viewId && MARVIN_VIEW_MAP[viewId]) {
+    showView(viewId);
+    showToast(`Navigated to ${MARVIN_VIEW_MAP[viewId]}`, 'info');
+  } else {
+    showToast('Unknown view', 'error');
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
