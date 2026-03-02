@@ -570,6 +570,12 @@ To create takeoff section(s):
 To navigate:
 {{"type": "action", "message": "Brief explanation", "action": {{"type": "navigate", "data": {{"viewId": "viewIdHere", "viewLabel": "View Name"}}}}}}
 
+To add to knowledge base (when the user says "remember", "from now on", "add to your notes", "always", "never", or similar):
+{{"type": "action", "message": "Brief explanation of what you're saving", "action": {{"type": "updateKnowledgeBase", "data": {{"entries": ["- Concise rule or fact to remember"]}}}}}}
+
+To remove from knowledge base:
+{{"type": "action", "message": "Brief explanation", "action": {{"type": "updateKnowledgeBase", "data": {{"remove": ["exact text of the line to remove"]}}}}}}
+
 ## Your knowledge
 
 **How estimates work:**
@@ -612,7 +618,10 @@ estimates, builder, catalog, services, production, settings, contacts, contracts
 - If you notice something that looks off in the estimate (e.g., 0% travel, missing services, unusually high/low margins), mention it proactively.
 - Keep action messages short (1 sentence). Conversational answers can be longer but stay focused.
 - You can discuss pricing strategy, suggest services to add, explain how markups affect margins, compare to industry benchmarks — be a real estimating partner.
-- The Company Knowledge Base (if present) contains the owner's specific preferences and standards. Always follow those over generic defaults. For example, if the KB says "minimum $350/month", flag any estimate below that threshold."""
+- The Company Knowledge Base (if present) contains the owner's specific preferences and standards. Always follow those over generic defaults. For example, if the KB says "minimum $350/month", flag any estimate below that threshold.
+- When the user says things like "remember that...", "from now on...", "always do...", "never do...", "add to your notes...", or "update your notes...", use the updateKnowledgeBase action to save it. Write entries as concise bullet points starting with "- ".
+- When the user asks to remove or forget something, use updateKnowledgeBase with the "remove" field, matching the exact text of the line to remove.
+- You can also suggest adding something to the knowledge base if you notice the user repeatedly correcting you about the same thing."""
 
 
 def _parse_chat_response(text):

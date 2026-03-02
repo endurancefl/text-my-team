@@ -72,6 +72,9 @@ def allowed_origin_from_header(origin_header):
     """Check if origin is allowed. Returns the origin or the default."""
     if origin_header in ALLOWED_ORIGINS:
         return origin_header
+    # file:// pages send Origin: null — allow for local testing
+    if not origin_header or origin_header == "null":
+        return "*"
     return ALLOWED_ORIGINS[0]
 
 

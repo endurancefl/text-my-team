@@ -7011,6 +7011,10 @@ select option:checked {
   background: #FFF3E0;
   color: #E65100;
 }
+.marvin-action-icon.update-kb {
+  background: #F3E5F5;
+  color: #7B1FA2;
+}
 .marvin-action-icon .material-icons-outlined {
   font-size: 16px;
 }

@@ -5376,13 +5376,32 @@ function renderMarvinActionCard(action) {
       btnText = 'Go';
       btnClass = 'navigate';
       break;
+    case 'updateKnowledgeBase':
+      iconName = 'bookmark_add';
+      iconClass = 'update-kb';
+      btnText = action.data?.remove ? 'Remove' : 'Save to Notes';
+      btnClass = 'apply';
+      break;
     default:
       return '';
   }
 
-  const detail = action.data?.fieldLabel
-    ? `${action.data.fieldLabel} → ${action.data.value}`
-    : action.data?.viewLabel || action.data?.sectionName || '';
+  let detail = '';
+  if (action.type === 'setField' && action.data?.fieldLabel) {
+    detail = `${action.data.fieldLabel} → ${action.data.value}`;
+  } else if (action.type === 'updateKnowledgeBase') {
+    const entries = action.data?.entries || action.data?.remove || [];
+    detail = entries.join('\n');
+  } else {
+    detail = action.data?.viewLabel || action.data?.sectionName || '';
+  }
+
+  const labelMap = {
+    setField: 'Update Field',
+    createSection: 'New Section',
+    navigate: 'Navigate',
+    updateKnowledgeBase: action.data?.remove ? 'Remove from Notes' : 'Remember This'
+  };
 
   return `
     <div class="marvin-action-card">
@@ -5390,7 +5409,7 @@ function renderMarvinActionCard(action) {
         <div class="marvin-action-icon ${iconClass}">
           <span class="material-icons-outlined">${iconName}</span>
         </div>
-        <span class="marvin-action-label">${action.type === 'setField' ? 'Update Field' : action.type === 'createSection' ? 'New Section' : 'Navigate'}</span>
+        <span class="marvin-action-label">${labelMap[action.type] || ''}</span>
       </div>
       ${detail ? `<div class="marvin-action-detail">${escapeHtml(detail)}</div>` : ''}
       <button class="marvin-action-btn ${btnClass}" onclick="applyMarvinAction('${actionId}', this)">
@@ -5575,6 +5594,9 @@ function applyMarvinAction(actionId, btn) {
     case 'navigate':
       applyMarvinNavigate(action.data);
       break;
+    case 'updateKnowledgeBase':
+      applyMarvinKBUpdate(action.data);
+      break;
     default:
       showToast('Unknown action type', 'error');
       return;
@@ -5648,6 +5670,52 @@ function applyMarvinNavigate(data) {
     showToast(`Navigated to ${MARVIN_VIEW_MAP[viewId]}`, 'info');
   } else {
     showToast('Unknown view', 'error');
+  }
+}
+
+async function applyMarvinKBUpdate(data) {
+  let kb = bidSettings.marvinKnowledgeBase || '';
+
+  if (data.remove && data.remove.length) {
+    // Remove matching lines
+    data.remove.forEach(line => {
+      const trimmed = line.trim();
+      kb = kb.split('\n').filter(l => l.trim() !== trimmed).join('\n');
+    });
+    showToast('Removed from MARVIN notes', 'success');
+  }
+
+  if (data.entries && data.entries.length) {
+    // Append new entries
+    const newEntries = data.entries.join('\n');
+    kb = kb.trim() ? kb.trim() + '\n' + newEntries : newEntries;
+    showToast(`Saved ${data.entries.length} note(s) to MARVIN knowledge base`, 'success');
+  }
+
+  // Update in-memory
+  bidSettings.marvinKnowledgeBase = kb;
+
+  // Update Settings textarea if it exists
+  const kbEl = document.getElementById('setting-marvin-kb');
+  if (kbEl) kbEl.value = kb;
+
+  // Auto-save to backend
+  try {
+    await saveBidSettings({
+      laborRate: bidSettings.laborRate,
+      residentialLaborMarkup: bidSettings.residentialLaborMarkup,
+      residentialMaterialMarkup: bidSettings.residentialMaterialMarkup,
+      residentialSubMarkup: bidSettings.residentialSubMarkup,
+      commercialLaborMarkup: bidSettings.commercialLaborMarkup,
+      commercialMaterialMarkup: bidSettings.commercialMaterialMarkup,
+      commercialSubMarkup: bidSettings.commercialSubMarkup,
+      defaultTravelTime: bidSettings.defaultTravelTime,
+      defaultMulchDepth: bidSettings.defaultMulchDepth,
+      defaultMulchPricePerYard: bidSettings.defaultMulchPricePerYard,
+      marvinKnowledgeBase: kb
+    });
+  } catch (e) {
+    console.warn('Could not auto-save knowledge base:', e);
   }
 }
 
