@@ -1180,11 +1180,11 @@
           <div class="settings-card" style="grid-column: 1 / -1;">
             <div class="settings-card-header">
               <span class="material-icons-outlined" style="font-size: 18px; vertical-align: middle; margin-right: 6px; background: linear-gradient(135deg, #667eea, #764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">auto_awesome</span>
-              MARVIN Knowledge Base
+              M.A.R.V.I.N. Knowledge Base
             </div>
             <div class="settings-card-body">
               <p style="font-size: 12px; color: var(--text-secondary); margin: 0 0 10px 0; line-height: 1.5;">
-                Persistent instructions for MARVIN. These are included in every conversation so MARVIN knows your company's preferences, pricing, and standards without being told each time.
+                Persistent instructions for M.A.R.V.I.N. These are included in every conversation so M.A.R.V.I.N. knows your company's preferences, pricing, and standards without being told each time.
               </p>
               <textarea class="settings-input" id="setting-marvin-kb" rows="10"
                 style="width: 100%; min-height: 160px; resize: vertical; font-family: 'Roboto Mono', monospace; font-size: 12px; line-height: 1.6; padding: 12px;"
@@ -1745,7 +1745,7 @@
       </div>
 
       <!-- MARVIN FAB Button -->
-      <button class="marvin-fab" id="marvin-fab" onclick="toggleMarvinPanel()" title="Ask MARVIN">
+      <button class="marvin-fab" id="marvin-fab" onclick="toggleMarvinPanel()" title="Ask M.A.R.V.I.N.">
         <span class="material-icons-outlined">auto_awesome</span>
         <span class="marvin-fab-pulse"></span>
       </button>
@@ -1759,7 +1759,7 @@
         <div class="marvin-panel-title">
           <span class="marvin-panel-icon material-icons-outlined">auto_awesome</span>
           <div>
-            <div class="marvin-panel-name">MARVIN</div>
+            <div class="marvin-panel-name">M.A.R.V.I.N.</div>
             <div class="marvin-panel-subtitle">AI Assistant</div>
           </div>
         </div>
@@ -1777,7 +1777,7 @@
           <div class="marvin-welcome-icon">
             <span class="material-icons-outlined">auto_awesome</span>
           </div>
-          <h3>Hi, I'm MARVIN</h3>
+          <h3>Hi, I'm M.A.R.V.I.N.</h3>
           <p>I can help you build estimates, adjust settings, and answer questions about your project.</p>
           <div class="marvin-suggestions">
             <button class="marvin-chip" onclick="marvinQuickPrompt('Create a mulch section split by bed type')">Create a mulch section</button>
@@ -1796,7 +1796,7 @@
         </div>
       </div>
       <div class="marvin-panel-input">
-        <textarea id="marvin-chat-input" placeholder="Ask MARVIN anything..." rows="1" onkeydown="handleMarvinKeydown(event)" oninput="autoGrowMarvinInput(this)"></textarea>
+        <textarea id="marvin-chat-input" placeholder="Ask M.A.R.V.I.N. anything..." rows="1" onkeydown="handleMarvinKeydown(event)" oninput="autoGrowMarvinInput(this)"></textarea>
         <button class="marvin-send-btn" id="marvin-send-btn" onclick="sendMarvinMessage()">
           <span class="material-icons-outlined">send</span>
         </button>
@@ -5123,7 +5123,7 @@ function clearMarvinChat() {
       <div class="marvin-welcome-icon">
         <span class="material-icons-outlined">auto_awesome</span>
       </div>
-      <h3>Hi, I'm MARVIN</h3>
+      <h3>Hi, I'm M.A.R.V.I.N.</h3>
       <p>I can help you build estimates, adjust settings, and answer questions about your project.</p>
       <div class="marvin-suggestions">
         <button class="marvin-chip" onclick="marvinQuickPrompt('Create a mulch section split by bed type')">Create a mulch section</button>
@@ -5824,14 +5824,14 @@ async function applyMarvinKBUpdate(data) {
       const trimmed = line.trim();
       kb = kb.split('\n').filter(l => l.trim() !== trimmed).join('\n');
     });
-    showToast('Removed from MARVIN notes', 'success');
+    showToast('Removed from M.A.R.V.I.N. notes', 'success');
   }
 
   if (data.entries && data.entries.length) {
     // Append new entries
     const newEntries = data.entries.join('\n');
     kb = kb.trim() ? kb.trim() + '\n' + newEntries : newEntries;
-    showToast(`Saved ${data.entries.length} note(s) to MARVIN knowledge base`, 'success');
+    showToast(`Saved ${data.entries.length} note(s) to M.A.R.V.I.N. knowledge base`, 'success');
   }
 
   // Update in-memory
