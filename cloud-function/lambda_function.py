@@ -663,7 +663,7 @@ def _execute_tools_parallel(tool_uses):
 
 
 def _handle_marvin(event, allowed):
-    """Handle MARVIN AI requests — section generation (mode='section') and chat (mode='chat')."""
+    """Handle MARVIN AI chat requests."""
     try:
         body = event.get("body", "")
         is_base64 = event.get("isBase64Encoded", False)
@@ -673,7 +673,6 @@ def _handle_marvin(event, allowed):
         data = json.loads(body)
         prompt = data.get("prompt", "").strip()
         history = data.get("history", [])
-        mode = data.get("mode", "section")
 
         if not prompt:
             return _error_response("Missing 'prompt' in request body", 400, allowed)
@@ -686,12 +685,8 @@ def _handle_marvin(event, allowed):
         import anthropic
         client = anthropic.Anthropic(api_key=api_key)
 
-        if mode == "chat":
-            system_prompt = _build_chat_system_prompt(data.get("context", {}))
-            max_tokens = 4096
-        else:
-            system_prompt = _build_section_system_prompt()
-            max_tokens = 1024
+        system_prompt = _build_chat_system_prompt(data.get("context", {}))
+        max_tokens = 4096
 
         # Build messages: include conversation history for iterative refinement
         messages = []
@@ -702,15 +697,13 @@ def _handle_marvin(event, allowed):
                 messages.append({"role": role, "content": content})
         messages.append({"role": "user", "content": prompt})
 
-        # Build API call kwargs — add web search tool for chat mode only
+        # Build API call kwargs with web search and custom data tools
         api_kwargs = {
             "model": "claude-sonnet-4-20250514",
             "max_tokens": max_tokens,
             "system": system_prompt,
             "messages": messages,
-        }
-        if mode == "chat":
-            api_kwargs["tools"] = [
+            "tools": [
                 {
                     "type": "web_search_20250305",
                     "name": "web_search",
@@ -722,53 +715,53 @@ def _handle_marvin(event, allowed):
                         "country": "US",
                     },
                 }
-            ] + _MARVIN_CUSTOM_TOOLS
+            ] + _MARVIN_CUSTOM_TOOLS,
+        }
 
         message = client.messages.create(**api_kwargs)
 
-        # Unified continuation loop: handles web search (pause_turn) and custom tools (tool_use)
-        if mode == "chat":
-            tool_use_count = 0
-            total_iterations = 0
+        # Continuation loop: handles web search (pause_turn) and custom tools (tool_use)
+        tool_use_count = 0
+        total_iterations = 0
 
-            while total_iterations < 5:
-                if message.stop_reason == "end_turn":
-                    break
+        while total_iterations < 5:
+            if message.stop_reason == "end_turn":
+                break
 
-                if message.stop_reason == "pause_turn":
-                    # Web search continuation (existing behavior)
-                    total_iterations += 1
-                    messages.append({"role": "assistant", "content": message.content})
-                    messages.append({"role": "user", "content": "Continue."})
-                    message = client.messages.create(**api_kwargs)
-                    continue
+            if message.stop_reason == "pause_turn":
+                # Web search continuation
+                total_iterations += 1
+                messages.append({"role": "assistant", "content": message.content})
+                messages.append({"role": "user", "content": "Continue."})
+                message = client.messages.create(**api_kwargs)
+                continue
 
-                if message.stop_reason == "tool_use":
-                    if tool_use_count >= 2:
-                        break  # Safety cap: API Gateway has 30s hard timeout
-                    tool_use_count += 1
-                    total_iterations += 1
+            if message.stop_reason == "tool_use":
+                if tool_use_count >= 2:
+                    break  # Safety cap: API Gateway has 30s hard timeout
+                tool_use_count += 1
+                total_iterations += 1
 
-                    # Extract tool_use blocks and execute in parallel
-                    tool_uses = [b for b in message.content if b.type == "tool_use"]
-                    results = _execute_tools_parallel(tool_uses)
+                # Extract tool_use blocks and execute in parallel
+                tool_uses = [b for b in message.content if b.type == "tool_use"]
+                results = _execute_tools_parallel(tool_uses)
 
-                    # Build tool_result messages
-                    tool_results = []
-                    for tu in tool_uses:
-                        result_data = results.get(tu.id, {"error": "No result"})
-                        tool_results.append({
-                            "type": "tool_result",
-                            "tool_use_id": tu.id,
-                            "content": json.dumps(result_data, default=str),
-                        })
+                # Build tool_result messages
+                tool_results = []
+                for tu in tool_uses:
+                    result_data = results.get(tu.id, {"error": "No result"})
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": tu.id,
+                        "content": json.dumps(result_data, default=str),
+                    })
 
-                    messages.append({"role": "assistant", "content": message.content})
-                    messages.append({"role": "user", "content": tool_results})
-                    message = client.messages.create(**api_kwargs)
-                    continue
+                messages.append({"role": "assistant", "content": message.content})
+                messages.append({"role": "user", "content": tool_results})
+                message = client.messages.create(**api_kwargs)
+                continue
 
-                break  # Unknown stop_reason
+            break  # Unknown stop_reason
 
         # Extract text from response — may contain multiple blocks when web search is used
         text_parts = []
@@ -777,10 +770,7 @@ def _handle_marvin(event, allowed):
                 text_parts.append(block.text)
         result_text = "\n".join(text_parts).strip()
 
-        if mode == "chat":
-            result_json = _parse_chat_response(result_text)
-        else:
-            result_json = _parse_section_response(result_text)
+        result_json = _parse_chat_response(result_text)
 
         resp_headers = cors_headers(allowed)
         resp_headers["Content-Type"] = "application/json"
@@ -792,28 +782,6 @@ def _handle_marvin(event, allowed):
 
     except Exception as e:
         return _error_response(f"MARVIN error: {e}", 500, allowed)
-
-
-def _build_section_system_prompt():
-    """Original section-only system prompt for backward compatibility."""
-    return """You are MARVIN, a takeoff section generator for a landscape maintenance estimating tool.
-
-Given a user description, generate a section configuration as JSON. There are 3 section types:
-
-1. "split" — divides a total into sub-rows by percentage. Example: lawn split by mower type.
-   Config: { "type": "split", "label": "Section Name", "unit": "SF", "rows": ["Row 1", "Row 2", "Row 3"] }
-
-2. "value" — a single input value. Example: number of palm trees.
-   Config: { "type": "value", "label": "Section Name", "unit": "EA" }
-
-3. "calc" — input × constant = output. Example: flowers ÷ 18 = flats.
-   Config: { "type": "calc", "label": "Section Name", "inputLabel": "Input Name", "inputUnit": "EA", "constant": 18, "constantLabel": "per flat", "outputLabel": "Output Name", "outputUnit": "flats" }
-
-Available units: SF, LF, CY, EA, bags, flats, gallons, hours, lbs, tons, pallets
-
-Return ONLY a JSON object with a "sections" array containing one or more section configs. No markdown, no explanation.
-
-When the user asks you to refine or change a previous result, generate the updated section config incorporating their feedback."""
 
 
 def _build_chat_system_prompt(context):
@@ -973,18 +941,3 @@ def _parse_chat_response(text):
 
     # Case 3: Plain text response — the normal conversational case
     return {"type": "text", "message": text}
-
-
-def _parse_section_response(text):
-    """Parse a section-mode response (original behavior)."""
-    import re
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        json_match = re.search(r'\{[\s\S]*\}', text)
-        if json_match:
-            try:
-                return json.loads(json_match.group())
-            except json.JSONDecodeError:
-                return {"error": "Could not parse AI response", "raw": text}
-        return {"error": "Could not parse AI response", "raw": text}

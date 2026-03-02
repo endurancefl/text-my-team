@@ -4933,7 +4933,7 @@ function setupConfigDragEvents() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  UNIFIED TAKEOFF GRID — Add Section Modal (Manual + MARVIN)
+//  UNIFIED TAKEOFF GRID — Add Section Modal (Manual Builder)
 // ═══════════════════════════════════════════════════════════════
 
 function showAddSectionModal() {
@@ -4946,11 +4946,6 @@ function showAddSectionModal() {
     document.body.appendChild(div.firstElementChild);
     modal = document.getElementById('add-section-modal-overlay');
   }
-  // Reset state
-  switchAddSectionTab('marvin');
-  document.getElementById('marvin-prompt-input').value = '';
-  const resultArea = document.getElementById('marvin-result-area');
-  if (resultArea) resultArea.innerHTML = '';
   modal.classList.add('active');
   document.getElementById('add-section-modal').classList.add('active');
 }
@@ -4970,54 +4965,35 @@ function buildAddSectionModalHTML() {
         <h3>Add Section</h3>
         <button class="config-panel-close" onclick="hideAddSectionModal()">&times;</button>
       </div>
-      <div class="marvin-tab-bar">
-        <button class="marvin-tab active" data-tab="marvin" onclick="switchAddSectionTab('marvin')">Ask MARVIN</button>
-        <button class="marvin-tab" data-tab="manual" onclick="switchAddSectionTab('manual')">Build Manually</button>
-      </div>
-      <div id="add-section-tab-marvin">
-        <textarea id="marvin-prompt-input" class="marvin-textarea" rows="3"
-          placeholder="Describe the section you need, e.g. 'split turf into bermuda and zoysia' or 'each bag covers 2 CY of mulch'"></textarea>
-        <button class="marvin-generate-btn" onclick="generateWithMarvin()">Generate Section</button>
-        <div id="marvin-result-area"></div>
-        <div class="marvin-footer">MARVIN &mdash; Marginally Above Random, Very Impressive Nonetheless</div>
-      </div>
-      <div id="add-section-tab-manual" style="display:none">
-        <div class="add-section-form">
-          <div class="form-row">
-            <label>Section Name</label>
-            <input type="text" id="manual-section-name" placeholder="e.g. Palm Trees">
-          </div>
-          <div class="form-row">
-            <label>Type</label>
-            <select id="manual-section-type" onchange="updateManualTypeFields()">
-              <option value="split">Split (divide into rows)</option>
-              <option value="value">Value (single number)</option>
-              <option value="calc">Calc (input &times; constant = output)</option>
-            </select>
-          </div>
-          <div class="form-row">
-            <label>Unit</label>
-            <select id="manual-section-unit">
-              <option value="SF">SF</option><option value="LF">LF</option><option value="CY">CY</option>
-              <option value="EA">EA</option><option value="bags">bags</option><option value="flats">flats</option>
-              <option value="gallons">gallons</option><option value="hours">hours</option><option value="lbs">lbs</option>
-              <option value="tons">tons</option><option value="pallets">pallets</option>
-            </select>
-          </div>
-          <div id="manual-type-fields"></div>
-          <div class="form-actions">
-            <button class="btn-save-section" onclick="saveManualSection()">Add Section</button>
-            <button class="btn-cancel-section" onclick="hideAddSectionModal()">Cancel</button>
-          </div>
+      <div class="add-section-form">
+        <div class="form-row">
+          <label>Section Name</label>
+          <input type="text" id="manual-section-name" placeholder="e.g. Palm Trees">
+        </div>
+        <div class="form-row">
+          <label>Type</label>
+          <select id="manual-section-type" onchange="updateManualTypeFields()">
+            <option value="split">Split (divide into rows)</option>
+            <option value="value">Value (single number)</option>
+            <option value="calc">Calc (input &times; constant = output)</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Unit</label>
+          <select id="manual-section-unit">
+            <option value="SF">SF</option><option value="LF">LF</option><option value="CY">CY</option>
+            <option value="EA">EA</option><option value="bags">bags</option><option value="flats">flats</option>
+            <option value="gallons">gallons</option><option value="hours">hours</option><option value="lbs">lbs</option>
+            <option value="tons">tons</option><option value="pallets">pallets</option>
+          </select>
+        </div>
+        <div id="manual-type-fields"></div>
+        <div class="form-actions">
+          <button class="btn-save-section" onclick="saveManualSection()">Add Section</button>
+          <button class="btn-cancel-section" onclick="hideAddSectionModal()">Cancel</button>
         </div>
       </div>
     </div>`;
-}
-
-function switchAddSectionTab(tab) {
-  document.querySelectorAll('.marvin-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
-  document.getElementById('add-section-tab-marvin').style.display = tab === 'marvin' ? '' : 'none';
-  document.getElementById('add-section-tab-manual').style.display = tab === 'manual' ? '' : 'none';
 }
 
 function updateManualTypeFields() {
@@ -5071,137 +5047,6 @@ function addCustomSection(section) {
   companyTakeoffSections = cfg;
   saveTakeoffSectionsToBackend();
   renderTakeoffGrid();
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  UNIFIED TAKEOFF GRID — MARVIN AI
-// ═══════════════════════════════════════════════════════════════
-
-let marvinHistory = [];       // conversation history [{role, content}]
-let marvinLastRawJSON = null; // last raw JSON response for context
-
-async function generateWithMarvin(isRefinement) {
-  const inputId = isRefinement ? 'marvin-refine-input' : 'marvin-prompt-input';
-  const prompt = document.getElementById(inputId).value.trim();
-  if (!prompt) { showToast('Describe what you need', 'error'); return; }
-
-  // On fresh prompt, reset history
-  if (!isRefinement) {
-    marvinHistory = [];
-    marvinLastRawJSON = null;
-  }
-
-  const resultArea = document.getElementById('marvin-result-area');
-  resultArea.innerHTML = '<div class="marvin-loading">MARVIN is thinking...</div>';
-
-  try {
-    const resp = await fetch('https://ibjyxrp542.execute-api.us-east-1.amazonaws.com/prod/marvin', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, history: marvinHistory })
-    });
-
-    const data = await resp.json();
-
-    if (!data.success || !data.result?.sections?.length) {
-      resultArea.innerHTML = `<div style="color:var(--red);padding:12px;font-size:13px;">
-        MARVIN couldn't generate a section. Try rephrasing your description.</div>
-        <div class="marvin-refine-area">
-          <textarea id="marvin-refine-input" class="marvin-textarea" rows="2"
-            placeholder="Tell MARVIN what to change..."></textarea>
-          <button class="marvin-generate-btn" onclick="generateWithMarvin(true)">Refine</button>
-        </div>`;
-      // Still track the failed attempt in history
-      marvinHistory.push({ role: 'user', content: prompt });
-      return;
-    }
-
-    // Track conversation history
-    const rawJSON = JSON.stringify(data.result);
-    marvinHistory.push({ role: 'user', content: prompt });
-    marvinHistory.push({ role: 'assistant', content: rawJSON });
-    marvinLastRawJSON = rawJSON;
-
-    // Show editable preview of first section
-    const sec = data.result.sections[0];
-    let previewHTML = renderMarvinPreview(sec);
-
-    previewHTML += `
-      <div class="marvin-actions">
-        <button class="marvin-generate-btn" onclick="saveMarvinSection()">Add Section</button>
-        <button class="btn-cancel-section" onclick="resetMarvin()">Start Over</button>
-      </div>
-      <div class="marvin-refine-area">
-        <textarea id="marvin-refine-input" class="marvin-textarea" rows="2"
-          placeholder="Tell MARVIN what to change..."></textarea>
-        <button class="marvin-refine-btn" onclick="generateWithMarvin(true)">Refine</button>
-      </div>`;
-
-    resultArea.innerHTML = previewHTML;
-
-  } catch (err) {
-    resultArea.innerHTML = `<div style="color:var(--red);padding:12px;font-size:13px;">
-      Could not reach MARVIN. Check your connection and try again.</div>`;
-    console.error('MARVIN error:', err);
-  }
-}
-
-function renderMarvinPreview(sec) {
-  let html = `<div class="marvin-result">
-    <div class="result-field"><label>Name</label>
-      <input type="text" id="marvin-result-name" value="${sec.label || ''}"></div>
-    <div class="result-field"><label>Type</label>
-      <select id="marvin-result-type">
-        <option value="split"${sec.type === 'split' ? ' selected' : ''}>Split</option>
-        <option value="value"${sec.type === 'value' ? ' selected' : ''}>Value</option>
-        <option value="calc"${sec.type === 'calc' ? ' selected' : ''}>Calc</option>
-      </select></div>
-    <div class="result-field"><label>Unit</label>
-      <input type="text" id="marvin-result-unit" value="${sec.unit || 'SF'}"></div>`;
-
-  if (sec.type === 'split' && sec.rows) {
-    html += `<div class="result-field"><label>Rows</label>
-      <textarea id="marvin-result-rows" class="row-labels-input">${sec.rows.join('\n')}</textarea></div>`;
-  }
-  if (sec.type === 'calc') {
-    html += `
-      <div class="result-field"><label>Input</label><input type="text" id="marvin-result-input-label" value="${sec.inputLabel || ''}"></div>
-      <div class="result-field"><label>Constant</label><input type="number" id="marvin-result-constant" value="${sec.constant || 1}"></div>
-      <div class="result-field"><label>Output</label><input type="text" id="marvin-result-output-label" value="${sec.outputLabel || ''}"></div>`;
-  }
-
-  html += `</div>`;
-  return html;
-}
-
-function resetMarvin() {
-  marvinHistory = [];
-  marvinLastRawJSON = null;
-  document.getElementById('marvin-prompt-input').value = '';
-  document.getElementById('marvin-result-area').innerHTML = '';
-}
-
-function saveMarvinSection() {
-  const name = document.getElementById('marvin-result-name').value.trim();
-  const type = document.getElementById('marvin-result-type').value;
-  const unit = document.getElementById('marvin-result-unit').value.trim() || 'SF';
-  const id = 'custom_' + name.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Date.now();
-
-  const section = { id, label: name, type, unit };
-
-  if (type === 'split') {
-    const rowsText = document.getElementById('marvin-result-rows')?.value || '';
-    section.rows = rowsText.split('\n').map(r => r.trim()).filter(Boolean);
-  } else if (type === 'calc') {
-    section.inputLabel = document.getElementById('marvin-result-input-label')?.value || 'Input';
-    section.constant = parseFloat(document.getElementById('marvin-result-constant')?.value) || 1;
-    section.outputLabel = document.getElementById('marvin-result-output-label')?.value || 'Output';
-  }
-
-  addCustomSection(section);
-  hideAddSectionModal();
-  showTakeoffConfigModal();
-  showToast('Section added by MARVIN', 'success');
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -5567,36 +5412,130 @@ function buildMarvinContext() {
     } catch (e) { /* skip */ }
   }
 
-  // Bid settings defaults (always useful)
-  ctx.bidDefaults = {
+  // ─── PLATFORM-WIDE DATA (always sent, regardless of current view) ───
+
+  // All saved estimates/bids — status, amounts, contract linkage
+  if (savedBids && savedBids.length > 0) {
+    ctx.estimates = savedBids.map(b => ({
+      bidId: b.bidId,
+      propertyAddress: b.propertyAddress || '',
+      status: b.status || 'Draft',
+      bidTotal: b.bidTotal || 0,
+      margin: b.margin || 0,
+      contractId: b.contractId || null,
+      date: b.date || '',
+      division: b.division || '',
+      jobType: b.jobType || 'recurring',
+      services: (b.services || []).map(s =>
+        typeof s === 'string' ? s : (s.name || s.proposalName || s.serviceName || '')
+      )
+    }));
+  }
+
+  // All contracts (may be lazy-loaded — empty until Contracts view visited)
+  if (typeof allContracts !== 'undefined' && allContracts && allContracts.length > 0) {
+    ctx.contracts = allContracts.map(c => ({
+      contractId: c.contractId,
+      bidId: c.bidId || '',
+      propertyAddress: c.propertyAddress || '',
+      status: c.status || '',
+      startDate: c.startDate || '',
+      endDate: c.endDate || '',
+      monthlyPayment: c.monthlyPayment || 0,
+      contractValue: c.contractValue || 0,
+      assignedCrew: c.assignedCrew || '',
+      division: c.division || '',
+      contactName: c.contactName || ''
+    }));
+  }
+
+  // All properties with bid/contract enrichment
+  if (typeof properties !== 'undefined' && properties && properties.length > 0) {
+    ctx.properties = properties.map(p => ({
+      propertyId: p.propertyId || '',
+      address: p.propertyAddress || p.address || '',
+      type: p.propertyType || '',
+      lotSizeSF: p.lotSizeSF || 0,
+      hasActiveContract: !!p.hasActiveContract,
+      contractValue: p.contractValue || 0,
+      bidCount: (p.bids || []).length,
+      contractCount: (p.contracts || []).length,
+      contactName: p.contactName || ''
+    }));
+  }
+
+  // Contacts
+  if (typeof contacts !== 'undefined' && contacts && contacts.length > 0) {
+    ctx.contacts = contacts.map(c => ({
+      contactId: c.contactId || '',
+      name: c.name || c.contactName || '',
+      company: c.company || '',
+      email: c.email || '',
+      phone: c.phone || ''
+    }));
+  }
+
+  // Reminders
+  if (typeof allReminders !== 'undefined' && allReminders && allReminders.length > 0) {
+    ctx.reminders = allReminders.map(r => ({
+      text: r.text || r.reminder || '',
+      date: r.date || '',
+      status: r.status || '',
+      propertyAddress: r.propertyAddress || ''
+    }));
+  }
+
+  // Service catalog (available service types)
+  if (typeof serviceCatalog !== 'undefined' && serviceCatalog && serviceCatalog.length > 0) {
+    ctx.serviceCatalog = serviceCatalog.map(s => ({
+      name: s.serviceName || s.name || '',
+      defaultVisits: s.defaultVisits || 0,
+      billingTier: s.billingTier || 'fixed',
+      durationType: s.durationType || 'scalable'
+    }));
+  }
+
+  // Bid settings (full relevant config)
+  ctx.bidSettings = {
     laborRate: bidSettings.laborRate,
     residentialLaborMarkup: bidSettings.residentialLaborMarkup,
     residentialMaterialMarkup: bidSettings.residentialMaterialMarkup,
-    defaultTravelTime: bidSettings.defaultTravelTime
+    commercialLaborMarkup: bidSettings.commercialLaborMarkup,
+    commercialMaterialMarkup: bidSettings.commercialMaterialMarkup,
+    subMarkup: bidSettings.subMarkup,
+    defaultTravelTime: bidSettings.defaultTravelTime,
+    companyName: bidSettings.companyName || '',
+    divisions: bidSettings.divisions || []
   };
 
-  // Schedule view data (sidebar Schedule — uses schedTicketsCache)
+  // Company knowledge base
+  if (bidSettings.marvinKnowledgeBase) {
+    ctx.knowledgeBase = bidSettings.marvinKnowledgeBase;
+  }
+
+  // ─── VIEW-SPECIFIC DATA (schedule views) ───
+
+  // Schedule view tickets (sidebar Schedule)
   if (typeof schedTicketsCache !== 'undefined' && schedTicketsCache && schedTicketsCache.length > 0) {
-    const mapTicket = t => ({
-      ticketId: t.ticketId,
-      eventDate: t.eventDate,
-      propertyAddress: t.propertyAddress || '',
-      services: (Array.isArray(t.services) ? t.services : []).map(s =>
-        typeof s === 'string' ? s : (s.name || s.serviceName || '')
-      ),
-      status: t.status || 'scheduled',
-      assignedCrew: t.assignedCrew || '',
-      totalEstHours: t.totalEstHours || 0
-    });
     ctx.scheduleTickets = {
       viewMode: typeof schedMode !== 'undefined' ? schedMode : 'month',
       viewDate: typeof schedDate !== 'undefined' && schedDate ? schedDate.toISOString().slice(0, 10) : '',
       totalTickets: schedTicketsCache.length,
-      tickets: schedTicketsCache.slice(0, 80).map(mapTicket)
+      tickets: schedTicketsCache.slice(0, 80).map(t => ({
+        ticketId: t.ticketId,
+        eventDate: t.eventDate,
+        propertyAddress: t.propertyAddress || '',
+        services: (Array.isArray(t.services) ? t.services : []).map(s =>
+          typeof s === 'string' ? s : (s.name || s.serviceName || '')
+        ),
+        status: t.status || 'scheduled',
+        assignedCrew: t.assignedCrew || '',
+        totalEstHours: t.totalEstHours || 0
+      }))
     };
   }
 
-  // Contract detail schedule data (Contracts → specific contract)
+  // Contract detail tickets (Contracts → specific contract)
   if (scheduleTickets && scheduleTickets.length > 0) {
     ctx.contractSchedule = {
       contractId: scheduleContract ? scheduleContract.contractId : null,
@@ -5613,37 +5552,6 @@ function buildMarvinContext() {
         totalEstHours: t.totalEstHours || 0
       }))
     };
-  }
-
-  // Contracts summary
-  if (typeof allContracts !== 'undefined' && allContracts && allContracts.length > 0) {
-    ctx.contracts = allContracts.slice(0, 40).map(c => ({
-      contractId: c.contractId,
-      propertyAddress: c.propertyAddress || '',
-      status: c.status || '',
-      services: c.services || '',
-      totalVisits: c.totalVisits || 0,
-      annualValue: c.annualValue || c.bidTotal || 0,
-      startDate: c.startDate || '',
-      endDate: c.endDate || '',
-      assignedCrew: c.assignedCrew || ''
-    }));
-  }
-
-  // Properties summary
-  if (typeof properties !== 'undefined' && properties && properties.length > 0) {
-    ctx.properties = properties.slice(0, 40).map(p => ({
-      address: p.propertyAddress || p.address || '',
-      type: p.propertyType || '',
-      lotSizeSF: p.lotSizeSF || 0,
-      hasContract: !!(p.contractId || p.activeContract),
-      status: p.status || ''
-    }));
-  }
-
-  // Company knowledge base (persistent MARVIN instructions)
-  if (bidSettings.marvinKnowledgeBase) {
-    ctx.knowledgeBase = bidSettings.marvinKnowledgeBase;
   }
 
   ctx.availableViews = Object.entries(MARVIN_VIEW_MAP).map(([id, label]) => ({ id, label }));
