@@ -12,7 +12,7 @@
   <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.js"></script>
-  <link rel="stylesheet" href="css/estimate.css?v=marvin-panel">
+  <link rel="stylesheet" href="css/estimate.css?v=marvin-briefing">
 </head>
 <body>
 
@@ -1749,6 +1749,7 @@
         <span class="material-icons-outlined">auto_awesome</span>
         <span class="marvin-fab-pulse"></span>
       </button>
+
 
     </div>
 
@@ -5210,6 +5211,7 @@ function saveMarvinSection() {
 let marvinChatHistory = [];   // [{role, content}] for panel conversations
 let marvinPanelOpen = false;
 let marvinIsThinking = false;
+let marvinTypewriterActive = null; // tracks active typewriter animation
 
 const MARVIN_CHAT_URL = 'https://ibjyxrp542.execute-api.us-east-1.amazonaws.com/prod/marvin';
 
@@ -5260,6 +5262,8 @@ function toggleMarvinPanel() {
   if (marvinPanelOpen) {
     const input = document.getElementById('marvin-chat-input');
     setTimeout(() => input.focus(), 350);
+    // Check morning briefing when panel opens
+    checkMorningBriefing();
   }
 }
 
@@ -5318,6 +5322,50 @@ function formatMarvinText(text) {
   return html;
 }
 
+function typewriterEffect(bubble, rawText, action, actionContainer, messagesEl) {
+  return new Promise((resolve) => {
+    const words = rawText.split(/(\s+)/); // preserve whitespace tokens
+    let index = 0;
+    bubble.classList.add('typing');
+
+    const timer = setInterval(() => {
+      // Render 2 word-tokens per tick (word + whitespace = 1 logical pair, but we step by 2 tokens)
+      index += 2;
+      if (index >= words.length) index = words.length;
+      const partial = words.slice(0, index).join('');
+      bubble.innerHTML = formatMarvinText(partial);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+
+      if (index >= words.length) {
+        clearInterval(timer);
+        bubble.classList.remove('typing');
+        if (action && actionContainer) {
+          actionContainer.innerHTML = renderMarvinActionCard(action);
+          messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+        marvinTypewriterActive = null;
+        resolve();
+      }
+    }, 30);
+
+    marvinTypewriterActive = { timer, bubble, rawText, action, actionContainer, messagesEl, resolve };
+  });
+}
+
+function skipTypewriter() {
+  if (!marvinTypewriterActive) return;
+  const { timer, bubble, rawText, action, actionContainer, messagesEl, resolve } = marvinTypewriterActive;
+  clearInterval(timer);
+  bubble.classList.remove('typing');
+  bubble.innerHTML = formatMarvinText(rawText);
+  if (action && actionContainer) {
+    actionContainer.innerHTML = renderMarvinActionCard(action);
+  }
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  marvinTypewriterActive = null;
+  resolve();
+}
+
 function appendMarvinMessage(role, content, action) {
   // Hide welcome screen on first message
   const welcome = document.getElementById('marvin-welcome');
@@ -5328,24 +5376,33 @@ function appendMarvinMessage(role, content, action) {
   msgDiv.className = `marvin-msg ${role}`;
 
   if (role === 'assistant') {
-    const rendered = formatMarvinText(content);
+    // Create empty bubble + action container for typewriter animation
+    const contentWrapper = document.createElement('div');
+    const bubble = document.createElement('div');
+    bubble.className = 'marvin-msg-bubble';
+    const actionContainer = document.createElement('div');
+    contentWrapper.appendChild(bubble);
+    contentWrapper.appendChild(actionContainer);
+
     msgDiv.innerHTML = `
       <div class="marvin-msg-avatar">
         <span class="material-icons-outlined">auto_awesome</span>
-      </div>
-      <div>
-        <div class="marvin-msg-bubble">${rendered}</div>
-        ${action ? renderMarvinActionCard(action) : ''}
       </div>`;
+    msgDiv.appendChild(contentWrapper);
+    messages.appendChild(msgDiv);
+    messages.scrollTop = messages.scrollHeight;
+
+    // Return refs for typewriter — caller animates
+    return { bubble, actionContainer, messagesEl: messages };
   } else {
     msgDiv.innerHTML = `
       <div>
         <div class="marvin-msg-bubble">${escapeHtml(content)}</div>
       </div>`;
+    messages.appendChild(msgDiv);
+    messages.scrollTop = messages.scrollHeight;
+    return null;
   }
-
-  messages.appendChild(msgDiv);
-  messages.scrollTop = messages.scrollHeight;
 }
 
 // Store pending actions for safe retrieval by button clicks
@@ -5518,6 +5575,72 @@ function buildMarvinContext() {
     defaultTravelTime: bidSettings.defaultTravelTime
   };
 
+  // Schedule view data (sidebar Schedule — uses schedTicketsCache)
+  if (typeof schedTicketsCache !== 'undefined' && schedTicketsCache && schedTicketsCache.length > 0) {
+    const mapTicket = t => ({
+      ticketId: t.ticketId,
+      eventDate: t.eventDate,
+      propertyAddress: t.propertyAddress || '',
+      services: (Array.isArray(t.services) ? t.services : []).map(s =>
+        typeof s === 'string' ? s : (s.name || s.serviceName || '')
+      ),
+      status: t.status || 'scheduled',
+      assignedCrew: t.assignedCrew || '',
+      totalEstHours: t.totalEstHours || 0
+    });
+    ctx.scheduleTickets = {
+      viewMode: typeof schedMode !== 'undefined' ? schedMode : 'month',
+      viewDate: typeof schedDate !== 'undefined' && schedDate ? schedDate.toISOString().slice(0, 10) : '',
+      totalTickets: schedTicketsCache.length,
+      tickets: schedTicketsCache.slice(0, 80).map(mapTicket)
+    };
+  }
+
+  // Contract detail schedule data (Contracts → specific contract)
+  if (scheduleTickets && scheduleTickets.length > 0) {
+    ctx.contractSchedule = {
+      contractId: scheduleContract ? scheduleContract.contractId : null,
+      propertyAddress: scheduleContract ? scheduleContract.propertyAddress : null,
+      totalTickets: scheduleTickets.length,
+      tickets: scheduleTickets.slice(0, 60).map(t => ({
+        ticketId: t.ticketId,
+        eventDate: t.eventDate,
+        services: (Array.isArray(t.services) ? t.services : []).map(s =>
+          typeof s === 'string' ? s : (s.name || s.serviceName || '')
+        ),
+        status: t.status || 'scheduled',
+        assignedCrew: t.assignedCrew || '',
+        totalEstHours: t.totalEstHours || 0
+      }))
+    };
+  }
+
+  // Contracts summary
+  if (typeof allContracts !== 'undefined' && allContracts && allContracts.length > 0) {
+    ctx.contracts = allContracts.slice(0, 40).map(c => ({
+      contractId: c.contractId,
+      propertyAddress: c.propertyAddress || '',
+      status: c.status || '',
+      services: c.services || '',
+      totalVisits: c.totalVisits || 0,
+      annualValue: c.annualValue || c.bidTotal || 0,
+      startDate: c.startDate || '',
+      endDate: c.endDate || '',
+      assignedCrew: c.assignedCrew || ''
+    }));
+  }
+
+  // Properties summary
+  if (typeof properties !== 'undefined' && properties && properties.length > 0) {
+    ctx.properties = properties.slice(0, 40).map(p => ({
+      address: p.propertyAddress || p.address || '',
+      type: p.propertyType || '',
+      lotSizeSF: p.lotSizeSF || 0,
+      hasContract: !!(p.contractId || p.activeContract),
+      status: p.status || ''
+    }));
+  }
+
   // Company knowledge base (persistent MARVIN instructions)
   if (bidSettings.marvinKnowledgeBase) {
     ctx.knowledgeBase = bidSettings.marvinKnowledgeBase;
@@ -5531,6 +5654,9 @@ async function sendMarvinMessage() {
   const input = document.getElementById('marvin-chat-input');
   const text = input.value.trim();
   if (!text || marvinIsThinking) return;
+
+  // Skip any active typewriter animation before processing new message
+  skipTypewriter();
 
   // Show user message
   appendMarvinMessage('user', text);
@@ -5551,7 +5677,7 @@ async function sendMarvinMessage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         prompt: text,
-        history: marvinChatHistory.slice(0, -1), // exclude current message (already in prompt)
+        history: marvinChatHistory.slice(0, -1),
         mode: 'chat',
         context
       })
@@ -5564,13 +5690,98 @@ async function sendMarvinMessage() {
     const message = result.message || result.raw || 'I couldn\'t generate a response.';
     const action = result.action || null;
 
-    appendMarvinMessage('assistant', message, action);
+    // Hide typing indicator, then animate response
+    document.getElementById('marvin-typing').style.display = 'none';
+    const refs = appendMarvinMessage('assistant', message, action);
     marvinChatHistory.push({ role: 'assistant', content: message });
+    if (refs) {
+      await typewriterEffect(refs.bubble, message, action, refs.actionContainer, refs.messagesEl);
+    }
 
   } catch (err) {
     console.error('MARVIN chat error:', err);
-    appendMarvinMessage('assistant', 'Sorry, I had trouble processing that. Please try again.');
-    marvinChatHistory.push({ role: 'assistant', content: 'Sorry, I had trouble processing that.' });
+    const errMsg = 'Sorry, I had trouble processing that. Please try again.';
+    document.getElementById('marvin-typing').style.display = 'none';
+    const refs = appendMarvinMessage('assistant', errMsg);
+    marvinChatHistory.push({ role: 'assistant', content: errMsg });
+    if (refs) {
+      await typewriterEffect(refs.bubble, errMsg, null, refs.actionContainer, refs.messagesEl);
+    }
+  } finally {
+    marvinIsThinking = false;
+    document.getElementById('marvin-typing').style.display = 'none';
+  }
+}
+
+// ─── Morning Briefing ───────────────────────────────────────
+
+function checkMorningBriefing() {
+  const today = new Date().toISOString().slice(0, 10);
+  if (localStorage.getItem('marvinLastBriefingDate') === today) return;
+  if (marvinIsThinking) return;
+  if (marvinChatHistory.length > 0) return;
+
+  localStorage.setItem('marvinLastBriefingDate', today);
+
+  const day = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+  const date = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  let prompt = `Today is ${day}, ${date}. Give a morning briefing. `;
+  prompt += `Weather for central Florida in 1 line (search the web). `;
+  prompt += `Check Knowledge Base for reminders matching today. `;
+  prompt += `Any open items worth noting. `;
+  prompt += `3-5 lines max. No filler.`;
+
+  sendMarvinBriefingMessage(prompt);
+}
+
+async function sendMarvinBriefingMessage(promptText) {
+  if (marvinIsThinking) return;
+
+  // Push to history (system-initiated — no user bubble)
+  marvinChatHistory.push({ role: 'user', content: promptText });
+
+  // Show typing indicator
+  marvinIsThinking = true;
+  document.getElementById('marvin-typing').style.display = 'flex';
+  const messages = document.getElementById('marvin-panel-messages');
+  messages.scrollTop = messages.scrollHeight;
+
+  try {
+    const context = buildMarvinContext();
+    const resp = await fetch(MARVIN_CHAT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: promptText,
+        history: marvinChatHistory.slice(0, -1),
+        mode: 'chat',
+        context
+      })
+    });
+
+    const data = await resp.json();
+    if (!data.success) throw new Error(data.error || 'Request failed');
+
+    const result = data.result;
+    const message = result.message || result.raw || 'Good morning! Briefing couldn\'t load, but I\'m here.';
+    const action = result.action || null;
+
+    document.getElementById('marvin-typing').style.display = 'none';
+    const refs = appendMarvinMessage('assistant', message, action);
+    marvinChatHistory.push({ role: 'assistant', content: message });
+    if (refs) {
+      await typewriterEffect(refs.bubble, message, action, refs.actionContainer, refs.messagesEl);
+    }
+
+  } catch (err) {
+    console.error('MARVIN briefing error:', err);
+    const fallback = 'Good morning! Briefing couldn\'t load, but I\'m here — ask me anything.';
+    document.getElementById('marvin-typing').style.display = 'none';
+    const refs = appendMarvinMessage('assistant', fallback);
+    marvinChatHistory.push({ role: 'assistant', content: fallback });
+    if (refs) {
+      await typewriterEffect(refs.bubble, fallback, null, refs.actionContainer, refs.messagesEl);
+    }
   } finally {
     marvinIsThinking = false;
     document.getElementById('marvin-typing').style.display = 'none';
@@ -6912,16 +7123,20 @@ async function loadAllData() {
   } catch (err) {
     console.error('Bulk loadAllData failed, falling back to individual loads:', err);
     // Fallback to individual requests
-    await Promise.all([loadItemCatalog(), loadBidSettings(), loadBids(), loadTemplates(), loadServiceCatalog(), loadContacts()]);
-    checkForSavedEstimate();
-    renderMowerTable();
-    renderEdgeTable();
-    if (USE_NEW_TAKEOFF) {
-      initTakeoffGridEvents();
-      loadTakeoffSections().then(() => renderTakeoffGrid());
+    try {
+      await Promise.all([loadItemCatalog(), loadBidSettings(), loadBids(), loadTemplates(), loadServiceCatalog(), loadContacts()]);
+      checkForSavedEstimate();
+      renderMowerTable();
+      renderEdgeTable();
+      if (USE_NEW_TAKEOFF) {
+        initTakeoffGridEvents();
+        loadTakeoffSections().then(() => renderTakeoffGrid());
+      }
+      await loadPropertiesFromBackend();
+      populateEstimatePropertyPicker();
+    } catch (fallbackErr) {
+      console.error('Fallback loads also failed:', fallbackErr);
     }
-    await loadPropertiesFromBackend();
-    populateEstimatePropertyPicker();
   }
 }
 
