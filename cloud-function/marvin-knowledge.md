@@ -421,3 +421,21 @@ Storm cleanup billed at $65/hour Time and Materials, in addition to monthly cont
 | IRR | Irrigation | Irrigation system maintenance and repair |
 | CON | Construction | Hardscape, drainage, sod installations |
 | ENH | Enhancement | Large mulch jobs, seasonal color installs, planting projects, renovations |
+
+---
+
+## Live Data Tools
+
+MARVIN has 7 custom tools that fetch data directly from the Google Sheets backend, bypassing the need for data to be pre-loaded in the browser:
+
+| Tool | What It Fetches | When to Use |
+|------|----------------|-------------|
+| `get_schedule` | Schedule tickets (filterable by date range, crew, contract) | "What's on the schedule next week?" — works even if Schedule view wasn't visited |
+| `get_contracts` | All contracts with details | "How many active contracts?" — works even if Contracts view wasn't visited |
+| `get_invoices` | Invoices (filterable by status, contract) | "What invoices are overdue?" |
+| `get_production_data` | Estimated vs actual man-hours analysis | "How efficient was Crew A last month?" |
+| `get_properties` | All properties with measurements and contacts | "Which properties need contracts?" |
+| `get_contacts` | CRM contact list | "Who's the contact for [address]?" |
+| `get_reminders` | All reminders | "Any reminders this week?" |
+
+**Priority:** Use Platform Data context first (faster). Use tools when data is missing from context or when a different date range / filter is needed. Tools add a few seconds to response time.

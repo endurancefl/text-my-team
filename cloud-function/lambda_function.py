@@ -19,6 +19,9 @@ import json
 import os
 import re
 import uuid
+import urllib.request
+import urllib.parse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import boto3
 from pathlib import Path
@@ -54,6 +57,9 @@ _MARVIN_KNOWLEDGE = ""
 _knowledge_path = Path(__file__).parent / "marvin-knowledge.md"
 if _knowledge_path.exists():
     _MARVIN_KNOWLEDGE = _knowledge_path.read_text(encoding="utf-8")
+
+# Google Sheets backend URL (same endpoint used by all frontend apps)
+GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbygkHGZmIYUj9F91u-3eF3_V9mC7xZ03PfCJt6AD_VnpSXheLlEvt6h1obmqUf4JkRg/exec"
 
 # S3 client (reused across invocations)
 _s3_client = None
@@ -451,6 +457,211 @@ def _parse_multipart(body, boundary):
     return result
 
 
+# ─── MARVIN Custom Tool Definitions ───────────────────────────────────────────
+
+_MARVIN_CUSTOM_TOOLS = [
+    {
+        "name": "get_schedule",
+        "description": "Fetch schedule tickets from the database. Returns tickets with property, crew, date, services, estimated hours, and status. Use when the user asks about the schedule, upcoming work, or what's planned.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "start_date": {
+                    "type": "string",
+                    "description": "Start date filter (YYYY-MM-DD). Defaults to today if omitted."
+                },
+                "end_date": {
+                    "type": "string",
+                    "description": "End date filter (YYYY-MM-DD). Defaults to 7 days from start_date if omitted."
+                },
+                "crew": {
+                    "type": "string",
+                    "description": "Filter by crew name (e.g. 'Crew A'). Omit for all crews."
+                },
+                "contract_id": {
+                    "type": "string",
+                    "description": "Filter by contract ID. Omit for all contracts."
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "get_contracts",
+        "description": "Fetch all contracts from the database. Returns contract details including property, crew, dates, monthly payment, status, and signing info. Use when the user asks about contracts, active accounts, or contract details.",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
+    {
+        "name": "get_invoices",
+        "description": "Fetch invoices from the database. Returns invoice details including amounts, status, dates, and payment info. Use when the user asks about invoices, payments, overdue amounts, or billing.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "description": "Filter by status: 'draft', 'sent', 'overdue', 'paid'. Omit for all."
+                },
+                "contract_id": {
+                    "type": "string",
+                    "description": "Filter by contract ID. Omit for all contracts."
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "get_production_data",
+        "description": "Fetch production analysis data comparing estimated vs actual man-hours at service and item level. Use when the user asks about crew efficiency, production rates, actual vs estimated performance.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "start_date": {
+                    "type": "string",
+                    "description": "Start date (YYYY-MM-DD). Required for meaningful results."
+                },
+                "end_date": {
+                    "type": "string",
+                    "description": "End date (YYYY-MM-DD). Required for meaningful results."
+                },
+                "crew": {
+                    "type": "string",
+                    "description": "Filter by crew name. Use 'all' or omit for all crews."
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "get_properties",
+        "description": "Fetch all properties from the database. Returns property details including address, lot size, measurements, contacts, bid/contract counts, and crew assignments. Use when the user asks about properties, property details, or which properties need attention.",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
+    {
+        "name": "get_contacts",
+        "description": "Fetch all contacts from the CRM. Returns contact details including name, email, phone, company, stage, and notes. Use when the user asks about contacts, customers, or who manages a property.",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
+    {
+        "name": "get_reminders",
+        "description": "Fetch all reminders from the database. Returns reminder details including property, description, date, status, and assigned crew. Use when the user asks about reminders, upcoming tasks, or notes.",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
+]
+
+
+def _fetch_backend(params):
+    """HTTP GET to the Google Sheets backend with query parameters. Returns parsed JSON."""
+    query = urllib.parse.urlencode(params)
+    url = f"{GOOGLE_SHEETS_URL}?{query}"
+    req = urllib.request.Request(url, method="GET")
+    try:
+        with urllib.request.urlopen(req, timeout=25) as resp:
+            raw = resp.read().decode("utf-8")
+            return json.loads(raw)
+    except Exception as e:
+        return {"error": f"Backend request failed: {e}"}
+
+
+def _execute_tool(tool_name, tool_input):
+    """Dispatch a MARVIN tool call to the appropriate backend endpoint."""
+    from datetime import date, timedelta
+
+    if tool_name == "get_schedule":
+        params = {"action": "getTickets"}
+        start = tool_input.get("start_date", "")
+        end = tool_input.get("end_date", "")
+        # Default to today + 7 days if no dates provided
+        if not start:
+            start = date.today().isoformat()
+        if not end:
+            end = (date.today() + timedelta(days=7)).isoformat()
+        params["startDate"] = start
+        params["endDate"] = end
+        if tool_input.get("crew"):
+            params["crew"] = tool_input["crew"]
+        if tool_input.get("contract_id"):
+            params["contractId"] = tool_input["contract_id"]
+        result = _fetch_backend(params)
+        # Truncate to 100 tickets max
+        if isinstance(result, dict) and "tickets" in result:
+            result["tickets"] = result["tickets"][:100]
+            result["_truncated"] = len(result["tickets"]) >= 100
+        return result
+
+    elif tool_name == "get_contracts":
+        return _fetch_backend({"action": "getContracts"})
+
+    elif tool_name == "get_invoices":
+        params = {"action": "getInvoices"}
+        if tool_input.get("status"):
+            params["status"] = tool_input["status"]
+        if tool_input.get("contract_id"):
+            params["contractId"] = tool_input["contract_id"]
+        result = _fetch_backend(params)
+        # Truncate to 200 invoices max
+        if isinstance(result, dict) and "invoices" in result:
+            result["invoices"] = result["invoices"][:200]
+        return result
+
+    elif tool_name == "get_production_data":
+        params = {"action": "getProductionAnalysis"}
+        if tool_input.get("start_date"):
+            params["startDate"] = tool_input["start_date"]
+        if tool_input.get("end_date"):
+            params["endDate"] = tool_input["end_date"]
+        params["crew"] = tool_input.get("crew", "all")
+        return _fetch_backend(params)
+
+    elif tool_name == "get_properties":
+        result = _fetch_backend({"action": "getEstimatingProperties"})
+        # Truncate to 200 properties max
+        if isinstance(result, dict) and "properties" in result:
+            result["properties"] = result["properties"][:200]
+        return result
+
+    elif tool_name == "get_contacts":
+        return _fetch_backend({"action": "getContacts"})
+
+    elif tool_name == "get_reminders":
+        return _fetch_backend({"action": "getReminders"})
+
+    else:
+        return {"error": f"Unknown tool: {tool_name}"}
+
+
+def _execute_tools_parallel(tool_uses):
+    """Execute multiple tool calls in parallel. Returns dict of tool_id -> result."""
+    results = {}
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = {
+            executor.submit(_execute_tool, tu.name, tu.input): tu.id
+            for tu in tool_uses
+        }
+        for future in as_completed(futures):
+            tool_id = futures[future]
+            try:
+                results[tool_id] = future.result()
+            except Exception as e:
+                results[tool_id] = {"error": str(e)}
+    return results
+
+
 def _handle_marvin(event, allowed):
     """Handle MARVIN AI requests — section generation (mode='section') and chat (mode='chat')."""
     try:
@@ -491,14 +702,80 @@ def _handle_marvin(event, allowed):
                 messages.append({"role": role, "content": content})
         messages.append({"role": "user", "content": prompt})
 
-        message = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=max_tokens,
-            system=system_prompt,
-            messages=messages,
-        )
+        # Build API call kwargs — add web search tool for chat mode only
+        api_kwargs = {
+            "model": "claude-sonnet-4-20250514",
+            "max_tokens": max_tokens,
+            "system": system_prompt,
+            "messages": messages,
+        }
+        if mode == "chat":
+            api_kwargs["tools"] = [
+                {
+                    "type": "web_search_20250305",
+                    "name": "web_search",
+                    "max_uses": 5,
+                    "user_location": {
+                        "type": "approximate",
+                        "city": "Orlando",
+                        "region": "Florida",
+                        "country": "US",
+                    },
+                }
+            ] + _MARVIN_CUSTOM_TOOLS
 
-        result_text = message.content[0].text.strip()
+        message = client.messages.create(**api_kwargs)
+
+        # Unified continuation loop: handles web search (pause_turn) and custom tools (tool_use)
+        if mode == "chat":
+            tool_use_count = 0
+            total_iterations = 0
+
+            while total_iterations < 5:
+                if message.stop_reason == "end_turn":
+                    break
+
+                if message.stop_reason == "pause_turn":
+                    # Web search continuation (existing behavior)
+                    total_iterations += 1
+                    messages.append({"role": "assistant", "content": message.content})
+                    messages.append({"role": "user", "content": "Continue."})
+                    message = client.messages.create(**api_kwargs)
+                    continue
+
+                if message.stop_reason == "tool_use":
+                    if tool_use_count >= 2:
+                        break  # Safety cap: API Gateway has 30s hard timeout
+                    tool_use_count += 1
+                    total_iterations += 1
+
+                    # Extract tool_use blocks and execute in parallel
+                    tool_uses = [b for b in message.content if b.type == "tool_use"]
+                    results = _execute_tools_parallel(tool_uses)
+
+                    # Build tool_result messages
+                    tool_results = []
+                    for tu in tool_uses:
+                        result_data = results.get(tu.id, {"error": "No result"})
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": tu.id,
+                            "content": json.dumps(result_data, default=str),
+                        })
+
+                    messages.append({"role": "assistant", "content": message.content})
+                    messages.append({"role": "user", "content": tool_results})
+                    message = client.messages.create(**api_kwargs)
+                    continue
+
+                break  # Unknown stop_reason
+
+        # Extract text from response — may contain multiple blocks when web search is used
+        text_parts = []
+        for block in message.content:
+            if block.type == "text":
+                text_parts.append(block.text)
+        result_text = "\n".join(text_parts).strip()
 
         if mode == "chat":
             result_json = _parse_chat_response(result_text)
@@ -587,11 +864,43 @@ To remove from knowledge base:
 
 {_MARVIN_KNOWLEDGE}
 
-## Current estimate context
+## Platform Data (live snapshot — this IS your data, use it to answer questions)
+
+The JSON below contains EVERYTHING currently loaded in the platform. This is authoritative, real-time data. Use it directly to answer questions. The data includes:
+
+- **estimates**: All saved bids/estimates with status (Draft/Finalized/Revision), amounts, contractId (if finalized), services, and dates. A "Finalized" estimate means a contract was generated.
+- **contracts**: Active contracts with start/end dates, monthly payments, assigned crews. May be empty if the Contracts view hasn't been visited yet — but finalized estimates (with contractId) prove contracts exist.
+- **properties**: All properties with bid counts, contract counts, hasActiveContract flag, lot sizes, contact names.
+- **contacts**: Customer contact list.
+- **reminders**: Upcoming reminders and notes.
+- **serviceCatalog**: Available service types and their defaults.
+- **bidSettings**: Company rate configuration (labor rates, markups, divisions).
+- **scheduleTickets**: Tickets currently displayed on the Schedule calendar (if the user has visited Schedule view).
+- **contractSchedule**: Tickets for a specific contract detail view.
+- **Active estimate fields**: When the user has an estimate open — property info, measurements, takeoffs, services with line items, calculated totals, tier breakdowns.
+- **knowledgeBase**: Company-specific instructions and preferences.
+
+```json
 {ctx_str}
+```
 {kb_section}
+## Data Tools (live backend access)
+
+You have tools to fetch FRESH data directly from the database: `get_schedule`, `get_contracts`, `get_invoices`, `get_production_data`, `get_properties`, `get_contacts`, `get_reminders`. These are more reliable than the Platform Data JSON for data that might not be loaded yet.
+
+**When to use tools vs context:**
+- Use context first for: active estimate details, bid settings, service catalog, any data already populated in Platform Data above
+- Use tools for: schedule (if scheduleTickets is missing or you need a different date range), contracts (if empty in context), invoices, production data, properties (if you need full details beyond what's in context)
+- If context has the data you need, use it — it's faster. Tools add a few seconds.
+- Don't call tools speculatively. Only when you actually need the data to answer the question.
+- You can call multiple tools at once if you need data from multiple sources.
+
 ## Guidelines
-- Reference specific numbers from context: "Your lot is 12,500 SF" not "the lot size is whatever it's set to."
+
+**CRITICAL: Never say "I don't have access to that data." You DO have access — it's either in the Platform Data above or you can fetch it with your data tools.** Read the JSON carefully first. If the data isn't in the JSON, use your tools to fetch it from the backend. Only if both fail should you explain what happened.
+
+- Answer questions by referencing SPECIFIC data from the JSON. Don't be vague. "You have 1 finalized estimate for 2216 Mallard Circle at $7,936.82 with an active contract" — not "check the Contracts view."
+- When the user asks about schedules, contracts, estimates, properties — look at the data FIRST, answer from it, THEN offer navigation if they want more detail.
 - Give actual recommendations, don't just list options. Use your knowledge of production rates, typical values, and pricing.
 - For section creation, suggest good row names based on common landscape categories.
 - If you notice something off in the estimate (0% travel, missing services, unusual margins), mention it proactively.
@@ -600,7 +909,11 @@ To remove from knowledge base:
 - The Company Knowledge Base (if present) contains the owner's specific preferences. Always follow those over generic defaults.
 - When the user says "remember that...", "from now on...", "always/never...", use the updateKnowledgeBase action. Write entries as concise bullet points starting with "- ".
 - When asked to remove or forget something, use updateKnowledgeBase with "remove", matching exact text.
-- Suggest adding to knowledge base if the user repeatedly corrects you about the same thing."""
+- Suggest adding to knowledge base if the user repeatedly corrects you about the same thing.
+
+## Web Search
+You have access to web search. Use it when the user asks about things not in your context — weather, current material prices, local regulations, competitor pricing, product specifications, news, or anything else that benefits from current information. Do NOT search for things already in your context (estimate data, property info, bid settings, catalog rates) — that data is already provided and is more accurate than web results.
+When you use search results, be CONCISE. Give the answer, not an essay. For weather: just the forecast numbers and one line about crew impact. For prices: just the price range and source. Short and direct — the user is busy."""
 
 
 def _parse_chat_response(text):
