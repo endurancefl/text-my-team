@@ -8823,62 +8823,6 @@ function renderPropertyProjects() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  PROJECT HISTORY BY DIVISION (LEGACY — kept for reference)
-// ═══════════════════════════════════════════════════════════════
-
-async function renderPropertyProjectHistory() {
-  const historyEl = document.getElementById('property-project-history');
-  if (!currentProperty) return;
-
-  // Load tickets if not already loaded
-  try {
-    const normAddr = normalizeAddress(currentProperty.address);
-    const resp = await fetch(GOOGLE_SHEETS_URL + '?action=getTickets');
-    const data = await resp.json();
-    if (!data.success || !data.tickets) {
-      historyEl.innerHTML = '<p class="contact-no-estimates">No project history available.</p>';
-      return;
-    }
-
-    // Filter tickets for this property
-    const propTickets = data.tickets.filter(t =>
-      normalizeAddress(t.propertyAddress) === normAddr && (t.status === 'completed' || t.status === 'partial')
-    );
-
-    if (propTickets.length === 0) {
-      historyEl.innerHTML = '<p class="contact-no-estimates">No completed work for this property.</p>';
-      return;
-    }
-
-    // Group by division
-    const byDivision = {};
-    propTickets.forEach(t => {
-      const div = t.division || 'MNT';
-      if (!byDivision[div]) byDivision[div] = [];
-      byDivision[div].push(t);
-    });
-
-    historyEl.innerHTML = Object.entries(byDivision).map(([div, tickets]) => {
-      const divClass = 'div-' + div.toLowerCase();
-      const ticketHtml = tickets.slice(0, 10).map(t => {
-        return `<div style="display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; border-bottom: 1px solid var(--gw-divider);">
-          <span>${t.ticketId} — ${t.eventDate || ''}</span>
-          <span style="color: var(--gw-text-secondary);">${t.status}</span>
-        </div>`;
-      }).join('');
-      return `<div style="margin-bottom: 16px;">
-        <div style="margin-bottom: 8px;"><span class="division-badge ${divClass}">${div}</span> <span style="font-size: 12px; color: var(--gw-text-secondary);">${tickets.length} completed</span></div>
-        ${ticketHtml}
-        ${tickets.length > 10 ? `<div style="font-size: 12px; color: var(--gw-text-disabled); padding-top: 4px;">...and ${tickets.length - 10} more</div>` : ''}
-      </div>`;
-    }).join('');
-  } catch (err) {
-    console.error('Error loading project history:', err);
-    historyEl.innerHTML = '<p class="contact-no-estimates">Error loading project history.</p>';
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
 //  ESTIMATE BUILDER PROPERTY PICKER
 // ═══════════════════════════════════════════════════════════════
 
