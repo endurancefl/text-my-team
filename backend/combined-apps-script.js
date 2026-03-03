@@ -836,7 +836,7 @@ function createContract(data) {
   // Ensure new columns exist on existing sheets
   var existingData = sheet.getDataRange().getValues();
   var headers = existingData[0];
-  var newCols = ['Payment Terms', 'Contract Value', 'CC Fee %', 'CC Gross-Up', 'Contact Name', 'Contact Email', 'Billing Address', 'PDF URL', 'PDF File ID', 'Job Type', 'Schedule Type', 'Project Name', 'Deposit Percent', 'Deposit Amount', 'Services JSON'];
+  var newCols = ['Payment Terms', 'Contract Value', 'CC Fee %', 'CC Gross-Up', 'Contact Name', 'Contact Email', 'Billing Address', 'PDF URL', 'PDF File ID', 'Job Type', 'Schedule Type', 'Project Name', 'Deposit Percent', 'Deposit Amount', 'Services JSON', 'Billing Contact Name', 'Billing Contact Email'];
   newCols.forEach(function(colName) {
     if (headers.indexOf(colName) === -1) {
       var nextCol = headers.length + 1;
@@ -875,7 +875,9 @@ function createContract(data) {
     projectName: headers.indexOf('Project Name'),
     depositPercent: headers.indexOf('Deposit Percent'),
     depositAmount: headers.indexOf('Deposit Amount'),
-    servicesJson: headers.indexOf('Services JSON')
+    servicesJson: headers.indexOf('Services JSON'),
+    billingContactName: headers.indexOf('Billing Contact Name'),
+    billingContactEmail: headers.indexOf('Billing Contact Email')
   };
 
   var idCol = col.contractId !== -1 ? col.contractId : 0;
@@ -921,6 +923,8 @@ function createContract(data) {
     else if (c === col.depositPercent) row.push(data.depositPercent || 0);
     else if (c === col.depositAmount) row.push(data.depositAmount || 0);
     else if (c === col.servicesJson) row.push(data.servicesJson || '');
+    else if (c === col.billingContactName) row.push(data.billingContactName || '');
+    else if (c === col.billingContactEmail) row.push(data.billingContactEmail || '');
     else row.push('');
   }
 
@@ -968,6 +972,8 @@ function updateContract(data) {
         'Contact Name': data.contactName,
         'Contact Email': data.contactEmail,
         'Billing Address': data.billingAddress,
+        'Billing Contact Name': data.billingContactName,
+        'Billing Contact Email': data.billingContactEmail,
         'PDF URL': data.pdfUrl,
         'PDF File ID': data.pdfFileId,
         'signedPdfUrl': data.signedPdfUrl,
@@ -3287,8 +3293,16 @@ function saveContact(data) {
   var sheet = ss.getSheetByName('Contacts');
   if (!sheet) {
     sheet = ss.insertSheet('Contacts');
-    sheet.getRange(1, 1, 1, 13).setValues([['contactId', 'firstName', 'lastName', 'email', 'phone', 'company', 'billingAddress', 'propertyAddress', 'stage', 'source', 'notes', 'createdAt', 'updatedAt']]);
+    sheet.getRange(1, 1, 1, 14).setValues([['contactId', 'firstName', 'lastName', 'email', 'phone', 'company', 'billingAddress', 'propertyAddress', 'stage', 'source', 'notes', 'createdAt', 'updatedAt', 'displayName']]);
   }
+
+  // Ensure displayName column exists on older sheets
+  var tempHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  if (tempHeaders.indexOf('displayName') === -1) {
+    var nextCol = tempHeaders.length + 1;
+    sheet.getRange(1, nextCol).setValue('displayName').setFontWeight('bold');
+  }
+
   var contactId = 'C-' + Date.now();
   var now = new Date().toISOString();
   sheet.appendRow([
@@ -3304,7 +3318,8 @@ function saveContact(data) {
     data.source || '',
     data.notes || '',
     now,
-    now
+    now,
+    data.displayName || ''
   ]);
   return { success: true, contactId: contactId };
 }
@@ -3313,6 +3328,7 @@ function updateContact(data) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('Contacts');
   var rows = sheet.getDataRange().getValues();
+  var headers = rows[0];
   for (var i = 1; i < rows.length; i++) {
     if (String(rows[i][0]) === String(data.contactId)) {
       var now = new Date().toISOString();
@@ -3330,6 +3346,11 @@ function updateContact(data) {
         rows[i][11],  // keep original createdAt
         now
       ]]);
+      // Write displayName column by header index
+      var dnCol = headers.indexOf('displayName');
+      if (dnCol >= 0) {
+        sheet.getRange(i + 1, dnCol + 1).setValue(data.displayName || '');
+      }
       return { success: true };
     }
   }
@@ -3887,9 +3908,9 @@ function generateInvoiceBatch(data) {
     var dueDate = new Date(now.getFullYear(), now.getMonth() + 1, 30);
     var dueDateStr = Utilities.formatDate(dueDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
 
-    // Look up contact info
-    var contactName = contract.contactName || contract.customerName || '';
-    var contactEmail = contract.contactEmail || contract.customerEmail || '';
+    // Look up contact info — prefer billing contact, fall back to primary
+    var contactName = contract['Billing Contact Name'] || contract.contactName || contract.customerName || '';
+    var contactEmail = contract['Billing Contact Email'] || contract.contactEmail || contract.customerEmail || '';
     var billingAddress = contract.billingAddress || contract.propertyAddress || '';
     var paymentTerms = contract.paymentTerms || 'Net 30';
 

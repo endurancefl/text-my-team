@@ -2217,6 +2217,10 @@
             <input type="text" class="form-input" id="contact-last-name" placeholder="Smith">
           </div>
         </div>
+        <div class="form-group" style="margin-top: 16px;">
+          <label class="form-label">Display Name <span style="color:var(--gw-text-muted);font-weight:normal;">(optional — e.g. "John & Jane Smith")</span></label>
+          <input type="text" class="form-input" id="contact-display-name" placeholder="John & Jane Smith">
+        </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px;">
           <div class="form-group">
             <label class="form-label">Email</label>
@@ -7159,12 +7163,35 @@ function getContactInitials(contact) {
 }
 
 function getContactDisplayName(contact) {
+  if (contact.displayName && contact.displayName.trim()) return contact.displayName.trim();
   const f = (contact.firstName || '').trim();
   const l = (contact.lastName || '').trim();
   if (f && l) return f + ' ' + l;
   if (f) return f;
   if (l) return l;
   return contact.company || contact.email || 'Unnamed Contact';
+}
+
+function resolveContactByRole(propertyId, preferredRole, fallbackRole) {
+  const links = (propertyContacts || []).filter(l => l.propertyId === propertyId);
+  if (links.length === 0) return null;
+
+  const preferred = links.find(l => l.role === preferredRole);
+  if (preferred) {
+    const c = contacts.find(c => c.contactId === preferred.contactId);
+    if (c) return c;
+  }
+
+  if (fallbackRole && fallbackRole !== preferredRole) {
+    const fb = links.find(l => l.role === fallbackRole);
+    if (fb) {
+      const c = contacts.find(c => c.contactId === fb.contactId);
+      if (c) return c;
+    }
+  }
+
+  // Last resort: first linked contact
+  return contacts.find(c => c.contactId === links[0].contactId) || null;
 }
 
 function getLinkedEstimatesForContact(contactId) {
@@ -7236,6 +7263,7 @@ function openContactModal(mode) {
     saveBtn.textContent = 'Update Contact';
     document.getElementById('contact-first-name').value = currentContact.firstName || '';
     document.getElementById('contact-last-name').value = currentContact.lastName || '';
+    document.getElementById('contact-display-name').value = currentContact.displayName || '';
     document.getElementById('contact-email').value = currentContact.email || '';
     document.getElementById('contact-phone').value = currentContact.phone || '';
     document.getElementById('contact-company').value = currentContact.company || '';
@@ -7249,6 +7277,7 @@ function openContactModal(mode) {
     saveBtn.textContent = 'Save Contact';
     document.getElementById('contact-first-name').value = '';
     document.getElementById('contact-last-name').value = '';
+    document.getElementById('contact-display-name').value = '';
     document.getElementById('contact-email').value = '';
     document.getElementById('contact-phone').value = '';
     document.getElementById('contact-company').value = '';
@@ -7276,6 +7305,7 @@ async function saveContactFromModal() {
   const contactData = {
     firstName: firstName,
     lastName: lastName,
+    displayName: document.getElementById('contact-display-name').value.trim(),
     email: document.getElementById('contact-email').value.trim(),
     phone: document.getElementById('contact-phone').value.trim(),
     company: document.getElementById('contact-company').value.trim(),
@@ -8141,10 +8171,11 @@ function enrichPropertiesWithBidsContracts(backendProps) {
     const activeContract = p.contracts.find(c => (c.status || '').toLowerCase() === 'active');
     p.contractValue = activeContract ? (activeContract.monthlyPayment || 0) : 0;
     p.normalizedAddress = normAddr;
-    // Contact name from junction links
+    // Contact name from junction links — prefer Owner role
     const propLinks = (propertyContacts || []).filter(l => l.propertyId === p.propertyId);
     if (propLinks.length > 0) {
-      const primaryContact = contacts.find(c => c.contactId === propLinks[0].contactId);
+      const ownerLink = propLinks.find(l => l.role === 'Owner') || propLinks[0];
+      const primaryContact = contacts.find(c => c.contactId === ownerLink.contactId);
       p.contactName = primaryContact ? getContactDisplayName(primaryContact) : '';
     } else {
       // Fallback: match contacts by address
@@ -8827,11 +8858,12 @@ function onEstimatePropertySelect(propertyId) {
   populateEstimateContactPicker(); // Ensure picker is populated first
   const contactPicker = document.getElementById('estimate-contact-picker');
   if (contactPicker && !currentEstimate.contactId) {
-    // Try junction links first
+    // Try junction links first — prefer Owner role
     const propLinks = (propertyContacts || []).filter(l => l.propertyId === propertyId);
     if (propLinks.length > 0) {
-      contactPicker.value = propLinks[0].contactId;
-      onEstimateContactChange(propLinks[0].contactId);
+      const ownerLink = propLinks.find(l => l.role === 'Owner') || propLinks[0];
+      contactPicker.value = ownerLink.contactId;
+      onEstimateContactChange(ownerLink.contactId);
     } else {
       // Fallback: match contact by address
       const normAddr = normalizeAddress(prop.address);
@@ -11689,6 +11721,7 @@ async function finalizeEstimate() {
       await handleSaveBid();
 
       // Step 2: Update contract row with new totals
+      const revBillingContact = currentEstimate.propertyId ? resolveContactByRole(currentEstimate.propertyId, 'Billing Contact', 'Owner') : null;
       await fetch(GOOGLE_SHEETS_URL, {
         method: 'POST',
         body: JSON.stringify({
@@ -11705,9 +11738,11 @@ async function finalizeEstimate() {
           contractValue: Math.round(fixedAnnual * 100) / 100,
           ccFeePercent: currentEstimate.contract.ccFeePercent || 0,
           ccGrossUp: currentEstimate.contract.ccGrossUp || false,
-          contactName: currentContact ? ((currentContact.firstName || '') + ' ' + (currentContact.lastName || '')).trim() : '',
+          contactName: currentContact ? getContactDisplayName(currentContact) : '',
           contactEmail: currentContact ? (currentContact.email || '') : '',
-          billingAddress: currentContact ? (currentContact.billingAddress || '') : ''
+          billingAddress: currentContact ? (currentContact.billingAddress || '') : '',
+          billingContactName: revBillingContact ? getContactDisplayName(revBillingContact) : '',
+          billingContactEmail: revBillingContact ? (revBillingContact.email || '') : ''
         })
       });
 
@@ -11824,6 +11859,7 @@ async function finalizeEstimate() {
         await handleSaveBid();
       }
 
+      const newBillingContact = currentEstimate.propertyId ? resolveContactByRole(currentEstimate.propertyId, 'Billing Contact', 'Owner') : null;
       const contractResult = await fetch(GOOGLE_SHEETS_URL, {
         method: 'POST',
         body: JSON.stringify({
@@ -11840,9 +11876,11 @@ async function finalizeEstimate() {
           contractValue: Math.round(fixedAnnual * 100) / 100,
           ccFeePercent: currentEstimate.contract.ccFeePercent || 0,
           ccGrossUp: currentEstimate.contract.ccGrossUp || false,
-          contactName: currentContact ? ((currentContact.firstName || '') + ' ' + (currentContact.lastName || '')).trim() : '',
+          contactName: currentContact ? getContactDisplayName(currentContact) : '',
           contactEmail: currentContact ? (currentContact.email || '') : '',
           billingAddress: currentContact ? (currentContact.billingAddress || '') : '',
+          billingContactName: newBillingContact ? getContactDisplayName(newBillingContact) : '',
+          billingContactEmail: newBillingContact ? (newBillingContact.email || '') : '',
           servicesJson: JSON.stringify(currentEstimate.services.map(svc => ({
             name: svc.proposalName || svc.name || '',
             category: svc.category || '',
@@ -12078,6 +12116,7 @@ async function finalizeWorkTicket(finalizeBtn, linkedContact) {
 
     // Step 3: Create contract
     const depositAmount = wt.collectDeposit ? Math.round(projectTotal * wt.depositPercent / 100 * 100) / 100 : 0;
+    const wtBillingContact = currentEstimate.propertyId ? resolveContactByRole(currentEstimate.propertyId, 'Billing Contact', 'Owner') : null;
 
     const contractResult = await fetch(GOOGLE_SHEETS_URL, {
       method: 'POST',
@@ -12095,9 +12134,11 @@ async function finalizeWorkTicket(finalizeBtn, linkedContact) {
         contractValue: Math.round(projectTotal * 100) / 100,
         ccFeePercent: 0,
         ccGrossUp: false,
-        contactName: linkedContact ? ((linkedContact.firstName || '') + ' ' + (linkedContact.lastName || '')).trim() : '',
+        contactName: linkedContact ? getContactDisplayName(linkedContact) : '',
         contactEmail: linkedContact ? (linkedContact.email || '') : '',
         billingAddress: linkedContact ? (linkedContact.billingAddress || '') : '',
+        billingContactName: wtBillingContact ? getContactDisplayName(wtBillingContact) : '',
+        billingContactEmail: wtBillingContact ? (wtBillingContact.email || '') : '',
         jobType: 'work_ticket',
         scheduleType: wt.scheduleType,
         projectName: wt.projectName || '',
@@ -12274,7 +12315,7 @@ async function generateContractPdf() {
       companyWebsite: 'endurancefl.com',
       companyCity: 'Orlando, FL',
       // Customer
-      customerName: ct ? ((ct.firstName || '') + ' ' + (ct.lastName || '')).trim() : '',
+      customerName: ct ? getContactDisplayName(ct) : '',
       customerCompany: ct ? (ct.company || '') : '',
       billingAddress: ct ? (ct.billingAddress || '') : '',
       propertyAddress: currentEstimate.propertyAddress || '',
