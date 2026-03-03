@@ -4612,7 +4612,7 @@ function deleteProperty(data) {
 //  PROPERTY CONTACTS (Junction Table)
 // ═══════════════════════════════════════════════════════════════
 
-var PROPERTY_CONTACTS_HEADERS = ['linkId', 'propertyId', 'contactId', 'role', 'createdAt'];
+var PROPERTY_CONTACTS_HEADERS = ['linkId', 'propertyId', 'contactId', 'role', 'createdAt', 'isPrimary'];
 
 function ensurePropertyContactsSheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -4621,6 +4621,15 @@ function ensurePropertyContactsSheet() {
     sheet = ss.insertSheet('PropertyContacts');
     sheet.getRange(1, 1, 1, PROPERTY_CONTACTS_HEADERS.length).setValues([PROPERTY_CONTACTS_HEADERS]);
     sheet.getRange(1, 1, 1, PROPERTY_CONTACTS_HEADERS.length).setFontWeight('bold');
+  } else {
+    // Migration: add new columns if missing (e.g., isPrimary)
+    var existingHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var newCols = PROPERTY_CONTACTS_HEADERS.filter(function(h) { return existingHeaders.indexOf(h) === -1; });
+    if (newCols.length > 0) {
+      var startCol = existingHeaders.length + 1;
+      sheet.getRange(1, startCol, 1, newCols.length).setValues([newCols]);
+      sheet.getRange(1, startCol, 1, newCols.length).setFontWeight('bold');
+    }
   }
   return sheet;
 }
@@ -4650,7 +4659,8 @@ function linkContactToProperty(data) {
     data.propertyId || '',
     data.contactId || '',
     data.role || 'Owner',
-    now
+    now,
+    data.isPrimary || ''
   ]);
   return { success: true, linkId: linkId };
 }

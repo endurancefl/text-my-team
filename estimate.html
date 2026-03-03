@@ -2494,13 +2494,20 @@
         <div id="contact-linker-results" style="margin-top: 12px; max-height: 240px; overflow-y: auto;"></div>
         <div class="form-group" style="margin-top: 16px;">
           <label class="form-label">Role</label>
-          <select class="form-select" id="contact-linker-role">
+          <select class="form-select" id="contact-linker-role" onchange="toggleLinkerPrimary()">
             <option value="Owner">Owner</option>
+            <option value="Co-Owner">Co-Owner</option>
             <option value="Property Manager">Property Manager</option>
             <option value="Billing Contact">Billing Contact</option>
             <option value="Tenant">Tenant</option>
             <option value="Other">Other</option>
           </select>
+        </div>
+        <div class="form-group" id="contact-linker-primary-group" style="margin-top: 12px; display: none;">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" id="contact-linker-primary" checked>
+            <span class="form-label" style="margin: 0;">Primary contact (billing & contract signing)</span>
+          </label>
         </div>
       </div>
       <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; padding: 16px 24px; border-top: 1px solid var(--gw-divider);">
@@ -7176,10 +7183,25 @@ function resolveContactByRole(propertyId, preferredRole, fallbackRole) {
   const links = (propertyContacts || []).filter(l => l.propertyId === propertyId);
   if (links.length === 0) return null;
 
+  // Exact role match
   const preferred = links.find(l => l.role === preferredRole);
   if (preferred) {
     const c = contacts.find(c => c.contactId === preferred.contactId);
     if (c) return c;
+  }
+
+  // Co-Owner fallback when looking for Owner: primary Co-Owner first, then any Co-Owner
+  if (preferredRole === 'Owner') {
+    const primaryCoOwner = links.find(l => l.role === 'Co-Owner' && l.isPrimary === 'Yes');
+    if (primaryCoOwner) {
+      const c = contacts.find(c => c.contactId === primaryCoOwner.contactId);
+      if (c) return c;
+    }
+    const anyCoOwner = links.find(l => l.role === 'Co-Owner');
+    if (anyCoOwner) {
+      const c = contacts.find(c => c.contactId === anyCoOwner.contactId);
+      if (c) return c;
+    }
   }
 
   if (fallbackRole && fallbackRole !== preferredRole) {
@@ -7187,6 +7209,19 @@ function resolveContactByRole(propertyId, preferredRole, fallbackRole) {
     if (fb) {
       const c = contacts.find(c => c.contactId === fb.contactId);
       if (c) return c;
+    }
+    // Co-Owner fallback for fallbackRole === 'Owner' too
+    if (fallbackRole === 'Owner') {
+      const primaryCoOwner = links.find(l => l.role === 'Co-Owner' && l.isPrimary === 'Yes');
+      if (primaryCoOwner) {
+        const c = contacts.find(c => c.contactId === primaryCoOwner.contactId);
+        if (c) return c;
+      }
+      const anyCoOwner = links.find(l => l.role === 'Co-Owner');
+      if (anyCoOwner) {
+        const c = contacts.find(c => c.contactId === anyCoOwner.contactId);
+        if (c) return c;
+      }
     }
   }
 
@@ -8171,10 +8206,13 @@ function enrichPropertiesWithBidsContracts(backendProps) {
     const activeContract = p.contracts.find(c => (c.status || '').toLowerCase() === 'active');
     p.contractValue = activeContract ? (activeContract.monthlyPayment || 0) : 0;
     p.normalizedAddress = normAddr;
-    // Contact name from junction links — prefer Owner role
+    // Contact name from junction links — prefer Owner, then primary Co-Owner, then any Co-Owner
     const propLinks = (propertyContacts || []).filter(l => l.propertyId === p.propertyId);
     if (propLinks.length > 0) {
-      const ownerLink = propLinks.find(l => l.role === 'Owner') || propLinks[0];
+      const ownerLink = propLinks.find(l => l.role === 'Owner')
+        || propLinks.find(l => l.role === 'Co-Owner' && l.isPrimary === 'Yes')
+        || propLinks.find(l => l.role === 'Co-Owner')
+        || propLinks[0];
       const primaryContact = contacts.find(c => c.contactId === ownerLink.contactId);
       p.contactName = primaryContact ? getContactDisplayName(primaryContact) : '';
     } else {
@@ -8349,7 +8387,8 @@ function renderPropertyLinkedContacts() {
   links.forEach(link => {
     const contact = contacts.find(c => c.contactId === link.contactId);
     if (contact) {
-      allLinked.push({ contact, role: link.role || 'Owner', linkId: link.linkId, fromJunction: true });
+      const displayRole = (link.role === 'Co-Owner' && link.isPrimary === 'Yes') ? 'Co-Owner · Primary' : (link.role || 'Owner');
+      allLinked.push({ contact, role: displayRole, linkId: link.linkId, fromJunction: true });
     }
   });
 
@@ -8406,10 +8445,18 @@ async function unlinkContact(linkId) {
 //  CONTACT LINKER OVERLAY
 // ═══════════════════════════════════════════════════════════════
 
+function toggleLinkerPrimary() {
+  const role = document.getElementById('contact-linker-role').value;
+  const group = document.getElementById('contact-linker-primary-group');
+  group.style.display = role === 'Co-Owner' ? 'block' : 'none';
+}
+
 function openContactLinker() {
   selectedLinkerContactId = null;
   document.getElementById('contact-linker-search').value = '';
   document.getElementById('contact-linker-role').value = 'Owner';
+  document.getElementById('contact-linker-primary').checked = true;
+  document.getElementById('contact-linker-primary-group').style.display = 'none';
   document.getElementById('contact-linker-save-btn').disabled = true;
   renderContactLinkerResults();
   document.getElementById('contact-linker-modal').classList.add('active');
@@ -8469,13 +8516,16 @@ async function saveLinkFromLinker() {
   saveBtn.classList.add('btn--loading');
 
   try {
+    const role = document.getElementById('contact-linker-role').value;
+    const isPrimary = (role === 'Co-Owner' && document.getElementById('contact-linker-primary').checked) ? 'Yes' : '';
     const resp = await fetch(GOOGLE_SHEETS_URL, {
       method: 'POST',
       body: JSON.stringify({
         linkContactToProperty: true,
         propertyId: currentProperty.propertyId,
         contactId: selectedLinkerContactId,
-        role: document.getElementById('contact-linker-role').value
+        role: role,
+        isPrimary: isPrimary
       })
     });
     const result = await resp.json();
@@ -8858,10 +8908,13 @@ function onEstimatePropertySelect(propertyId) {
   populateEstimateContactPicker(); // Ensure picker is populated first
   const contactPicker = document.getElementById('estimate-contact-picker');
   if (contactPicker && !currentEstimate.contactId) {
-    // Try junction links first — prefer Owner role
+    // Try junction links first — prefer Owner, then primary Co-Owner, then any Co-Owner
     const propLinks = (propertyContacts || []).filter(l => l.propertyId === propertyId);
     if (propLinks.length > 0) {
-      const ownerLink = propLinks.find(l => l.role === 'Owner') || propLinks[0];
+      const ownerLink = propLinks.find(l => l.role === 'Owner')
+        || propLinks.find(l => l.role === 'Co-Owner' && l.isPrimary === 'Yes')
+        || propLinks.find(l => l.role === 'Co-Owner')
+        || propLinks[0];
       contactPicker.value = ownerLink.contactId;
       onEstimateContactChange(ownerLink.contactId);
     } else {
