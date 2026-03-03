@@ -835,14 +835,14 @@ function createContract(data) {
 
   if (!sheet) {
     sheet = ss.insertSheet('Contracts');
-    sheet.getRange(1, 1, 1, 20).setValues([['Contract ID', 'Bid ID', 'Property Address', 'Assigned Crew', 'Preferred Day', 'Start Date', 'End Date', 'Contract Months', 'Monthly Payment', 'Status', 'Created Date', 'Payment Terms', 'Contract Value', 'CC Fee %', 'CC Gross-Up', 'Contact Name', 'Contact Email', 'Billing Address', 'PDF URL', 'PDF File ID']]);
+    sheet.getRange(1, 1, 1, 18).setValues([['Contract ID', 'Bid ID', 'Property Address', 'Assigned Crew', 'Preferred Day', 'Start Date', 'End Date', 'Contract Months', 'Monthly Payment', 'Status', 'Created Date', 'Payment Terms', 'Contract Value', 'Contact Name', 'Contact Email', 'Billing Address', 'PDF URL', 'PDF File ID']]);
     sheet.getRange(1, 1, 1, 20).setFontWeight('bold');
   }
 
   // Ensure new columns exist on existing sheets
   var existingData = sheet.getDataRange().getValues();
   var headers = existingData[0];
-  var newCols = ['Payment Terms', 'Contract Value', 'CC Fee %', 'CC Gross-Up', 'Contact Name', 'Contact Email', 'Billing Address', 'PDF URL', 'PDF File ID', 'Job Type', 'Schedule Type', 'Project Name', 'Deposit Percent', 'Deposit Amount', 'Services JSON', 'Billing Contact Name', 'Billing Contact Email'];
+  var newCols = ['Payment Terms', 'Contract Value', 'Contact Name', 'Contact Email', 'Billing Address', 'PDF URL', 'PDF File ID', 'Job Type', 'Schedule Type', 'Project Name', 'Deposit Percent', 'Deposit Amount', 'Services JSON', 'Billing Contact Name', 'Billing Contact Email'];
   newCols.forEach(function(colName) {
     if (headers.indexOf(colName) === -1) {
       var nextCol = headers.length + 1;
@@ -869,8 +869,6 @@ function createContract(data) {
     createdDate: headers.indexOf('Created Date'),
     paymentTerms: headers.indexOf('Payment Terms'),
     contractValue: headers.indexOf('Contract Value'),
-    ccFeePercent: headers.indexOf('CC Fee %'),
-    ccGrossUp: headers.indexOf('CC Gross-Up'),
     contactName: headers.indexOf('Contact Name'),
     contactEmail: headers.indexOf('Contact Email'),
     billingAddress: headers.indexOf('Billing Address'),
@@ -916,8 +914,6 @@ function createContract(data) {
     else if (c === col.createdDate) row.push(dateStr);
     else if (c === col.paymentTerms) row.push(data.paymentTerms || 'Net 30');
     else if (c === col.contractValue) row.push(data.contractValue || 0);
-    else if (c === col.ccFeePercent) row.push(data.ccFeePercent || 0);
-    else if (c === col.ccGrossUp) row.push(data.ccGrossUp ? 'Yes' : 'No');
     else if (c === col.contactName) row.push(data.contactName || '');
     else if (c === col.contactEmail) row.push(data.contactEmail || '');
     else if (c === col.billingAddress) row.push(data.billingAddress || '');
@@ -973,8 +969,6 @@ function updateContract(data) {
         'Status': data.status || 'active',
         'Payment Terms': data.paymentTerms,
         'Contract Value': data.contractValue,
-        'CC Fee %': data.ccFeePercent,
-        'CC Gross-Up': data.ccGrossUp !== undefined ? (data.ccGrossUp ? 'Yes' : 'No') : undefined,
         'Contact Name': data.contactName,
         'Contact Email': data.contactEmail,
         'Billing Address': data.billingAddress,
@@ -1122,8 +1116,6 @@ function getContracts() {
     createdDate: headers.indexOf('Created Date'),
     paymentTerms: headers.indexOf('Payment Terms'),
     contractValue: headers.indexOf('Contract Value'),
-    ccFeePercent: headers.indexOf('CC Fee %'),
-    ccGrossUp: headers.indexOf('CC Gross-Up'),
     contactName: headers.indexOf('Contact Name'),
     contactEmail: headers.indexOf('Contact Email'),
     billingAddress: headers.indexOf('Billing Address'),
@@ -1157,8 +1149,6 @@ function getContracts() {
         createdDate: col.createdDate !== -1 ? (row[col.createdDate] || '') : '',
         paymentTerms: col.paymentTerms !== -1 ? (row[col.paymentTerms] || 'Net 30') : 'Net 30',
         contractValue: col.contractValue !== -1 ? (row[col.contractValue] || 0) : 0,
-        ccFeePercent: col.ccFeePercent !== -1 ? (row[col.ccFeePercent] || 0) : 0,
-        ccGrossUp: col.ccGrossUp !== -1 ? (row[col.ccGrossUp] === 'Yes') : false,
         contactName: col.contactName !== -1 ? (row[col.contactName] || '') : '',
         contactEmail: col.contactEmail !== -1 ? (row[col.contactEmail] || '') : '',
         billingAddress: col.billingAddress !== -1 ? (row[col.billingAddress] || '') : '',

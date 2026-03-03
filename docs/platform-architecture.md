@@ -1712,7 +1712,7 @@ Three measurement methods that can be used independently or layered together:
 - [ ] Real-time calculation engine (internal costs, markups, profit, margin)
 - [ ] Three-tier billing structure (Fixed/Billed Separately/Recommended)
 - [ ] Template save/load
-- [ ] Credit card gross-up toggle
+- [x] ~~Credit card gross-up toggle~~ (removed — CC fees handled in auto-pay setup)
 
 #### Proposals & Signing
 - [ ] PDF proposal generation (Cloud Function or API route)
@@ -2600,7 +2600,7 @@ All sheets live in one spreadsheet with one Code.gs serving both estimate.html a
 **New Sheets (Built):**
 | Sheet | Purpose |
 |-------|---------|
-| Contracts | contractId, bidId, propertyAddress, assignedCrew, preferredDay, startDate, endDate, contractMonths, monthlyPayment, status, createdDate, paymentTerms, contractValue, ccFeePercent, ccGrossUp, contactName, contactEmail, billingAddress, pdfUrl, pdfFileId, jobType, scheduleType, projectName, depositPercent, depositAmount, servicesJson, billingContactName, billingContactEmail, ticketsGenerated (updatable via `updateContract` during revision; pdfUrl/pdfFileId saved after PDF upload; billingContactName/Email resolved from PropertyContacts 'Billing Contact' role at finalize time; ticketsGenerated set to 'Yes' by `generateScheduleFromSigned()` after customer signs contract) |
+| Contracts | contractId, bidId, propertyAddress, assignedCrew, preferredDay, startDate, endDate, contractMonths, monthlyPayment, status, createdDate, paymentTerms, contractValue, contactName, contactEmail, billingAddress, pdfUrl, pdfFileId, jobType, scheduleType, projectName, depositPercent, depositAmount, servicesJson, billingContactName, billingContactEmail, ticketsGenerated (updatable via `updateContract` during revision; pdfUrl/pdfFileId saved after PDF upload; billingContactName/Email resolved from PropertyContacts 'Billing Contact' role at finalize time; ticketsGenerated set to 'Yes' by `generateScheduleFromSigned()` after customer signs contract) |
 | Scheduled Tickets | ticketId, contractId, propertyAddress, assignedCrew, eventDate, servicesJson (each service has name, estimatedHours, items[]; each item has name, hours, and optionally quantities {easy,medium,hard}, unit, complexityFactor for production rate analysis), totalEstHours, travelHours, status, completedDate, notes, completedServices (JSON array of completed service names for partial tickets), createdDate, needsReschedule (boolean — auto-set TRUE when status=skipped, cleared when rescheduled) |
 | Crew Members | name, phone, role (Leader/Member), crew (MNT Crew 1), pin (4-digit identity PIN), status (Active/Inactive) |
 | Time Entries | entryId, crew, date, entryType (day_clock/job/indirect/service), ticketId, propertyAddress, serviceName, indirectCategory, clockIn, clockOut, durationMinutes, crewMembers (JSON), memberCount, notes, createdDate, durationType (scalable/fixed — auto-upgraded column), reopened ('true'/'' — auto-upgraded column, flags entries created by reopening a completed service), estimatedHours (auto-upgraded column — service-level estimated hours from ticket, passed by crew.html on service start/reopen/split) |
