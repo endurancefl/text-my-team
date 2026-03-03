@@ -374,10 +374,9 @@
                     <label class="form-label">Property</label>
                     <div class="property-picker-wrapper">
                       <select class="form-select" id="estimate-property-picker" onchange="onEstimatePropertySelect(this.value)">
-                        <option value="">— Select property or type address —</option>
+                        <option value="">— Select property —</option>
                       </select>
                     </div>
-                    <input type="text" class="form-input" id="prop-address" placeholder="Or type address manually..." style="margin-top: 6px;">
                   </div>
                   <div class="form-group">
                     <label class="form-label">Property Type</label>
@@ -3373,9 +3372,6 @@ function resumeSavedEstimate() {
   estimateDirty = true;
 
   // Restore UI
-  if (currentEstimate.propertyAddress) {
-    document.getElementById('prop-address').value = currentEstimate.propertyAddress;
-  }
   if (currentEstimate.propertyType) {
     document.getElementById('prop-type').value = currentEstimate.propertyType;
   }
@@ -5149,7 +5145,7 @@ const MARVIN_CHAT_URL = 'https://ibjyxrp542.execute-api.us-east-1.amazonaws.com/
 
 // Field map: fieldId → { domId, path in currentEstimate, label }
 const MARVIN_FIELD_MAP = {
-  propertyAddress: { domId: 'prop-address', path: 'propertyAddress', label: 'Property Address' },
+  propertyAddress: { domId: 'estimate-property-picker', path: 'propertyAddress', label: 'Property Address' },
   propertyType:    { domId: 'prop-type', path: 'propertyType', label: 'Property Type' },
   lotSizeSF:       { domId: 'lot-size-sf', path: 'lotSizeSF', label: 'Lot Size (SF)' },
   travelPercent:   { domId: 'travel-percent', path: 'travelPercent', label: 'Travel %' },
@@ -7664,10 +7660,9 @@ function onEstimateContactChange(contactId) {
   currentEstimate.contactName = getContactDisplayName(contact);
 
   // Auto-fill property address if empty
-  const addrInput = document.getElementById('prop-address');
-  if (contact.propertyAddress && !addrInput.value.trim()) {
-    addrInput.value = contact.propertyAddress;
+  if (contact.propertyAddress && !currentEstimate.propertyAddress) {
     currentEstimate.propertyAddress = contact.propertyAddress;
+    renderEstimateHeader();
   }
 }
 
@@ -7707,7 +7702,6 @@ function startEstimateForContact() {
     if (currentContact.propertyAddress) {
       currentEstimate.propertyAddress = currentContact.propertyAddress;
     }
-    document.getElementById('prop-address').value = currentEstimate.propertyAddress || '';
     document.getElementById('prop-type').value = 'Residential';
     document.getElementById('prop-lot-size').value = '';
     document.getElementById('file-upload-zone').classList.remove('has-file');
@@ -8930,10 +8924,9 @@ function onEstimatePropertySelect(propertyId) {
   const prop = properties.find(p => p.propertyId === propertyId);
   if (!prop) return;
 
-  // Auto-fill address
+  // Auto-fill address from property record (single source of truth)
   currentEstimate.propertyAddress = prop.address;
   currentEstimate.propertyId = prop.propertyId;
-  document.getElementById('prop-address').value = prop.address;
   renderEstimateHeader();
 
   // Auto-fill property type
@@ -14510,7 +14503,6 @@ function startBlankFromPicker() {
   }
 
   // Reset UI elements
-  document.getElementById('prop-address').value = '';
   document.getElementById('prop-type').value = 'Residential';
   document.getElementById('prop-lot-size').value = '';
   document.getElementById('file-upload-zone').classList.remove('has-file');
@@ -14579,7 +14571,6 @@ async function selectTemplateAndStart() {
   estimateDirty = false;
 
   // Reset UI elements
-  document.getElementById('prop-address').value = '';
   document.getElementById('prop-type').value = 'Residential';
   document.getElementById('prop-lot-size').value = '';
   document.getElementById('file-upload-zone').classList.remove('has-file');
@@ -15596,7 +15587,6 @@ function startBlankEstimate() {
   currentTemplateId = null;
   startedFromBlank = true;
   estimateDirty = false;
-  document.getElementById('prop-address').value = '';
   document.getElementById('prop-type').value = 'Residential';
   document.getElementById('prop-lot-size').value = '';
   document.getElementById('file-upload-zone').classList.remove('has-file');
@@ -15993,8 +15983,7 @@ document.addEventListener('DOMContentLoaded', function() {
     try {
       const result = await parseAttentiveFile(file);
 
-      // Store property info
-      currentEstimate.propertyAddress = result.address;
+      // Store measurements (address comes from property picker, not Attentive)
       currentEstimate.lotSizeSF = result.lotSize;
 
       // Store raw features as read-only reference
@@ -16017,11 +16006,19 @@ document.addEventListener('DOMContentLoaded', function() {
       recalcHardscape();
 
       // Update UI
-      document.getElementById('prop-address').value = result.address;
       document.getElementById('prop-lot-size').value = result.lotSize > 0 ? result.lotSize.toLocaleString('en-US') : '';
       document.getElementById('file-upload-zone').classList.add('has-file');
       document.getElementById('file-upload-text').textContent = file.name;
       renderEstimateHeader();
+
+      // Attentive address mismatch warning
+      if (result.address && currentEstimate.propertyAddress) {
+        const attAddr = result.address.replace(/,?\s*(USA|US|United States)$/i, '').trim().toLowerCase();
+        const propAddr = currentEstimate.propertyAddress.trim().toLowerCase();
+        if (attAddr && propAddr && !attAddr.includes(propAddr) && !propAddr.includes(attAddr)) {
+          showToast(`Attentive report address "${result.address}" doesn't match selected property "${currentEstimate.propertyAddress}". Verify you uploaded the correct file.`, 'warning', 8000);
+        }
+      }
 
       // Update Property Setup tables display
       renderPropertySetupTables();
@@ -16191,13 +16188,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-  // Property inputs
-  document.getElementById('prop-address').addEventListener('input', function() {
-    currentEstimate.propertyAddress = this.value;
-    renderEstimateHeader();
-    markEstimateDirty();
-  });
-
+  // Property inputs (address comes from property picker — no manual input listener needed)
   document.getElementById('prop-type').addEventListener('change', function() {
     currentEstimate.propertyType = this.value;
     renderTableBody();
