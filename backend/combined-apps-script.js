@@ -5041,7 +5041,7 @@ function getRemindersForCrew(crewName, dateStr) {
 // ═══════════════════════════════════════════════════════════════
 
 function ensureSigningColumns(sheet, headers) {
-  var needed = ['signingToken', 'signingStatus', 'signedName', 'signedAt', 'signedIP', 'signedUserAgent', 'signedPdfUrl', 'signedPdfFileId', 'consentText', 'pdfHash'];
+  var needed = ['signingToken', 'signingStatus', 'signedName', 'signedAt', 'signedIP', 'signedUserAgent', 'signedPdfUrl', 'signedPdfFileId', 'consentText', 'pdfHash', 'companySigner', 'companySignedAt', 'companySignedIP'];
   needed.forEach(function(col) {
     if (headers.indexOf(col) < 0) {
       var lastCol = sheet.getLastColumn();
@@ -5052,6 +5052,7 @@ function ensureSigningColumns(sheet, headers) {
 }
 
 function sendContractForSigning(data) {
+  var LAMBDA_URL = 'https://ibjyxrp542.execute-api.us-east-1.amazonaws.com/prod/generate_site_report';
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('Contracts');
   if (!sheet) return { success: false, error: 'Contracts sheet not found' };
@@ -5085,10 +5086,147 @@ function sendContractForSigning(data) {
   var email = data.contactEmail || contract['Contact Email'];
   if (!email) return { success: false, error: 'No email address on contact' };
 
-  // Generate signing token
-  var token = Utilities.getUuid();
+  var contractId = contract['Contract ID'] || '';
+  var propertyAddr = contract['Property Address'] || '';
+  var contactName = contract['Contact Name'] || '';
+  var monthly = parseFloat(contract['Monthly Payment']) || 0;
+  var contractValue = parseFloat(contract['Contract Value']) || 0;
+  var startDate = contract['Start Date'] || '';
+  var endDate = contract['End Date'] || '';
+  var paymentTerms = contract['Payment Terms'] || 'Net 30';
+  var bidId = contract['Bid ID'] || '';
+  var billingAddress = contract['Billing Address'] || '';
+  var companySignedAt = new Date().toISOString();
 
-  // Store token and set status
+  // Look up bid JSON for services, termsAndConditionsHtml, propertyType
+  var services = [];
+  var termsAndConditionsHtml = null;
+  var propertyType = 'residential';
+  var customerCompany = '';
+
+  if (bidId) {
+    try {
+      var bidSheet = ss.getSheetByName('Bids');
+      if (bidSheet) {
+        var bidData = bidSheet.getDataRange().getValues();
+        var bidHeaders = bidData[0];
+        var bidIdCol = bidHeaders.indexOf('bidId');
+        var jsonCol = bidHeaders.indexOf('json');
+        for (var b = 1; b < bidData.length; b++) {
+          if (String(bidData[b][bidIdCol]) === String(bidId) && bidData[b][jsonCol]) {
+            var bidJson = JSON.parse(bidData[b][jsonCol]);
+            propertyType = bidJson.propertyType || 'residential';
+
+            var sections = bidJson.sections || [];
+            for (var s = 0; s < sections.length; s++) {
+              var sec = sections[s];
+              services.push({
+                name: sec.sectionName || sec.name || '',
+                frequency: sec.frequency || '',
+                annualTotal: sec.annualTotal || 0,
+                description: sec.description || '',
+                billingTier: sec.billingTier || 'fixed'
+              });
+            }
+
+            if (bidJson.contract && bidJson.contract.termsAndConditionsHtml) {
+              termsAndConditionsHtml = bidJson.contract.termsAndConditionsHtml;
+            }
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      Logger.log('sendContractForSigning: Error loading bid data: ' + e);
+    }
+  }
+
+  // Build Lambda metadata with company signature (no customer signature yet)
+  var metadata = {
+    type: 'contract',
+    renderer: 'weasyprint',
+    propertyType: propertyType,
+    companyName: 'Endurance Services',
+    companyPhone: '(407) 579-4403',
+    companyWebsite: 'endurancefl.com',
+    companyCity: 'Orlando, FL',
+    contractId: contractId,
+    customerName: contactName,
+    customerCompany: customerCompany,
+    billingAddress: billingAddress,
+    propertyAddress: propertyAddr,
+    generatedDate: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+    startDate: startDate,
+    endDate: endDate,
+    monthlyPayment: monthly,
+    contractValue: contractValue,
+    paymentTerms: paymentTerms,
+    services: services,
+    companySigner: 'Jack McMahon',
+    companySignedAt: companySignedAt
+  };
+
+  if (termsAndConditionsHtml) {
+    metadata.termsAndConditionsHtml = termsAndConditionsHtml;
+  }
+
+  // POST to Lambda to regenerate PDF with company signature
+  var lambdaResp = UrlFetchApp.fetch(LAMBDA_URL, {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify({ metadata: JSON.stringify(metadata) }),
+    muteHttpExceptions: true
+  });
+
+  var respCode = lambdaResp.getResponseCode();
+  if (respCode !== 200) {
+    return { success: false, error: 'PDF generation failed (' + respCode + ')' };
+  }
+
+  // Handle response — could be direct PDF blob or JSON with downloadUrl
+  var contentType = lambdaResp.getHeaders()['Content-Type'] || '';
+  var pdfBlob;
+
+  if (contentType.indexOf('application/pdf') !== -1) {
+    pdfBlob = lambdaResp.getBlob().setName(contractId + '-contract.pdf');
+  } else {
+    var respJson = JSON.parse(lambdaResp.getContentText());
+    if (respJson.downloadUrl) {
+      var dlResp = UrlFetchApp.fetch(respJson.downloadUrl, { muteHttpExceptions: true });
+      pdfBlob = dlResp.getBlob().setName(contractId + '-contract.pdf');
+    } else {
+      return { success: false, error: 'Unexpected PDF response format' };
+    }
+  }
+
+  // Upload new PDF to Drive, overwrite PDF URL and PDF File ID
+  var folder = getPropertyFolder(propertyAddr, 'Contracts');
+  var file = folder.createFile(pdfBlob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+  var pdfUrlCol = headers.indexOf('PDF URL');
+  var pdfFileIdCol = headers.indexOf('PDF File ID');
+  if (pdfUrlCol >= 0) sheet.getRange(contractRow, pdfUrlCol + 1).setValue(file.getUrl());
+  if (pdfFileIdCol >= 0) sheet.getRange(contractRow, pdfFileIdCol + 1).setValue(file.getId());
+
+  // Compute SHA-256 hash of the PDF blob
+  var pdfBytes = pdfBlob.getBytes();
+  var rawHash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, pdfBytes);
+  var pdfHash = 'SHA-256:' + rawHash.map(function(b) { return ('0' + (b < 0 ? b + 256 : b).toString(16)).slice(-2); }).join('');
+
+  var pdfHashCol = headers.indexOf('pdfHash');
+  if (pdfHashCol >= 0) sheet.getRange(contractRow, pdfHashCol + 1).setValue(pdfHash);
+
+  // Store company signer info
+  var companySignerCol = headers.indexOf('companySigner');
+  var companySignedAtCol = headers.indexOf('companySignedAt');
+  var companySignedIPCol = headers.indexOf('companySignedIP');
+  if (companySignerCol >= 0) sheet.getRange(contractRow, companySignerCol + 1).setValue('Jack McMahon');
+  if (companySignedAtCol >= 0) sheet.getRange(contractRow, companySignedAtCol + 1).setValue(companySignedAt);
+  if (companySignedIPCol >= 0) sheet.getRange(contractRow, companySignedIPCol + 1).setValue(data.companySignedIP || '');
+
+  // Generate signing token and set status
+  var token = Utilities.getUuid();
   var tokenCol = headers.indexOf('signingToken');
   var statusCol = headers.indexOf('signingStatus');
   if (tokenCol >= 0) sheet.getRange(contractRow, tokenCol + 1).setValue(token);
@@ -5098,12 +5236,6 @@ function sendContractForSigning(data) {
   var signingUrl = 'https://endurancefl.github.io/text-my-team/sign.html?token=' + token;
 
   // Build email
-  var propertyAddr = contract['Property Address'] || '';
-  var contactName = contract['Contact Name'] || '';
-  var monthly = parseFloat(contract['Monthly Payment']) || 0;
-  var contractValue = parseFloat(contract['Contract Value']) || 0;
-  var contractId = contract['Contract ID'] || '';
-
   var subject = 'Contract ' + contractId + ' — Ready for Signature';
   var body = '<div style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;max-width:600px;margin:0 auto;">' +
     '<div style="background:#1a2e24;padding:24px 32px;border-radius:8px 8px 0 0;">' +
@@ -5128,23 +5260,13 @@ function sendContractForSigning(data) {
     '</div>' +
     '</div>';
 
-  // Attach contract PDF if available
-  var emailOptions = {
+  // Send email with new PDF attached
+  MailApp.sendEmail({
     to: email,
     subject: subject,
-    htmlBody: body
-  };
-
-  var pdfFileId = contract['PDF File ID'] || '';
-  if (pdfFileId) {
-    try {
-      emailOptions.attachments = [DriveApp.getFileById(pdfFileId).getBlob()];
-    } catch (e) {
-      Logger.log('Could not attach PDF: ' + e);
-    }
-  }
-
-  MailApp.sendEmail(emailOptions);
+    htmlBody: body,
+    attachments: [pdfBlob]
+  });
 
   return { success: true, token: token };
 }
@@ -5200,8 +5322,24 @@ function getContractForSigning(token) {
         }
       }
 
+      // Verify PDF hash integrity
+      var hashMismatch = false;
+      var storedHash = contract['pdfHash'] || '';
+      var pdfFileId = contract['PDF File ID'] || '';
+      if (storedHash && pdfFileId) {
+        try {
+          var pdfFile = DriveApp.getFileById(String(pdfFileId));
+          var pdfBytes = pdfFile.getBlob().getBytes();
+          var rawHash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, pdfBytes);
+          var computedHash = 'SHA-256:' + rawHash.map(function(b) { return ('0' + (b < 0 ? b + 256 : b).toString(16)).slice(-2); }).join('');
+          hashMismatch = (computedHash !== storedHash);
+        } catch (e) {
+          Logger.log('Hash verification error: ' + e);
+        }
+      }
+
       // Return only customer-safe data
-      return {
+      var result = {
         success: true,
         contractId: contract['Contract ID'] || '',
         companyName: 'Endurance Services',
@@ -5213,9 +5351,11 @@ function getContractForSigning(token) {
         startDate: contract['Start Date'] || '',
         endDate: contract['End Date'] || '',
         paymentTerms: contract['Payment Terms'] || 'Net 30',
-        pdfFileId: contract['PDF File ID'] || '',
+        pdfFileId: pdfFileId,
         signingStatus: contract['signingStatus'] || ''
       };
+      if (hashMismatch) result.hashMismatch = true;
+      return result;
     }
   }
 
@@ -5263,7 +5403,7 @@ function recordSignature(data) {
 
       // Compute SHA-256 hash of the contract PDF at signing time
       if (cols.pdfHash >= 0) {
-        var pdfFileIdCol = headers.indexOf('pdfFileId');
+        var pdfFileIdCol = headers.indexOf('PDF File ID');
         var pdfFileId = pdfFileIdCol >= 0 ? allData[i][pdfFileIdCol] : '';
         if (pdfFileId) {
           try {

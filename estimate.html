@@ -18601,13 +18601,21 @@ async function sendContractForSigning() {
   if (!confirm(`Send contract to ${email} for signature?`)) return;
 
   try {
-    showToast('Sending contract...', 'info', 8000);
+    // Capture company signer's IP (best-effort)
+    let companySignedIP = '';
+    try {
+      const ipResp = await fetch('https://api.ipify.org?format=json');
+      companySignedIP = (await ipResp.json()).ip || '';
+    } catch(e) {}
+
+    showToast('Sending contract...', 'info', 20000);
     const resp = await fetch(GOOGLE_SHEETS_URL, {
       method: 'POST',
       body: JSON.stringify({
         sendContractForSigning: true,
         contractId: currentEstimate.contractId,
-        contactEmail: email
+        contactEmail: email,
+        companySignedIP: companySignedIP
       })
     });
     const result = await resp.json();

@@ -496,6 +496,15 @@ async function init() {
       return;
     }
 
+    // PDF integrity check
+    if (data.hashMismatch) {
+      document.getElementById('error-message').textContent =
+        'This contract document has been modified since it was sent. ' +
+        'Please contact Endurance Services at (407) 579-4403 for assistance.';
+      showState('error');
+      return;
+    }
+
     // View tracking is handled server-side via getContractForSigning access logs
 
     renderContract(data);

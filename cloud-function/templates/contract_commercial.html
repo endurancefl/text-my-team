@@ -7,9 +7,14 @@
 <link rel="stylesheet" href="{{ css_url('contract.css') }}">
 {% endblock %}
 
+{% block running_header_content %}
+<div class="running-header">Endurance Services | {{ info_items[2][1] if info_items|length > 2 else '' }}</div>
+{% endblock %}
+
 {% block content %}
 {# ═══════════ PAGE 1: Cover Page ═══════════ #}
-<div class="contract-header">
+<div class="cover-page">
+<div class="contract-header" style="bookmark-level: 1; bookmark-label: 'Cover Page';">
   <div class="logo">
     {% if logo_uri %}
     <img src="{{ logo_uri }}" alt="Logo">
@@ -34,13 +39,14 @@
 {% if service_map_uri %}
 <img src="{{ service_map_uri }}" alt="Service Map" class="service-map">
 {% endif %}
+</div>
 
 {# ═══════════ PAGE 2: Services Tables ═══════════ #}
 <div class="page-break"></div>
 
 {# Fixed Payment Services #}
 {% if fixed_services %}
-<div class="gray-header-bar">Fixed Payment Services</div>
+<div class="gray-header-bar" style="bookmark-level: 1; bookmark-label: 'Services';">Fixed Payment Services</div>
 <table class="commercial-services-table">
   <thead>
     <tr>
@@ -152,7 +158,7 @@
 {# ═══════════ PAGE 3: Payment Schedule ═══════════ #}
 <div class="page-break"></div>
 
-<div class="gray-header-bar">Payment Schedule (Fixed Payment Services Only)</div>
+<div class="gray-header-bar" style="bookmark-level: 1; bookmark-label: 'Payment Schedule';">Payment Schedule (Fixed Payment Services Only)</div>
 <table class="payment-table">
   <thead>
     <tr>
@@ -184,7 +190,7 @@
 {# ═══════════ PAGE 4: Description of Services ═══════════ #}
 <div class="page-break"></div>
 
-<div class="gray-header-bar">Description of Services</div>
+<div class="gray-header-bar" style="bookmark-level: 1; bookmark-label: 'Description of Services';">Description of Services</div>
 
 {% if has_rich_desc %}
 <div class="rich-text-content">
@@ -208,8 +214,8 @@
 {# ═══════════ PAGE 5: Terms & Conditions ═══════════ #}
 <div class="page-break"></div>
 
-<div class="gray-header-bar">Terms and Conditions</div>
-<div class="terms-effective" style="margin-top: 6px;">Effective Date: {{ effective_date }}</div>
+<div class="gray-header-bar" style="bookmark-level: 1; bookmark-label: 'Terms and Conditions';">Terms and Conditions</div>
+<div class="terms-effective" style="margin-top: 6px;">Effective Date: {{ effective_date | format_date }}</div>
 <hr class="terms-divider">
 
 {% if custom_terms_html %}
@@ -234,16 +240,23 @@
 {% endif %}
 
 {# ═══════════ PAGE 6: Signature Page ═══════════ #}
-<div class="commercial-signature-section">
+<div class="commercial-signature-section" style="bookmark-level: 1; bookmark-label: 'Signature';">
   <div class="signature-title">Signature Section</div>
   <hr class="signature-divider">
   <div class="signature-grid">
     <div class="signature-col">
       <div class="sig-by-label">By</div>
+      {% if company_signer %}
+      <div class="signature-typed">{{ company_signer }}</div>
+      {% endif %}
       <div class="sig-line"></div>
       <div class="sig-name">Jack McMahon</div>
       <div class="sig-company">{{ company_name }}</div>
-      <div class="sig-date">Date: {{ generated_date }}</div>
+      {% if company_signed_at %}
+      <div class="sig-date">Signed: {{ company_signed_at }}</div>
+      {% else %}
+      <div class="sig-date">Date: {{ generated_date | format_date }}</div>
+      {% endif %}
     </div>
     <div class="signature-col">
       <div class="sig-by-label">By</div>
@@ -256,7 +269,7 @@
       {% if signed_at %}
       <div class="sig-date">Signed: {{ signed_at }}</div>
       {% else %}
-      <div class="sig-date">Date: {{ generated_date }}</div>
+      <div class="sig-date">Date: {{ generated_date | format_date }}</div>
       {% endif %}
     </div>
   </div>

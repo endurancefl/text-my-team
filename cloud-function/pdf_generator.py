@@ -26,6 +26,17 @@ def _format_signed_at(iso_str):
     except Exception:
         return iso_str
 
+
+def _format_date(iso_str):
+    """Convert ISO date string (2026-04-01) to '1 APR 2026'."""
+    if not iso_str:
+        return ""
+    try:
+        dt = datetime.strptime(str(iso_str).strip(), "%Y-%m-%d")
+        return f"{dt.day} {dt.strftime('%b').upper()} {dt.year}"
+    except Exception:
+        return str(iso_str)
+
 # Re-export CORS helpers from main.py so lambda_function.py can import from either module
 from main import (
     ALLOWED_ORIGINS,
@@ -44,7 +55,19 @@ ASSETS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
 
 FOOTER_TEXT = "(407) 579-4403  |  endurancefl.com  |  Orlando, FL"
 
+def _format_month(iso_str):
+    """Convert ISO date string (2026-02-01) to 'FEB 2026'."""
+    if not iso_str:
+        return ""
+    try:
+        dt = datetime.strptime(str(iso_str).strip(), "%Y-%m-%d")
+        return f"{dt.strftime('%b').upper()} {dt.year}"
+    except Exception:
+        return str(iso_str)
+
 _env = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
+_env.filters['format_date'] = _format_date
+_env.filters['format_month'] = _format_month
 
 
 def _css_url(filename):
@@ -78,6 +101,8 @@ def _render_pdf(template_name, context):
     # Add global template helpers
     context["footer_text"] = FOOTER_TEXT
     context["css_url"] = _css_url
+    if "logo_uri" not in context:
+        context["logo_uri"] = _logo_data_uri()
 
     template = _env.get_template(template_name)
     html_string = template.render(**context)
@@ -92,6 +117,8 @@ def render_html(template_name, context):
     """Render a Jinja2 template to an HTML string (for browser preview)."""
     context["footer_text"] = FOOTER_TEXT
     context["css_url"] = _css_url
+    if "logo_uri" not in context:
+        context["logo_uri"] = _logo_data_uri()
 
     template = _env.get_template(template_name)
     return template.render(**context)
@@ -275,6 +302,7 @@ def _generate_residential_contract(metadata):
 
     context = {
         "company_name": metadata.get("companyName", "Endurance Services"),
+        "logo_uri": _logo_data_uri(),
         "contract_id": metadata.get("contractId", ""),
         "generated_date": metadata.get("generatedDate", ""),
         "monthly_payment": metadata.get("monthlyPayment", 0),
@@ -294,6 +322,8 @@ def _generate_residential_contract(metadata):
         "clauses": clause_list,
         "signed_name": metadata.get("signedName", ""),
         "signed_at": _format_signed_at(metadata.get("signedAt", "")),
+        "company_signer": metadata.get("companySigner", ""),
+        "company_signed_at": _format_signed_at(metadata.get("companySignedAt", "")),
     }
 
     pdf_bytes = _render_pdf("contract_residential.html", context)
@@ -401,6 +431,8 @@ def _generate_commercial_contract(metadata, service_map_buffer=None):
         "contract_id": contract_id,
         "signed_name": metadata.get("signedName", ""),
         "signed_at": _format_signed_at(metadata.get("signedAt", "")),
+        "company_signer": metadata.get("companySigner", ""),
+        "company_signed_at": _format_signed_at(metadata.get("companySignedAt", "")),
     }
 
     pdf_bytes = _render_pdf("contract_commercial.html", context)

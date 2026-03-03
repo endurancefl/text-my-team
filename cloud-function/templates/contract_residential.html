@@ -7,10 +7,21 @@
 <link rel="stylesheet" href="{{ css_url('contract.css') }}">
 {% endblock %}
 
+{% block running_header_content %}
+<div class="running-header">Endurance Services | {{ property_address }}</div>
+{% endblock %}
+
 {% block content %}
 {# ═══════════ PAGE 1: Quote Page ═══════════ #}
+<div class="cover-page">
 <div class="contract-header">
-  <div class="company-name">{{ company_name }}</div>
+  <div class="logo">
+    {% if logo_uri %}
+    <img src="{{ logo_uri }}" alt="Endurance Services">
+    {% else %}
+    <div class="company-name">{{ company_name }}</div>
+    {% endif %}
+  </div>
   <div class="contract-info-box">
     <div class="info-box-header">
       <span class="info-box-header-label">Quote #{{ contract_id }}</span>
@@ -47,11 +58,9 @@
 <table class="services-table">
   <thead>
     <tr>
-      <th style="width: 22%">Product/Service</th>
-      <th style="width: 38%">Description</th>
-      <th style="width: 8%" class="right">Qty.</th>
-      <th style="width: 16%" class="right">Unit Price</th>
-      <th style="width: 16%" class="right">Total</th>
+      <th style="width: 40%">Product/Service</th>
+      <th style="width: 40%">Description</th>
+      <th style="width: 20%" class="right">Total</th>
     </tr>
   </thead>
   <tbody>
@@ -59,8 +68,6 @@
     <tr>
       <td>{{ svc.name }}</td>
       <td></td>
-      <td class="right">{{ svc.frequency }}</td>
-      <td class="right">${{ "{:,.2f}".format(svc.costPerOccurrence) }}</td>
       <td class="right">${{ "{:,.2f}".format(svc.annualTotal) }}</td>
     </tr>
     {% endfor %}
@@ -75,11 +82,12 @@
 </div>
 
 <div class="valid-note">This quote is valid for the next 30 days, after which values may be subject to change.</div>
+</div>
 
 {# ═══════════ PAGE 2: Description of Services ═══════════ #}
 <div class="page-break"></div>
 
-<div class="svc-desc-title">{{ primary_service_name }}</div>
+<h2 class="svc-desc-title" style="bookmark-level: 1; bookmark-label: 'Description of Services';">{{ primary_service_name }}</h2>
 <div class="svc-desc-subtitle">Description of Services</div>
 
 {% if has_rich_desc %}
@@ -104,8 +112,8 @@
 {# ═══════════ PAGE 3: Terms & Conditions + Signatures ═══════════ #}
 <div class="page-break"></div>
 
-<div class="terms-title">Terms and Conditions</div>
-<div class="terms-effective"><strong>Effective Date:</strong> {{ effective_date }}</div>
+<h2 class="terms-title" style="bookmark-level: 1; bookmark-label: 'Terms and Conditions';">Terms and Conditions</h2>
+<div class="terms-effective"><strong>Effective Date:</strong> {{ effective_date | format_date }}</div>
 
 {% if custom_terms_html %}
 <div class="rich-text-content">
@@ -136,10 +144,17 @@
   <hr class="signature-divider">
   <div class="signature-grid">
     <div class="signature-col">
+      {% if company_signer %}
+      <div class="signature-typed">{{ company_signer }}</div>
+      {% endif %}
       <div class="sig-line"></div>
       <div class="sig-name">Jack McMahon</div>
       <div class="sig-company">{{ company_name }}</div>
-      <div class="sig-date">Date: {{ generated_date }}</div>
+      {% if company_signed_at %}
+      <div class="sig-date">Signed: {{ company_signed_at }}</div>
+      {% else %}
+      <div class="sig-date">Date: {{ generated_date | format_date }}</div>
+      {% endif %}
     </div>
     <div class="signature-col">
       {% if signed_name %}
@@ -151,7 +166,7 @@
       {% if signed_at %}
       <div class="sig-date">Signed: {{ signed_at }}</div>
       {% else %}
-      <div class="sig-date">Date: {{ generated_date }}</div>
+      <div class="sig-date">Date: {{ generated_date | format_date }}</div>
       {% endif %}
     </div>
   </div>
