@@ -6813,7 +6813,7 @@ select option:checked {
   font-size: 13px;
   line-height: 1.5;
   word-wrap: break-word;
-  white-space: pre-wrap;
+  white-space: normal;
 }
 .marvin-msg.user .marvin-msg-bubble {
   background: var(--blue-primary);

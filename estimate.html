@@ -5162,9 +5162,11 @@ function formatMarvinText(text) {
   html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
   // Numbered lists: lines starting with 1. 2. etc.
   html = html.replace(/^\d+\.\s+(.+)$/gm, '<li>$1</li>');
-  // Line breaks for remaining newlines (not inside lists)
-  html = html.replace(/\n/g, '<br>');
-  // Clean up double breaks inside lists
+  // Paragraph breaks: double newlines → <br><br>
+  html = html.replace(/\n\n+/g, '<br><br>');
+  // Single newlines: collapse to space (let text reflow naturally)
+  html = html.replace(/\n/g, ' ');
+  // Clean up breaks inside lists
   html = html.replace(/<br><\/li>/g, '</li>');
   html = html.replace(/<\/ul><br>/g, '</ul>');
   return html;
