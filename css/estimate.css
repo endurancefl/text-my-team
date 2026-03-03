@@ -1897,7 +1897,17 @@ body {
 .property-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 12px 16px;
+  gap: 16px 24px;
+}
+.property-grid .form-group {
+  margin-bottom: 0;
+  min-width: 0;
+}
+.property-grid .form-select,
+.property-grid select,
+.property-grid .form-input {
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* Form elements — 32px inputs, 4px label gap */
@@ -5896,9 +5906,12 @@ select option:checked {
   display: flex;
   gap: 8px;
   align-items: center;
+  min-width: 0;
 }
 .property-picker-wrapper select {
   flex: 1;
+  min-width: 0;
+  width: 100%;
 }
 
 /* Division badge for project history — uses base .division-badge from line ~1135 */
