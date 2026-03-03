@@ -836,7 +836,7 @@ function createContract(data) {
   // Ensure new columns exist on existing sheets
   var existingData = sheet.getDataRange().getValues();
   var headers = existingData[0];
-  var newCols = ['Payment Terms', 'Contract Value', 'CC Fee %', 'CC Gross-Up', 'Contact Name', 'Contact Email', 'Billing Address', 'PDF URL', 'PDF File ID', 'Job Type', 'Schedule Type', 'Project Name', 'Deposit Percent', 'Deposit Amount'];
+  var newCols = ['Payment Terms', 'Contract Value', 'CC Fee %', 'CC Gross-Up', 'Contact Name', 'Contact Email', 'Billing Address', 'PDF URL', 'PDF File ID', 'Job Type', 'Schedule Type', 'Project Name', 'Deposit Percent', 'Deposit Amount', 'Services JSON'];
   newCols.forEach(function(colName) {
     if (headers.indexOf(colName) === -1) {
       var nextCol = headers.length + 1;
@@ -874,7 +874,8 @@ function createContract(data) {
     scheduleType: headers.indexOf('Schedule Type'),
     projectName: headers.indexOf('Project Name'),
     depositPercent: headers.indexOf('Deposit Percent'),
-    depositAmount: headers.indexOf('Deposit Amount')
+    depositAmount: headers.indexOf('Deposit Amount'),
+    servicesJson: headers.indexOf('Services JSON')
   };
 
   var idCol = col.contractId !== -1 ? col.contractId : 0;
@@ -919,6 +920,7 @@ function createContract(data) {
     else if (c === col.projectName) row.push(data.projectName || '');
     else if (c === col.depositPercent) row.push(data.depositPercent || 0);
     else if (c === col.depositAmount) row.push(data.depositAmount || 0);
+    else if (c === col.servicesJson) row.push(data.servicesJson || '');
     else row.push('');
   }
 
@@ -3806,6 +3808,12 @@ function generateInvoiceBatch(data) {
   var openTickets = [];
   var autoPayResults = [];
 
+  // Map service category to division label for invoice line items
+  function divisionLabel(category) {
+    var map = { 'Maintenance': 'Maintenance', 'Enhancement': 'Enhancement', 'Irrigation': 'Irrigation', 'Installation': 'Construction', 'Commercial': 'Construction' };
+    return map[category] || category || 'Maintenance';
+  }
+
   activeContracts.forEach(function(contract) {
     // Dedup: skip if already invoiced for this period
     var alreadyInvoiced = existingInvoices.some(function(inv) {
@@ -3829,12 +3837,50 @@ function generateInvoiceBatch(data) {
     // Build line items
     var lineItems = [];
     var monthly = parseFloat(contract.monthlyPayment) || 0;
-    lineItems.push({
-      description: 'Monthly Maintenance — ' + (contract.propertyAddress || ''),
-      quantity: 1,
-      rate: monthly,
-      amount: monthly
-    });
+
+    // Parse Services JSON for division-aware line items
+    var servicesRaw = contract.servicesJson || contract['Services JSON'] || '';
+    var services = [];
+    try { services = JSON.parse(servicesRaw); } catch(e) {}
+
+    // Only include fixed-payment services
+    var fixedServices = services.filter(function(s) { return (s.billingTier || 'fixed') === 'fixed'; });
+
+    if (fixedServices.length > 0) {
+      // Group annual totals by division
+      var groups = {};
+      fixedServices.forEach(function(s) {
+        var div = divisionLabel(s.category);
+        if (!groups[div]) groups[div] = 0;
+        groups[div] += (s.annualTotal || 0);
+      });
+
+      // Payment months from contract
+      var paymentMonths = parseInt(contract.contractMonths) || 12;
+
+      // Build billing month label (previous month)
+      var billingMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      var monthName = billingMonth.toLocaleDateString('en-US', { month: 'long' });
+
+      // Create one line per division
+      Object.keys(groups).forEach(function(div) {
+        var monthlyRate = Math.round(groups[div] / paymentMonths * 100) / 100;
+        lineItems.push({
+          description: monthName + ' ' + div,
+          quantity: 1,
+          rate: monthlyRate,
+          amount: monthlyRate
+        });
+      });
+    } else {
+      // Fallback: no services JSON or no fixed services — single line
+      lineItems.push({
+        description: 'Monthly Maintenance — ' + (contract.propertyAddress || ''),
+        quantity: 1,
+        rate: monthly,
+        amount: monthly
+      });
+    }
 
     var invoiceId = getNextInvoiceId(invoiceSheet);
     var nowStr = new Date().toISOString();

@@ -11842,7 +11842,13 @@ async function finalizeEstimate() {
           ccGrossUp: currentEstimate.contract.ccGrossUp || false,
           contactName: currentContact ? ((currentContact.firstName || '') + ' ' + (currentContact.lastName || '')).trim() : '',
           contactEmail: currentContact ? (currentContact.email || '') : '',
-          billingAddress: currentContact ? (currentContact.billingAddress || '') : ''
+          billingAddress: currentContact ? (currentContact.billingAddress || '') : '',
+          servicesJson: JSON.stringify(currentEstimate.services.map(svc => ({
+            name: svc.proposalName || svc.name || '',
+            category: svc.category || '',
+            billingTier: svc.billingTier || 'fixed',
+            annualTotal: svc.annualTotal || 0
+          })))
         })
       });
       const contractData = await contractResult.json();
@@ -12096,7 +12102,13 @@ async function finalizeWorkTicket(finalizeBtn, linkedContact) {
         scheduleType: wt.scheduleType,
         projectName: wt.projectName || '',
         depositPercent: wt.collectDeposit ? wt.depositPercent : 0,
-        depositAmount: depositAmount
+        depositAmount: depositAmount,
+        servicesJson: JSON.stringify(currentEstimate.services.map(svc => ({
+          name: svc.proposalName || svc.name || '',
+          category: svc.category || '',
+          billingTier: svc.billingTier || 'fixed',
+          annualTotal: svc.annualTotal || 0
+        })))
       })
     });
     const contractData = await contractResult.json();
