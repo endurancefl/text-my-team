@@ -10746,6 +10746,8 @@ async function openSavedEstimate(bidId) {
               currentEstimate.signedPdfUrl = contract.signedPdfUrl || '';
               currentEstimate.signedPdfFileId = contract.signedPdfFileId || '';
               currentEstimate.contactEmail = contract.contactEmail || '';
+              currentEstimate.ticketsGenerated = contract.ticketsGenerated || '';
+              if (!currentEstimate.assignedCrew) currentEstimate.assignedCrew = contract.assignedCrew || '';
             }
           } catch (e) { /* PDF URL load is non-critical */ }
         }
@@ -10820,6 +10822,8 @@ async function openSavedEstimate(bidId) {
             currentEstimate.signedPdfUrl = contract.signedPdfUrl || '';
             currentEstimate.signedPdfFileId = contract.signedPdfFileId || '';
             currentEstimate.contactEmail = contract.contactEmail || '';
+            currentEstimate.ticketsGenerated = contract.ticketsGenerated || '';
+            if (!currentEstimate.assignedCrew) currentEstimate.assignedCrew = contract.assignedCrew || '';
           }
         } catch (e) { /* PDF URL load is non-critical */ }
       }
@@ -11672,51 +11676,51 @@ async function finalizeEstimate() {
 
   const isRevision = !!currentEstimate.contractId;
 
-  const tickets = generateAllTickets({
-    services: currentEstimate.services,
-    startDate,
-    endDate,
-    preferredDay,
-    seasonalAnchor,
-    travelPercent
-  });
-
-  if (tickets.length === 0) {
-    showToast('No tickets could be generated. Check your service visit counts and dates.', 'error');
-    return;
-  }
-
-  // Calculate earned value and internal cost per ticket
-  const bidTotals = calculateBidTotals();
-  const allTicketHours = tickets.reduce((sum, t) => sum + (t.totalEstHours || 0) + (t.travelHours || 0), 0);
-
-  if (allTicketHours > 0) {
-    let runningEV = 0;
-    let runningIC = 0;
-
-    tickets.forEach((ticket, idx) => {
-      const ticketHours = (ticket.totalEstHours || 0) + (ticket.travelHours || 0);
-      const share = ticketHours / allTicketHours;
-
-      if (idx < tickets.length - 1) {
-        ticket.earnedValue = Math.round(bidTotals.bidTotal * share * 100) / 100;
-        ticket.internalCost = Math.round(bidTotals.internalCost * share * 100) / 100;
-        runningEV += ticket.earnedValue;
-        runningIC += ticket.internalCost;
-      } else {
-        // Last ticket gets the remainder (penny reconciliation)
-        ticket.earnedValue = Math.round((bidTotals.bidTotal - runningEV) * 100) / 100;
-        ticket.internalCost = Math.round((bidTotals.internalCost - runningIC) * 100) / 100;
-      }
-    });
-  } else {
-    tickets.forEach(ticket => {
-      ticket.earnedValue = 0;
-      ticket.internalCost = 0;
-    });
-  }
-
   if (isRevision) {
+    // Revision path needs tickets for regeneration
+    const tickets = generateAllTickets({
+      services: currentEstimate.services,
+      startDate,
+      endDate,
+      preferredDay,
+      seasonalAnchor,
+      travelPercent
+    });
+
+    if (tickets.length === 0) {
+      showToast('No tickets could be generated. Check your service visit counts and dates.', 'error');
+      return;
+    }
+
+    // Calculate earned value and internal cost per ticket
+    const bidTotals = calculateBidTotals();
+    const allTicketHours = tickets.reduce((sum, t) => sum + (t.totalEstHours || 0) + (t.travelHours || 0), 0);
+
+    if (allTicketHours > 0) {
+      let runningEV = 0;
+      let runningIC = 0;
+
+      tickets.forEach((ticket, idx) => {
+        const ticketHours = (ticket.totalEstHours || 0) + (ticket.travelHours || 0);
+        const share = ticketHours / allTicketHours;
+
+        if (idx < tickets.length - 1) {
+          ticket.earnedValue = Math.round(bidTotals.bidTotal * share * 100) / 100;
+          ticket.internalCost = Math.round(bidTotals.internalCost * share * 100) / 100;
+          runningEV += ticket.earnedValue;
+          runningIC += ticket.internalCost;
+        } else {
+          ticket.earnedValue = Math.round((bidTotals.bidTotal - runningEV) * 100) / 100;
+          ticket.internalCost = Math.round((bidTotals.internalCost - runningIC) * 100) / 100;
+        }
+      });
+    } else {
+      tickets.forEach(ticket => {
+        ticket.earnedValue = 0;
+        ticket.internalCost = 0;
+      });
+    }
+
     // ═══════════════════════════════════════════════════
     //  REVISION: Update existing contract + regenerate future tickets
     // ═══════════════════════════════════════════════════
@@ -11856,8 +11860,8 @@ async function finalizeEstimate() {
       estimateDirty = false;
 
       showToast(`Contract ${currentEstimate.contractId} updated. ${existingTicketInfo.completed} completed tickets kept, ${futureTickets.length} future tickets regenerated. (Revision #${newRevisionCount})`, 'success', 5000);
-      loadBids();
-      showView('estimates');
+      await loadBids();
+      renderEstimateHeader();
 
     } catch (err) {
       console.error('Error updating contract:', err);
@@ -11868,29 +11872,14 @@ async function finalizeEstimate() {
 
   } else {
     // ═══════════════════════════════════════════════════
-    //  FIRST-TIME FINALIZATION (existing behavior)
+    //  FIRST-TIME FINALIZATION — create contract only (tickets deferred until signed)
     // ═══════════════════════════════════════════════════
 
-    const serviceBreakdown = {};
-    const itemBreakdown = {};
-    tickets.forEach(t => {
-      t.services.forEach(s => {
-        serviceBreakdown[s.name] = (serviceBreakdown[s.name] || 0) + 1;
-        s.items.forEach(item => {
-          const key = s.name + ' → ' + item.name;
-          itemBreakdown[key] = (itemBreakdown[key] || 0) + 1;
-        });
-      });
-    });
-
-    let confirmMsg = `Ready to finalize and generate ${tickets.length} tickets.\n\n`;
+    let confirmMsg = `Ready to finalize estimate.\n\n`;
     confirmMsg += `Contract: ${startDate} to ${endDate} (${contractMonths} mo)\n`;
     confirmMsg += `Crew: ${crew || 'Unassigned'}\n`;
     confirmMsg += `Day: ${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][preferredDay]}\n\n`;
-    confirmMsg += `Services:\n`;
-    Object.entries(serviceBreakdown).forEach(([name, count]) => {
-      confirmMsg += `  ${name}: ${count} visits\n`;
-    });
+    confirmMsg += `Tickets will be generated after the contract is signed.\n`;
     confirmMsg += `\nThis will lock the estimate. Continue?`;
 
     if (!confirm(confirmMsg)) return;
@@ -11951,32 +11940,6 @@ async function finalizeEstimate() {
 
       const contractId = contractData.contractId;
 
-      const ticketPayload = tickets.map(t => ({
-        contractId: contractId,
-        propertyAddress: currentEstimate.propertyAddress,
-        assignedCrew: crew,
-        eventDate: t.eventDate,
-        services: t.services,
-        totalEstHours: t.totalEstHours,
-        travelHours: t.travelHours || 0,
-        earnedValue: t.earnedValue || 0,
-        internalCost: t.internalCost || 0
-      }));
-
-      const ticketResult = await fetch(GOOGLE_SHEETS_URL, {
-        method: 'POST',
-        body: JSON.stringify({
-          saveTickets: true,
-          tickets: ticketPayload
-        })
-      });
-      const ticketData = await ticketResult.json();
-
-      if (!ticketData.success) {
-        showToast('Contract created but error saving tickets: ' + (ticketData.error || 'Unknown'), 'error');
-        return;
-      }
-
       await fetch(GOOGLE_SHEETS_URL, {
         method: 'POST',
         body: JSON.stringify({
@@ -11995,7 +11958,7 @@ async function finalizeEstimate() {
       currentEstimate.revisionCount = 0;
       estimateDirty = false;
 
-      showToast(`Contract ${contractId} created with ${ticketData.ticketCount} tickets!`, 'success', 5000);
+      showToast(`Contract ${contractId} created. Generate a PDF to send for signature.`, 'success', 5000);
 
       // Auto-promote contact to Customer
       if (currentEstimate.contactId) {
@@ -12013,8 +11976,8 @@ async function finalizeEstimate() {
         }
       }
 
-      loadBids();
-      showView('estimates');
+      await loadBids();
+      renderEstimateHeader();
 
     } catch (err) {
       console.error('Error finalizing estimate:', err);
@@ -12282,14 +12245,141 @@ async function finalizeWorkTicket(finalizeBtn, linkedContact) {
       }
     }
 
-    loadBids();
-    showView('estimates');
+    await loadBids();
+    renderEstimateHeader();
 
   } catch (err) {
     console.error('Error finalizing work ticket:', err);
     showToast('Error creating work order. Check your connection and try again.', 'error');
   } finally {
     if (finalizeBtn) finalizeBtn.classList.remove('btn--loading');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  GENERATE SCHEDULE FROM SIGNED CONTRACT (deferred ticket creation)
+// ═══════════════════════════════════════════════════════════════
+
+async function generateScheduleFromSigned() {
+  if (!currentEstimate.contractId) return;
+
+  const contract = allContracts.find(c => c.contractId === currentEstimate.contractId);
+  if (!contract) {
+    showToast('Contract not found. Try reloading.', 'error');
+    return;
+  }
+
+  const crew = contract.assignedCrew || '';
+  const preferredDay = parseInt(contract.preferredDay) || 0;
+  const startDate = contract.startDate;
+  const contractMonths = parseInt(contract.contractMonths) || 12;
+
+  if (!startDate) {
+    showToast('Contract is missing a start date.', 'error');
+    return;
+  }
+
+  const start = new Date(startDate + 'T00:00:00');
+  const end = new Date(start);
+  end.setMonth(end.getMonth() + contractMonths);
+  end.setDate(end.getDate() - 1);
+  const endDate = end.toISOString().split('T')[0];
+
+  const seasonalAnchor = Math.max(...currentEstimate.services.map(s => s.visits || 0));
+  const travelPercent = currentEstimate.travelPercent || bidSettings.defaultTravelTime || 30;
+
+  const tickets = generateAllTickets({
+    services: currentEstimate.services,
+    startDate,
+    endDate,
+    preferredDay,
+    seasonalAnchor,
+    travelPercent
+  });
+
+  if (tickets.length === 0) {
+    showToast('No tickets generated. Check service visit counts and dates.', 'error');
+    return;
+  }
+
+  if (!confirm(`Generate ${tickets.length} tickets for this contract?\n\nContract: ${startDate} to ${endDate}\nCrew: ${crew || 'Unassigned'}\n\nContinue?`)) return;
+
+  // Calculate earned value and internal cost per ticket
+  const bidTotals = calculateBidTotals();
+  const allTicketHours = tickets.reduce((sum, t) => sum + (t.totalEstHours || 0) + (t.travelHours || 0), 0);
+
+  if (allTicketHours > 0) {
+    let runningEV = 0;
+    let runningIC = 0;
+
+    tickets.forEach((ticket, idx) => {
+      const ticketHours = (ticket.totalEstHours || 0) + (ticket.travelHours || 0);
+      const share = ticketHours / allTicketHours;
+
+      if (idx < tickets.length - 1) {
+        ticket.earnedValue = Math.round(bidTotals.bidTotal * share * 100) / 100;
+        ticket.internalCost = Math.round(bidTotals.internalCost * share * 100) / 100;
+        runningEV += ticket.earnedValue;
+        runningIC += ticket.internalCost;
+      } else {
+        ticket.earnedValue = Math.round((bidTotals.bidTotal - runningEV) * 100) / 100;
+        ticket.internalCost = Math.round((bidTotals.internalCost - runningIC) * 100) / 100;
+      }
+    });
+  } else {
+    tickets.forEach(ticket => {
+      ticket.earnedValue = 0;
+      ticket.internalCost = 0;
+    });
+  }
+
+  try {
+    // Save tickets to backend
+    const ticketPayload = tickets.map(t => ({
+      contractId: currentEstimate.contractId,
+      propertyAddress: currentEstimate.propertyAddress,
+      assignedCrew: crew,
+      eventDate: t.eventDate,
+      services: t.services,
+      totalEstHours: t.totalEstHours,
+      travelHours: t.travelHours || 0,
+      earnedValue: t.earnedValue || 0,
+      internalCost: t.internalCost || 0
+    }));
+
+    const ticketResult = await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        saveTickets: true,
+        tickets: ticketPayload
+      })
+    });
+    const ticketData = await ticketResult.json();
+
+    if (!ticketData.success) {
+      showToast('Error saving tickets: ' + (ticketData.error || 'Unknown'), 'error');
+      return;
+    }
+
+    // Mark ticketsGenerated on contract
+    await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        updateContract: true,
+        contractId: currentEstimate.contractId,
+        ticketsGenerated: 'Yes'
+      })
+    });
+
+    currentEstimate.ticketsGenerated = 'Yes';
+    // Update cached contract too
+    if (contract) contract.ticketsGenerated = 'Yes';
+
+    renderEstimateHeader();
+    showToast(`${tickets.length} tickets generated and added to schedule.`, 'success', 5000);
+  } catch (err) {
+    console.error('Error generating schedule:', err);
+    showToast('Error generating schedule. Check your connection and try again.', 'error');
   }
 }
 
@@ -12581,6 +12671,7 @@ function renderEstimateHeader() {
   const hasPdf = !!est.pdfUrl;
   const hasSignedPdf = !!est.signedPdfUrl;
   const isSigned = sigStatus === 'signed';
+  const hasTickets = !!est.ticketsGenerated;
 
   // --- Top tier: Context ---
   const displayAddress = address || 'New Estimate';
@@ -12659,6 +12750,8 @@ function renderEstimateHeader() {
       actionsHtml += `<button class="btn btn-sm btn-primary" onclick="generateContractPdf()">Generate PDF</button>`;
     } else if (!isSigned && sigStatus !== 'sent' && sigStatus !== 'viewed') {
       actionsHtml += `<button class="btn btn-sm btn-primary" onclick="sendContractForSigning()">Send Contract</button>`;
+    } else if (isSigned && !hasTickets) {
+      actionsHtml += `<button class="btn btn-sm btn-primary" onclick="generateScheduleFromSigned()">Generate Schedule</button>`;
     } else if (isSigned && !hasSignedPdf) {
       actionsHtml += `<button class="btn btn-sm btn-primary" onclick="generateSignedPdf()">Generate Signed PDF</button>`;
     }

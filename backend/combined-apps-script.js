@@ -977,7 +977,8 @@ function updateContract(data) {
         'PDF URL': data.pdfUrl,
         'PDF File ID': data.pdfFileId,
         'signedPdfUrl': data.signedPdfUrl,
-        'signedPdfFileId': data.signedPdfFileId
+        'signedPdfFileId': data.signedPdfFileId,
+        'ticketsGenerated': data.ticketsGenerated
       };
 
       for (var field in fieldsToUpdate) {
@@ -1067,7 +1068,8 @@ function getContracts() {
     signedName: headers.indexOf('signedName'),
     signedAt: headers.indexOf('signedAt'),
     signedPdfUrl: headers.indexOf('signedPdfUrl'),
-    signedPdfFileId: headers.indexOf('signedPdfFileId')
+    signedPdfFileId: headers.indexOf('signedPdfFileId'),
+    ticketsGenerated: headers.indexOf('ticketsGenerated')
   };
 
   var contracts = [];
@@ -1101,7 +1103,8 @@ function getContracts() {
         signedName: col.signedName !== -1 ? (row[col.signedName] || '') : '',
         signedAt: col.signedAt !== -1 ? (row[col.signedAt] || '') : '',
         signedPdfUrl: col.signedPdfUrl !== -1 ? (row[col.signedPdfUrl] || '') : '',
-        signedPdfFileId: col.signedPdfFileId !== -1 ? (row[col.signedPdfFileId] || '') : ''
+        signedPdfFileId: col.signedPdfFileId !== -1 ? (row[col.signedPdfFileId] || '') : '',
+        ticketsGenerated: col.ticketsGenerated !== -1 ? (row[col.ticketsGenerated] || '') : ''
       });
     }
   }

@@ -175,7 +175,7 @@ text-my-team/
   | Payment schedule | Monthly amortization over contract months | Total project price + optional deposit/balance split |
   | Contract card | "Contract Settings" — start/end, duration, payment months, price increase, CC fee | "Project Settings" — project name, schedule type, date(s), deposit toggle |
   | Ticket generation | `generateAllTickets()` across contract duration | `generateWorkTickets()` — 1 ticket (single visit) or N tickets (multi-day) |
-  | Finalization | Creates contract + recurring scheduled tickets | Creates work order + work ticket(s) with jobType/dayNumber/totalDays metadata |
+  | Finalization | Creates contract only (tickets deferred until contract is signed, then generated via "Generate Schedule" button) | Creates work order + work ticket(s) with jobType/dayNumber/totalDays metadata |
 
   **Work Ticket Schedule Types** ✅ **BUILT**:
   | Schedule Type | When to Use | What Gets Generated |
@@ -237,7 +237,7 @@ text-my-team/
 - **Two-Tier Estimate Header** ✅ **BUILT** (Mar 2026): Replaced cluttered single-row header with a state-driven two-tier layout for the builder view:
   - **Top tier (context)**: Back arrow (`showView('estimates')`) + property address + bid/contract ID + status badges (Draft/Revision/Finalized + signing state)
   - **Heavy rule**: 2px solid #202124 (Vignelli structural divider)
-  - **Bottom tier (actions)**: State-dependent buttons only — Draft: Save as Template, Save Estimate, Finalize; Revision: Save Draft, View Current PDF, Update Contract; Finalized: Revise Estimate, View Schedule, PDF actions, Send Contract/Generate PDF
+  - **Bottom tier (actions)**: State-dependent buttons only — Draft: Save as Template, Save Estimate, Finalize; Revision: Save Draft, View Current PDF, Update Contract; Finalized: Revise Estimate, View Schedule, PDF actions, primary action chain: Generate PDF → Send Contract → Generate Schedule (after signed, before tickets) → Generate Signed PDF
   - **PDF dropdown**: When both contract PDF and signed PDF exist, a dropdown menu consolidates View Contract PDF, View Signed PDF, and Regenerate PDF
   - **Key function**: `renderEstimateHeader()` — single function reads `currentEstimate.status` and `signingStatus`, renders correct header. `updateHeaderActions()` kept as backward-compatible alias
   - **Badge colors**: Draft (amber on #FEF7E0), Finalized (blue on #E8F0FE), Revision (amber on #FEF7E0), Signed (green on #E6F4EA), Awaiting Signature (blue on #E8F0FE)
@@ -2592,7 +2592,7 @@ All sheets live in one spreadsheet with one Code.gs serving both estimate.html a
 **New Sheets (Built):**
 | Sheet | Purpose |
 |-------|---------|
-| Contracts | contractId, bidId, propertyAddress, assignedCrew, preferredDay, startDate, endDate, contractMonths, monthlyPayment, status, createdDate, paymentTerms, contractValue, ccFeePercent, ccGrossUp, contactName, contactEmail, billingAddress, pdfUrl, pdfFileId, jobType, scheduleType, projectName, depositPercent, depositAmount, servicesJson, billingContactName, billingContactEmail (updatable via `updateContract` during revision; pdfUrl/pdfFileId saved after PDF upload; billingContactName/Email resolved from PropertyContacts 'Billing Contact' role at finalize time) |
+| Contracts | contractId, bidId, propertyAddress, assignedCrew, preferredDay, startDate, endDate, contractMonths, monthlyPayment, status, createdDate, paymentTerms, contractValue, ccFeePercent, ccGrossUp, contactName, contactEmail, billingAddress, pdfUrl, pdfFileId, jobType, scheduleType, projectName, depositPercent, depositAmount, servicesJson, billingContactName, billingContactEmail, ticketsGenerated (updatable via `updateContract` during revision; pdfUrl/pdfFileId saved after PDF upload; billingContactName/Email resolved from PropertyContacts 'Billing Contact' role at finalize time; ticketsGenerated set to 'Yes' by `generateScheduleFromSigned()` after customer signs contract) |
 | Scheduled Tickets | ticketId, contractId, propertyAddress, assignedCrew, eventDate, servicesJson (each service has name, estimatedHours, items[]; each item has name, hours, and optionally quantities {easy,medium,hard}, unit, complexityFactor for production rate analysis), totalEstHours, travelHours, status, completedDate, notes, completedServices (JSON array of completed service names for partial tickets), createdDate, needsReschedule (boolean — auto-set TRUE when status=skipped, cleared when rescheduled) |
 | Crew Members | name, phone, role (Leader/Member), crew (MNT Crew 1), pin (4-digit identity PIN), status (Active/Inactive) |
 | Time Entries | entryId, crew, date, entryType (day_clock/job/indirect/service), ticketId, propertyAddress, serviceName, indirectCategory, clockIn, clockOut, durationMinutes, crewMembers (JSON), memberCount, notes, createdDate, durationType (scalable/fixed — auto-upgraded column), reopened ('true'/'' — auto-upgraded column, flags entries created by reopening a completed service), estimatedHours (auto-upgraded column — service-level estimated hours from ticket, passed by crew.html on service start/reopen/split) |
@@ -2853,7 +2853,7 @@ You don't have to stop using the current app while you build the new one. Here's
    - ✅ **Clock-out decision modal** with Complete/Return Later, per-service audit trail
    - ✅ Time Entries sheet with saveTimeEntry + updateTimeEntry (day_clock, job, indirect, service)
    - ✅ Crew-hours display (man-hours ÷ crew size) + budgeted indirect time from travelHours
-   - ✅ **Contract finalization UI in estimate.html** — "Finalize Estimate" flow that generates tickets from bid services
+   - ✅ **Contract finalization UI in estimate.html** — "Finalize Estimate" flow creates contract only (tickets deferred). Flow: Finalize → Generate PDF → Send Contract → Customer signs on sign.html → "Generate Schedule" button creates tickets → "Generate Signed PDF" button. New function `generateScheduleFromSigned()` handles deferred ticket generation after signing, sets `ticketsGenerated` flag on contract. Revision path still regenerates tickets immediately.
    - ✅ **Estimate Revision & Re-Finalize workflow** — three-status lifecycle (Draft/Revision/Finalized), contract update instead of duplicate, future ticket regeneration, revision count tracking
    - ✅ **Ticket generation logic** — three date distribution strategies: `generateSeasonalMowingDates()` (weekly Apr–Oct, biweekly Nov–Mar; fills dormant gaps for higher targets (e.g. 52), trims dormant dates for lower targets), `generateWeeklyDates()` (every week, 50-54 visits), `generateSimpleScheduleDates()` (even distribution). Item-level `itemVisits` override, ticket bundling by date, earned value with penny reconciliation, `previewTickets()` breakdown
    - ✅ **GPS capture** at clock in/out — `captureGPS()` with high accuracy at 11 capture points (travel, day, ticket start/complete). Coordinates as `latIn/lngIn/latOut/lngOut`
