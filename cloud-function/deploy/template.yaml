@@ -98,19 +98,7 @@ Resources:
     Type: AWS::Serverless::HttpApi
     Properties:
       StageName: prod
-      CorsConfiguration:
-        AllowOrigins:
-          - "https://endurancefl.github.io"
-          - "https://enduranceservices.github.io"
-          - "http://localhost:8000"
-          - "http://127.0.0.1:8000"
-        AllowMethods:
-          - POST
-          - OPTIONS
-          - PUT
-        AllowHeaders:
-          - Content-Type
-        MaxAge: 3600
+      DisableExecuteApiEndpoint: false
 
 Outputs:
   ApiUrl:
