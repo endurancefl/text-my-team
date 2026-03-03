@@ -414,8 +414,8 @@
         </svg>
       </div>
       <h2>Contract Signed!</h2>
-      <p>Thank you for signing. A confirmation has been recorded and your signed contract will be available shortly.</p>
-      <p id="success-details" style="margin-top:16px;font-size:14px;color:#888;"></p>
+      <p>Thank you for signing your contract!</p>
+      <p id="success-details" style="margin-top:16px;font-size:14px;color:#888;white-space:pre-line;"></p>
     </div>
 
     <!-- Auto-Pay Setup (optional, shown after signing) -->
@@ -602,8 +602,12 @@ async function submitSignature() {
     const result = await resp.json();
 
     if (result.success) {
-      document.getElementById('success-details').textContent = 'Signed by ' + signedName + ' on ' +
+      var detailText = 'Signed by ' + signedName + ' on ' +
         new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      if (result.emailSent) {
+        detailText += '\nA copy of your signed contract has been emailed to you.';
+      }
+      document.getElementById('success-details').textContent = detailText;
       showState('success');
       showAutoPaySection();
     } else {

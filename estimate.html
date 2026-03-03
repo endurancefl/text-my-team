@@ -10720,15 +10720,13 @@ async function openSavedEstimate(bidId) {
         // Load PDF URL from contract if available
         if (currentEstimate.contractId) {
           try {
-            let contract = allContracts.find(c => c.contractId === currentEstimate.contractId);
-            if (!contract) {
-              const cResp = await fetch(GOOGLE_SHEETS_URL + '?action=getContracts');
-              const cData = await cResp.json();
-              if (cData.success) {
-                allContracts = cData.contracts || [];
-                contract = allContracts.find(c => c.contractId === currentEstimate.contractId);
-              }
+            // Always fetch fresh contract data (signing may have occurred since page load)
+            const cResp = await fetch(GOOGLE_SHEETS_URL + '?action=getContracts');
+            const cData = await cResp.json();
+            if (cData.success) {
+              allContracts = cData.contracts || [];
             }
+            let contract = allContracts.find(c => c.contractId === currentEstimate.contractId);
             if (contract) {
               if (contract.pdfUrl) {
                 currentEstimate.pdfUrl = contract.pdfUrl;
@@ -10796,15 +10794,13 @@ async function openSavedEstimate(bidId) {
       // Load PDF URL from contract if available
       if (currentEstimate.contractId) {
         try {
-          let contract = allContracts.find(c => c.contractId === currentEstimate.contractId);
-          if (!contract) {
-            const cResp = await fetch(GOOGLE_SHEETS_URL + '?action=getContracts');
-            const cData = await cResp.json();
-            if (cData.success) {
-              allContracts = cData.contracts || [];
-              contract = allContracts.find(c => c.contractId === currentEstimate.contractId);
-            }
+          // Always fetch fresh contract data (signing may have occurred since page load)
+          const cResp = await fetch(GOOGLE_SHEETS_URL + '?action=getContracts');
+          const cData = await cResp.json();
+          if (cData.success) {
+            allContracts = cData.contracts || [];
           }
+          let contract = allContracts.find(c => c.contractId === currentEstimate.contractId);
           if (contract) {
             if (contract.pdfUrl) {
               currentEstimate.pdfUrl = contract.pdfUrl;
@@ -18267,6 +18263,13 @@ async function sendContractForSigning() {
 
 async function generateSignedPdf() {
   if (!currentEstimate.contractId) return;
+
+  // If signed PDF already exists (e.g. auto-generated at signing), just open it
+  if (currentEstimate.signedPdfUrl) {
+    window.open(currentEstimate.signedPdfUrl, '_blank');
+    return;
+  }
+
   if (!currentEstimate.signedName) {
     showToast('Contract has not been signed yet.', 'error');
     return;

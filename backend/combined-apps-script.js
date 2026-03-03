@@ -5223,11 +5223,217 @@ function recordSignature(data) {
         }
       }
 
-      return { success: true };
+      // Generate signed PDF, upload to Drive, and email to customer (non-fatal)
+      var emailResult = null;
+      try {
+        var contractObj = {};
+        for (var j = 0; j < headers.length; j++) {
+          contractObj[headers[j]] = allData[i][j];
+        }
+        emailResult = generateAndEmailSignedPdf(
+          contractObj, data.signedName, new Date().toISOString(), sheet, row, headers
+        );
+      } catch (e) {
+        Logger.log('Signed PDF/email failed (non-fatal): ' + e);
+      }
+
+      return {
+        success: true,
+        signedPdfGenerated: !!(emailResult && emailResult.signedPdfUrl),
+        emailSent: !!(emailResult && emailResult.emailSent)
+      };
     }
   }
 
   return { success: false, error: 'Invalid signing token' };
+}
+
+/**
+ * Generate signed contract PDF via Lambda, upload to Drive, and email to customer.
+ * Called from recordSignature() after signature is recorded.
+ * @param {Object} contract - Row data as { headerName: value }
+ * @param {string} signedName - Customer's typed signature name
+ * @param {string} signedAt - ISO timestamp of signing
+ * @param {Sheet} sheet - Contracts sheet reference
+ * @param {number} row - 1-based row number in Contracts sheet
+ * @param {Array} headers - Header row array
+ * @returns {Object} { signedPdfUrl, signedPdfFileId, emailSent }
+ */
+function generateAndEmailSignedPdf(contract, signedName, signedAt, sheet, row, headers) {
+  var LAMBDA_URL = 'https://ibjyxrp542.execute-api.us-east-1.amazonaws.com/prod/generate_site_report';
+
+  var contractId = contract['Contract ID'] || '';
+  var propertyAddress = contract['Property Address'] || '';
+  var contactName = contract['Contact Name'] || '';
+  var contactEmail = contract['Contact Email'] || '';
+  var monthlyPayment = parseFloat(contract['Monthly Payment']) || 0;
+  var contractValue = parseFloat(contract['Contract Value']) || 0;
+  var startDate = contract['Start Date'] || '';
+  var endDate = contract['End Date'] || '';
+  var paymentTerms = contract['Payment Terms'] || 'Net 30';
+  var bidId = contract['Bid ID'] || '';
+  var billingAddress = contract['Billing Address'] || '';
+
+  if (!contactEmail) {
+    Logger.log('generateAndEmailSignedPdf: No contact email, skipping');
+    return { signedPdfUrl: '', signedPdfFileId: '', emailSent: false };
+  }
+
+  // Look up bid JSON for services, termsAndConditionsHtml, propertyType
+  var services = [];
+  var termsAndConditionsHtml = null;
+  var propertyType = 'residential';
+  var customerCompany = '';
+
+  if (bidId) {
+    try {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var bidSheet = ss.getSheetByName('Bids');
+      if (bidSheet) {
+        var bidData = bidSheet.getDataRange().getValues();
+        var bidHeaders = bidData[0];
+        var bidIdCol = bidHeaders.indexOf('bidId');
+        var jsonCol = bidHeaders.indexOf('json');
+        for (var b = 1; b < bidData.length; b++) {
+          if (String(bidData[b][bidIdCol]) === String(bidId) && bidData[b][jsonCol]) {
+            var bidJson = JSON.parse(bidData[b][jsonCol]);
+            propertyType = bidJson.propertyType || 'residential';
+
+            var sections = bidJson.sections || [];
+            for (var s = 0; s < sections.length; s++) {
+              var sec = sections[s];
+              services.push({
+                name: sec.sectionName || sec.name || '',
+                frequency: sec.frequency || '',
+                annualTotal: sec.annualTotal || 0,
+                description: sec.description || '',
+                billingTier: sec.billingTier || 'fixed'
+              });
+            }
+
+            // T&C from contract sub-object
+            if (bidJson.contract && bidJson.contract.termsAndConditionsHtml) {
+              termsAndConditionsHtml = bidJson.contract.termsAndConditionsHtml;
+            }
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      Logger.log('generateAndEmailSignedPdf: Error loading bid data: ' + e);
+    }
+  }
+
+  // Build Lambda metadata payload (matches estimate.html generateSignedPdf format)
+  var metadata = {
+    type: 'contract',
+    renderer: 'weasyprint',
+    propertyType: propertyType,
+    companyName: 'Endurance Services',
+    companyPhone: '(407) 579-4403',
+    companyWebsite: 'endurancefl.com',
+    companyCity: 'Orlando, FL',
+    contractId: contractId,
+    customerName: contactName,
+    customerCompany: customerCompany,
+    billingAddress: billingAddress,
+    propertyAddress: propertyAddress,
+    generatedDate: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+    startDate: startDate,
+    endDate: endDate,
+    monthlyPayment: monthlyPayment,
+    contractValue: contractValue,
+    paymentTerms: paymentTerms,
+    services: services,
+    signedName: signedName,
+    signedAt: signedAt
+  };
+
+  if (termsAndConditionsHtml) {
+    metadata.termsAndConditionsHtml = termsAndConditionsHtml;
+  }
+
+  // POST to Lambda
+  var lambdaResp = UrlFetchApp.fetch(LAMBDA_URL, {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify({ metadata: JSON.stringify(metadata) }),
+    muteHttpExceptions: true
+  });
+
+  var respCode = lambdaResp.getResponseCode();
+  if (respCode !== 200) {
+    throw new Error('Lambda returned ' + respCode + ': ' + lambdaResp.getContentText().substring(0, 200));
+  }
+
+  // Handle response — could be direct PDF blob or JSON with downloadUrl
+  var contentType = lambdaResp.getHeaders()['Content-Type'] || '';
+  var pdfBlob;
+
+  if (contentType.indexOf('application/pdf') !== -1) {
+    pdfBlob = lambdaResp.getBlob().setName(contractId + '-signed.pdf');
+  } else {
+    // JSON response with downloadUrl for large PDFs
+    var respJson = JSON.parse(lambdaResp.getContentText());
+    if (respJson.downloadUrl) {
+      var dlResp = UrlFetchApp.fetch(respJson.downloadUrl, { muteHttpExceptions: true });
+      pdfBlob = dlResp.getBlob().setName(contractId + '-signed.pdf');
+    } else {
+      throw new Error('Unexpected Lambda response format');
+    }
+  }
+
+  // Upload to Drive
+  var folder = getPropertyFolder(propertyAddress, 'Contracts');
+  var file = folder.createFile(pdfBlob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+  var signedPdfUrl = file.getUrl();
+  var signedPdfFileId = file.getId();
+
+  // Write signedPdfUrl and signedPdfFileId to Contracts sheet
+  var urlCol = headers.indexOf('signedPdfUrl');
+  var fileIdCol = headers.indexOf('signedPdfFileId');
+  if (urlCol >= 0) sheet.getRange(row, urlCol + 1).setValue(signedPdfUrl);
+  if (fileIdCol >= 0) sheet.getRange(row, fileIdCol + 1).setValue(signedPdfFileId);
+
+  // Email customer with signed PDF attached
+  var emailSent = false;
+  try {
+    var subject = 'Your Signed Contract — ' + contractId;
+    var body = '<div style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;max-width:600px;margin:0 auto;">' +
+      '<div style="background:#1a2e24;padding:24px 32px;border-radius:8px 8px 0 0;">' +
+      '<h1 style="color:#fff;margin:0;font-size:20px;">Endurance Services</h1>' +
+      '</div>' +
+      '<div style="padding:32px;background:#fff;border:1px solid #e0e0e0;border-top:none;">' +
+      '<p style="font-size:16px;color:#333;">Hi ' + contactName + ',</p>' +
+      '<p style="font-size:15px;color:#555;">Thank you for signing your landscape maintenance contract. A copy of your signed contract is attached to this email for your records.</p>' +
+      '<table style="width:100%;margin:20px 0;font-size:14px;border-collapse:collapse;">' +
+      '<tr><td style="padding:8px 0;color:#666;border-bottom:1px solid #f0f0f0;">Property</td><td style="padding:8px 0;font-weight:600;border-bottom:1px solid #f0f0f0;">' + propertyAddress + '</td></tr>' +
+      '<tr><td style="padding:8px 0;color:#666;border-bottom:1px solid #f0f0f0;">Contract #</td><td style="padding:8px 0;font-weight:600;border-bottom:1px solid #f0f0f0;">' + contractId + '</td></tr>' +
+      '<tr><td style="padding:8px 0;color:#666;border-bottom:1px solid #f0f0f0;">Monthly</td><td style="padding:8px 0;font-weight:600;border-bottom:1px solid #f0f0f0;">$' + monthlyPayment.toFixed(2) + '</td></tr>' +
+      '<tr><td style="padding:8px 0;color:#666;">Annual Total</td><td style="padding:8px 0;font-weight:600;font-size:16px;">$' + contractValue.toFixed(2) + '</td></tr>' +
+      '</table>' +
+      '<p style="font-size:14px;color:#555;">Signed by <strong>' + signedName + '</strong> on ' +
+      new Date(signedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) + '</p>' +
+      '</div>' +
+      '<div style="padding:16px 32px;background:#f8f9fa;border:1px solid #e0e0e0;border-top:none;border-radius:0 0 8px 8px;">' +
+      '<p style="font-size:12px;color:#999;margin:0;">Endurance Services &middot; (407) 579-4403 &middot; endurancefl.com</p>' +
+      '</div>' +
+      '</div>';
+
+    MailApp.sendEmail({
+      to: contactEmail,
+      subject: subject,
+      htmlBody: body,
+      attachments: [pdfBlob]
+    });
+    emailSent = true;
+  } catch (e) {
+    Logger.log('generateAndEmailSignedPdf: Email send failed: ' + e);
+  }
+
+  return { signedPdfUrl: signedPdfUrl, signedPdfFileId: signedPdfFileId, emailSent: emailSent };
 }
 
 // ═══════════════════════════════════════════════════════════════
