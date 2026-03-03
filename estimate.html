@@ -12,7 +12,7 @@
   <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.js"></script>
-  <link rel="stylesheet" href="css/estimate.css?v=marvin-briefing">
+  <link rel="stylesheet" href="css/estimate.css?v=property-grid-fix">
 </head>
 <body>
 
@@ -8894,7 +8894,7 @@ function populateEstimatePropertyPicker() {
   if (!picker) return;
 
   const currentVal = picker.value;
-  picker.innerHTML = '<option value="">— Select property or type address —</option>';
+  picker.innerHTML = '<option value="">— Select property —</option>';
   properties.forEach(p => {
     if (p.propertyId && p.address) {
       const opt = document.createElement('option');
