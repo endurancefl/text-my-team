@@ -213,14 +213,6 @@
                         <option value="Net 60">Net 60</option>
                       </select>
                     </div>
-                    <div class="form-group">
-                      <label class="form-label">CC Processing Fee %</label>
-                      <input type="number" class="form-input" id="contract-cc-fee" value="0" step="0.1" min="0" max="10">
-                    </div>
-                    <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
-                      <input type="checkbox" id="contract-cc-grossup" style="width: 18px; height: 18px; cursor: pointer;">
-                      <label class="form-label" for="contract-cc-grossup" style="margin: 0; cursor: pointer;">Gross-up monthly payment for CC fee</label>
-                    </div>
                   </div>
                   <div style="padding: 0 16px 16px; border-top: 1px solid #eee; margin-top: 8px; padding-top: 12px;">
                     <button class="btn btn-secondary" onclick="openTermsModal()" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
@@ -2724,8 +2716,6 @@ let currentEstimate = {
     paymentMonths: 12,
     priceIncrease: 0,
     paymentTerms: 'Net 30',
-    ccFeePercent: 0,
-    ccGrossUp: false,
     termsAndConditionsHtml: null
   },
   // NEW: Takeoffs data - the single source of truth for measurements
@@ -3390,8 +3380,6 @@ function resumeSavedEstimate() {
     document.getElementById('contract-payment-months').value = currentEstimate.contract.paymentMonths || 12;
     document.getElementById('contract-price-increase').value = currentEstimate.contract.priceIncrease || 0;
     document.getElementById('contract-payment-terms').value = currentEstimate.contract.paymentTerms || 'Net 30';
-    document.getElementById('contract-cc-fee').value = currentEstimate.contract.ccFeePercent || 0;
-    document.getElementById('contract-cc-grossup').checked = !!currentEstimate.contract.ccGrossUp;
   }
 
   document.getElementById('estimate-travel-percent').value = currentEstimate.travelPercent || 30;
@@ -5158,8 +5146,7 @@ const MARVIN_FIELD_MAP = {
   contractDuration:{ domId: 'contract-duration', path: 'contract.duration', label: 'Contract Duration' },
   paymentMonths:   { domId: 'payment-months', path: 'contract.paymentMonths', label: 'Payment Months' },
   priceIncrease:   { domId: 'price-increase', path: 'contract.priceIncrease', label: 'Price Increase %' },
-  paymentTerms:    { domId: 'payment-terms', path: 'contract.paymentTerms', label: 'Payment Terms' },
-  ccFee:           { domId: 'cc-fee-percent', path: 'contract.ccFeePercent', label: 'CC Fee %' }
+  paymentTerms:    { domId: 'payment-terms', path: 'contract.paymentTerms', label: 'Payment Terms' }
 };
 
 // View map for navigation
@@ -7714,8 +7701,6 @@ function startEstimateForContact() {
     document.getElementById('contract-payment-months').value = currentEstimate.contract.paymentMonths;
     document.getElementById('contract-price-increase').value = currentEstimate.contract.priceIncrease;
     document.getElementById('contract-payment-terms').value = currentEstimate.contract.paymentTerms;
-    document.getElementById('contract-cc-fee').value = currentEstimate.contract.ccFeePercent || 0;
-    document.getElementById('contract-cc-grossup').checked = !!currentEstimate.contract.ccGrossUp;
     renderTableBody();
     showView('builder');
   });
@@ -11853,9 +11838,7 @@ async function finalizeEstimate() {
     const totals = calculateBidTotals();
     const tierTotals = calculateTierTotals();
     const fixedAnnual = tierTotals.fixed.total || 0;
-    const effectiveAnnual = (currentEstimate.contract.ccGrossUp && currentEstimate.contract.ccFeePercent > 0)
-      ? fixedAnnual / (1 - currentEstimate.contract.ccFeePercent / 100)
-      : fixedAnnual;
+    const effectiveAnnual = fixedAnnual;
     const paymentMonths = currentEstimate.contract.paymentMonths || 12;
     const monthlyPayment = paymentMonths > 0 ? effectiveAnnual / paymentMonths : 0;
 
@@ -11877,8 +11860,6 @@ async function finalizeEstimate() {
         monthlyPayment: Math.round(monthlyPayment * 100) / 100,
         paymentTerms: currentEstimate.contract.paymentTerms || 'Net 30',
         contractValue: Math.round(fixedAnnual * 100) / 100,
-        ccFeePercent: currentEstimate.contract.ccFeePercent || 0,
-        ccGrossUp: currentEstimate.contract.ccGrossUp || false,
         contactName: currentContact ? getContactDisplayName(currentContact) : '',
         contactEmail: currentContact ? (currentContact.email || '') : '',
         billingAddress: currentContact ? (currentContact.billingAddress || '') : '',
@@ -11992,9 +11973,7 @@ async function finalizeEstimate() {
     const totals = calculateBidTotals();
     const tierTotals = calculateTierTotals();
     const fixedAnnual = tierTotals.fixed.total || 0;
-    const effectiveAnnual = (currentEstimate.contract.ccGrossUp && currentEstimate.contract.ccFeePercent > 0)
-      ? fixedAnnual / (1 - currentEstimate.contract.ccFeePercent / 100)
-      : fixedAnnual;
+    const effectiveAnnual = fixedAnnual;
     const paymentMonths = currentEstimate.contract.paymentMonths || 12;
     const monthlyPayment = paymentMonths > 0 ? effectiveAnnual / paymentMonths : 0;
 
@@ -12018,8 +11997,6 @@ async function finalizeEstimate() {
           monthlyPayment: Math.round(monthlyPayment * 100) / 100,
           paymentTerms: currentEstimate.contract.paymentTerms || 'Net 30',
           contractValue: Math.round(fixedAnnual * 100) / 100,
-          ccFeePercent: currentEstimate.contract.ccFeePercent || 0,
-          ccGrossUp: currentEstimate.contract.ccGrossUp || false,
           contactName: currentContact ? getContactDisplayName(currentContact) : '',
           contactEmail: currentContact ? (currentContact.email || '') : '',
           billingAddress: currentContact ? (currentContact.billingAddress || '') : '',
@@ -12250,8 +12227,6 @@ async function finalizeWorkTicket(finalizeBtn, linkedContact) {
         monthlyPayment: 0,
         paymentTerms: currentEstimate.contract.paymentTerms || 'Net 30',
         contractValue: Math.round(projectTotal * 100) / 100,
-        ccFeePercent: 0,
-        ccGrossUp: false,
         contactName: linkedContact ? getContactDisplayName(linkedContact) : '',
         contactEmail: linkedContact ? (linkedContact.email || '') : '',
         billingAddress: linkedContact ? (linkedContact.billingAddress || '') : '',
@@ -12507,9 +12482,7 @@ async function generateContractPdf() {
     const totals = calculateBidTotals();
     const paymentMonths = currentEstimate.contract.paymentMonths || 12;
     const fixedAnnual = tierTotals.fixed.total || 0;
-    const effectiveAnnual = (currentEstimate.contract.ccGrossUp && currentEstimate.contract.ccFeePercent > 0)
-      ? fixedAnnual / (1 - currentEstimate.contract.ccFeePercent / 100)
-      : fixedAnnual;
+    const effectiveAnnual = fixedAnnual;
     const monthlyPayment = paymentMonths > 0 ? effectiveAnnual / paymentMonths : 0;
     const schedule = calculatePaymentSchedule(effectiveAnnual, paymentMonths);
 
@@ -12574,8 +12547,6 @@ async function generateContractPdf() {
       paymentMonths: paymentMonths,
       paymentTerms: currentEstimate.contract.paymentTerms || 'Net 30',
       priceIncrease: currentEstimate.contract.priceIncrease || 0,
-      ccFeePercent: currentEstimate.contract.ccFeePercent || 0,
-      ccGrossUp: currentEstimate.contract.ccGrossUp || false,
       effectiveDate: currentEstimate.contract.startDate || '',
       generatedDate: generatedDate,
       // Services
@@ -14516,8 +14487,6 @@ function startBlankFromPicker() {
   document.getElementById('contract-payment-months').value = currentEstimate.contract.paymentMonths;
   document.getElementById('contract-price-increase').value = currentEstimate.contract.priceIncrease;
   document.getElementById('contract-payment-terms').value = currentEstimate.contract.paymentTerms;
-  document.getElementById('contract-cc-fee').value = currentEstimate.contract.ccFeePercent || 0;
-  document.getElementById('contract-cc-grossup').checked = !!currentEstimate.contract.ccGrossUp;
   document.getElementById('estimate-travel-percent').value = currentEstimate.travelPercent;
 
   renderTableBody();
@@ -14584,8 +14553,6 @@ async function selectTemplateAndStart() {
   document.getElementById('contract-payment-months').value = currentEstimate.contract.paymentMonths;
   document.getElementById('contract-price-increase').value = currentEstimate.contract.priceIncrease;
   document.getElementById('contract-payment-terms').value = currentEstimate.contract.paymentTerms;
-  document.getElementById('contract-cc-fee').value = currentEstimate.contract.ccFeePercent || 0;
-  document.getElementById('contract-cc-grossup').checked = !!currentEstimate.contract.ccGrossUp;
   document.getElementById('estimate-travel-percent').value = currentEstimate.travelPercent;
 
   renderTableBody();
@@ -15602,8 +15569,6 @@ function startBlankEstimate() {
   document.getElementById('contract-payment-months').value = currentEstimate.contract.paymentMonths;
   document.getElementById('contract-price-increase').value = currentEstimate.contract.priceIncrease;
   document.getElementById('contract-payment-terms').value = currentEstimate.contract.paymentTerms;
-  document.getElementById('contract-cc-fee').value = currentEstimate.contract.ccFeePercent || 0;
-  document.getElementById('contract-cc-grossup').checked = !!currentEstimate.contract.ccGrossUp;
 
   renderTableBody();
   showView('builder');
@@ -16437,8 +16402,7 @@ document.addEventListener('DOMContentLoaded', function() {
     'contract-duration': 'duration',
     'contract-payment-months': 'paymentMonths',
     'contract-price-increase': 'priceIncrease',
-    'contract-payment-terms': 'paymentTerms',
-    'contract-cc-fee': 'ccFeePercent'
+    'contract-payment-terms': 'paymentTerms'
   };
 
   Object.keys(contractInputs).forEach(inputId => {
@@ -16448,7 +16412,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const field = contractInputs[inputId];
         if (field === 'duration' || field === 'paymentMonths') {
           currentEstimate.contract[field] = parseInt(this.value) || 12;
-        } else if (field === 'priceIncrease' || field === 'ccFeePercent') {
+        } else if (field === 'priceIncrease') {
           currentEstimate.contract[field] = parseFloat(this.value) || 0;
         } else {
           currentEstimate.contract[field] = this.value;
@@ -16457,13 +16421,6 @@ document.addEventListener('DOMContentLoaded', function() {
         markEstimateDirty();
       });
     }
-  });
-
-  // CC gross-up checkbox
-  document.getElementById('contract-cc-grossup').addEventListener('change', function() {
-    currentEstimate.contract.ccGrossUp = this.checked;
-    renderTableBody();
-    markEstimateDirty();
   });
 
   // Service details modal - billing tier change
