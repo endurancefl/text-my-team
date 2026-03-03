@@ -1509,6 +1509,7 @@
                 Back to Properties
               </button>
               <div style="display: flex; gap: 8px;">
+                <button class="btn btn-primary" onclick="createEstimateFromProperty()" style="font-size: 13px; padding: 6px 12px;">New Estimate</button>
                 <button class="btn btn-secondary" onclick="openPropertyModal('edit')" style="font-size: 13px; padding: 6px 12px;">Edit Property</button>
                 <button class="btn btn-danger-text" id="property-delete-btn" onclick="deleteCurrentProperty()" style="font-size: 13px; padding: 6px 12px;">Delete</button>
               </div>
@@ -1580,11 +1581,11 @@
                   </div>
                 </div>
 
-                <!-- Project History by Division -->
+                <!-- Projects (one-off: work tickets, ENH, CON, IRR) -->
                 <div class="contact-detail-section">
-                  <h4>Project History</h4>
-                  <div id="property-project-history" class="contact-estimates-list">
-                    <p class="contact-no-estimates">No project history available.</p>
+                  <h4>Projects</h4>
+                  <div id="property-projects-list" class="contact-estimates-list">
+                    <p class="contact-no-estimates">No projects for this property.</p>
                   </div>
                 </div>
               </div>
@@ -8339,10 +8340,13 @@ function openPropertyProfile(propIdOrNormAddr) {
     estimatesList.innerHTML = '<p class="contact-no-estimates">No estimates for this property.</p>';
   }
 
-  // Contracts
+  // Contracts (recurring maintenance only — one-off projects shown in Projects section)
   const contractsList = document.getElementById('property-contracts-list');
-  if (prop.contracts && prop.contracts.length > 0) {
-    contractsList.innerHTML = prop.contracts.map(c => {
+  const recurringContracts = (prop.contracts || []).filter(c =>
+    c.jobType !== 'work_ticket' && (!c.division || c.division === 'MNT')
+  );
+  if (recurringContracts.length > 0) {
+    contractsList.innerHTML = recurringContracts.map(c => {
       const monthly = typeof c.monthlyPayment === 'number' ? formatCurrency(c.monthlyPayment) + '/mo' : '';
       const statusClass = (c.status || 'active').toLowerCase();
       const division = c.division || 'MNT';
@@ -8365,8 +8369,8 @@ function openPropertyProfile(propIdOrNormAddr) {
     contractsList.innerHTML = '<p class="contact-no-estimates">No contracts for this property.</p>';
   }
 
-  // Project History (completed tickets grouped by division)
-  renderPropertyProjectHistory();
+  // Projects (one-off: work tickets, ENH, CON, IRR)
+  renderPropertyProjects();
 }
 
 function renderPropertyLinkedContacts() {
@@ -8773,7 +8777,53 @@ function clearSubContractFile() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  PROJECT HISTORY BY DIVISION
+//  NEW ESTIMATE FROM PROPERTY PROFILE
+// ═══════════════════════════════════════════════════════════════
+
+function createEstimateFromProperty() {
+  if (!currentProperty) return;
+  window._pendingPropertyId = currentProperty.propertyId;
+  startNewEstimate();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PROJECTS (ONE-OFF) — REPLACES PROJECT HISTORY
+// ═══════════════════════════════════════════════════════════════
+
+function renderPropertyProjects() {
+  const el = document.getElementById('property-projects-list');
+  if (!currentProperty) return;
+
+  // One-off projects = work_ticket jobType OR non-MNT division contracts
+  const projects = (currentProperty.contracts || []).filter(c =>
+    c.jobType === 'work_ticket' || (c.division && c.division !== 'MNT')
+  );
+
+  if (projects.length === 0) {
+    el.innerHTML = '<p class="contact-no-estimates">No projects for this property.</p>';
+    return;
+  }
+
+  el.innerHTML = projects.map(c => {
+    const divBadge = c.division ? `<span class="division-badge div-${(c.division||'').toLowerCase()}">${c.division}</span>` : '';
+    const projectName = c.projectName || c.contractId;
+    const statusText = (c.status || 'active');
+    const dates = c.startDate ? `${c.startDate} → ${c.endDate || ''}` : '';
+    const value = c.contractValue ? formatCurrency(c.contractValue) : '';
+    return `<div class="contact-estimate-card" onclick="openContractDetail('${c.contractId}', '${(c.propertyAddress||'').replace(/'/g,"\\'")}')">
+      <div>
+        <div style="font-size: 14px; font-weight: 500;">${projectName} ${divBadge}</div>
+        <div style="font-size: 12px; color: var(--gw-text-secondary);"><span style="text-transform: capitalize;">${statusText}</span> — ${dates}</div>
+      </div>
+      <div style="text-align: right;">
+        <div style="font-size: 14px; font-weight: 500; font-feature-settings: 'tnum';">${value}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PROJECT HISTORY BY DIVISION (LEGACY — kept for reference)
 // ═══════════════════════════════════════════════════════════════
 
 async function renderPropertyProjectHistory() {
@@ -14139,6 +14189,12 @@ function startBlankFromPicker() {
   renderTableBody();
   adaptBuilderForJobType();
   showView('builder');
+
+  // Auto-populate property if started from property profile
+  if (window._pendingPropertyId) {
+    onEstimatePropertySelect(window._pendingPropertyId);
+    window._pendingPropertyId = null;
+  }
 }
 
 async function selectTemplateAndStart() {
@@ -14202,6 +14258,12 @@ async function selectTemplateAndStart() {
   renderTableBody();
   adaptBuilderForJobType();
   showView('builder');
+
+  // Auto-populate property if started from property profile
+  if (window._pendingPropertyId) {
+    onEstimatePropertySelect(window._pendingPropertyId);
+    window._pendingPropertyId = null;
+  }
 }
 
 async function loadEstimateFromTemplate(templateId) {
