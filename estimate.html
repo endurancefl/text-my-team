@@ -1289,57 +1289,129 @@
 
           <!-- CONTRACT DETAIL (service + calendar views for a selected contract) -->
           <div id="contracts-contract-detail" class="schedule-sub-view" style="display: none;">
-            <!-- Back button + contract info -->
-            <div class="schedule-header">
-              <div class="schedule-contract-info">
-                <button class="btn btn-secondary" onclick="showContractsList()" style="padding: 4px 12px; font-size: 13px; margin-bottom: 8px;">
+
+            <!-- CONTRACT SUMMARY PANEL -->
+            <div id="contracts-summary-panel">
+              <div class="contract-summary-back">
+                <button class="btn btn-secondary" onclick="showContractsList()" style="padding: 4px 12px; font-size: 13px;">
                   ← All Contracts
                 </button>
-                <h3 id="contracts-property-address"></h3>
-                <div class="schedule-meta">
-                  <span id="contracts-contract-id"></span>
-                  <span id="contracts-date-range"></span>
-                  <span id="contracts-crew"></span>
-                  <span id="contracts-ticket-count"></span>
+              </div>
+              <div class="contract-summary-header">
+                <h3 id="contract-summary-address"></h3>
+                <span id="contract-summary-status-badge" class="status-badge"></span>
+              </div>
+              <div class="contract-summary-actions">
+                <button class="btn btn-secondary" onclick="openEstimateFromContract()">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;vertical-align:-3px;margin-right:4px;">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
+                  </svg>
+                  View Estimate
+                </button>
+                <button class="btn btn-secondary" onclick="showContractTickets()">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;vertical-align:-3px;margin-right:4px;">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/>
+                  </svg>
+                  View Tickets
+                </button>
+                <button class="btn btn-secondary" id="contract-summary-view-pdf" onclick="openContractPdf()" style="display:none;">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;vertical-align:-3px;margin-right:4px;">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m.75 12l3 3m0 0l3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
+                  </svg>
+                  View Contract PDF
+                </button>
+                <button class="btn btn-secondary" id="contract-summary-view-signed" onclick="openSignedPdf()" style="display:none;">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;vertical-align:-3px;margin-right:4px;">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  </svg>
+                  View Signed PDF
+                </button>
+                <button class="btn btn-danger" id="contract-summary-terminate" onclick="showTerminateDialog()" style="display:none;">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;vertical-align:-3px;margin-right:4px;">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                  </svg>
+                  Terminate Contract
+                </button>
+              </div>
+              <div class="contract-summary-details" id="contract-summary-details"></div>
+              <div class="contract-summary-services" id="contract-summary-services"></div>
+            </div>
+
+            <!-- TICKETS SUB-VIEW (schedule header + service/calendar views) -->
+            <div id="contracts-tickets-subview" style="display: none;">
+              <!-- Back button + contract info -->
+              <div class="schedule-header">
+                <div class="schedule-contract-info">
+                  <button class="btn btn-secondary" onclick="showContractSummaryFromTickets()" style="padding: 4px 12px; font-size: 13px; margin-bottom: 8px;">
+                    ← Contract Summary
+                  </button>
+                  <h3 id="contracts-property-address"></h3>
+                  <div class="schedule-meta">
+                    <span id="contracts-contract-id"></span>
+                    <span id="contracts-date-range"></span>
+                    <span id="contracts-crew"></span>
+                    <span id="contracts-ticket-count"></span>
+                  </div>
+                </div>
+                <div class="schedule-view-toggle">
+                  <button class="toggle-btn active" id="contracts-toggle-service" onclick="setContractsView('service')">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+                    </svg>
+                    By Service
+                  </button>
+                  <button class="toggle-btn" id="contracts-toggle-calendar" onclick="setContractsView('calendar')">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                    Calendar
+                  </button>
                 </div>
               </div>
-              <div class="schedule-view-toggle">
-                <button class="toggle-btn active" id="contracts-toggle-service" onclick="setContractsView('service')">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
-                  </svg>
-                  By Service
-                </button>
-                <button class="toggle-btn" id="contracts-toggle-calendar" onclick="setContractsView('calendar')">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                  </svg>
-                  Calendar
-                </button>
+
+              <!-- SERVICE VIEW -->
+              <div id="contracts-service-view" class="schedule-detail-view active">
+                <div id="contracts-service-list"></div>
+              </div>
+
+              <!-- CALENDAR VIEW -->
+              <div id="contracts-calendar-view" class="schedule-detail-view" style="display: none;">
+                <div class="calendar-nav">
+                  <button class="btn btn-secondary" onclick="calendarPrevMonth()" style="padding: 4px 12px;">← Prev</button>
+                  <h3 id="calendar-month-label" style="margin: 0; min-width: 180px; text-align: center;"></h3>
+                  <button class="btn btn-secondary" onclick="calendarNextMonth()" style="padding: 4px 12px;">Next →</button>
+                </div>
+                <div class="calendar-grid" id="calendar-grid"></div>
+                <div id="calendar-day-detail" class="calendar-day-detail" style="display: none;">
+                  <div class="calendar-day-detail-header">
+                    <h4 id="calendar-day-detail-date"></h4>
+                    <button onclick="document.getElementById('calendar-day-detail').style.display='none'" style="background:none;border:none;font-size:18px;cursor:pointer;">&times;</button>
+                  </div>
+                  <div id="calendar-day-detail-content"></div>
+                </div>
               </div>
             </div>
 
-            <!-- SERVICE VIEW -->
-            <div id="contracts-service-view" class="schedule-detail-view active">
-              <div id="contracts-service-list"></div>
+            <!-- TERMINATE CONTRACT DIALOG -->
+            <div id="terminate-contract-dialog" class="modal-overlay" style="display: none;">
+              <div class="modal-content" style="max-width: 440px;">
+                <h3 style="margin: 0 0 16px; color: #dc3545;">Terminate Contract</h3>
+                <p style="margin: 0 0 16px; color: #666; font-size: 14px;">This will set the contract status to terminated and delete all future scheduled tickets. Completed work will be preserved.</p>
+                <div style="margin-bottom: 12px;">
+                  <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px;">Effective Date</label>
+                  <input type="date" id="terminate-date" class="form-input" style="width: 100%;">
+                </div>
+                <div style="margin-bottom: 16px;">
+                  <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px;">Reason (optional)</label>
+                  <textarea id="terminate-reason" class="form-input" rows="3" placeholder="Why is this contract being terminated?" style="width: 100%; resize: vertical;"></textarea>
+                </div>
+                <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                  <button class="btn btn-secondary" onclick="closeTerminateDialog()">Cancel</button>
+                  <button class="btn btn-danger" onclick="confirmTerminateContract()">Terminate</button>
+                </div>
+              </div>
             </div>
 
-            <!-- CALENDAR VIEW -->
-            <div id="contracts-calendar-view" class="schedule-detail-view" style="display: none;">
-              <div class="calendar-nav">
-                <button class="btn btn-secondary" onclick="calendarPrevMonth()" style="padding: 4px 12px;">← Prev</button>
-                <h3 id="calendar-month-label" style="margin: 0; min-width: 180px; text-align: center;"></h3>
-                <button class="btn btn-secondary" onclick="calendarNextMonth()" style="padding: 4px 12px;">Next →</button>
-              </div>
-              <div class="calendar-grid" id="calendar-grid"></div>
-              <div id="calendar-day-detail" class="calendar-day-detail" style="display: none;">
-                <div class="calendar-day-detail-header">
-                  <h4 id="calendar-day-detail-date"></h4>
-                  <button onclick="document.getElementById('calendar-day-detail').style.display='none'" style="background:none;border:none;font-size:18px;cursor:pointer;">&times;</button>
-                </div>
-                <div id="calendar-day-detail-content"></div>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -6992,6 +7064,15 @@ async function loadAllData() {
       debugLog('Loaded bid settings');
     }
 
+    // Contracts (load before bids so filtering works)
+    if (data.contracts && data.contracts.success) {
+      allContracts = data.contracts.contracts || [];
+      allContracts.forEach(c => {
+        c.startDate = normalizeDate(c.startDate);
+        c.endDate = normalizeDate(c.endDate);
+      });
+    }
+
     // Bids
     if (data.bids && data.bids.success) {
       savedBids = data.bids.bids || [];
@@ -10665,7 +10746,29 @@ function renderEstimatesList() {
     return;
   }
 
-  container.innerHTML = savedBids.map(bid => `
+  // Filter out bids that are fully contracted (signed + tickets generated)
+  const activeBids = savedBids.filter(bid => {
+    if (bid.status !== 'Finalized') return true;
+    if (!bid.contractId) return true;
+    const contract = allContracts.find(c => c.contractId === bid.contractId);
+    if (!contract) return true;
+    return !(contract.signingStatus === 'signed' && contract.ticketsGenerated === 'Yes');
+  });
+
+  if (activeBids.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <h3>All Caught Up</h3>
+        <p>All estimates have been signed and moved to Contracts.</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = activeBids.map(bid => `
     <div class="estimate-card" data-bid-id="${bid.bidId}" onclick="openSavedEstimate('${bid.bidId}')">
       <div class="estimate-card-header">
         <div class="estimate-card-address">${bid.propertyAddress || 'No Address'}</div>
@@ -11769,28 +11872,35 @@ async function finalizeEstimate() {
 
       // Step 2: Update contract row with new totals
       const revBillingContact = currentEstimate.propertyId ? resolveContactByRole(currentEstimate.propertyId, 'Billing Contact', 'Owner') : null;
+      const revisionPayload = {
+        updateContract: true,
+        contractId: currentEstimate.contractId,
+        propertyAddress: currentEstimate.propertyAddress,
+        assignedCrew: crew,
+        preferredDay: preferredDay,
+        startDate: startDate,
+        endDate: endDate,
+        contractMonths: contractMonths,
+        monthlyPayment: Math.round(monthlyPayment * 100) / 100,
+        paymentTerms: currentEstimate.contract.paymentTerms || 'Net 30',
+        contractValue: Math.round(fixedAnnual * 100) / 100,
+        ccFeePercent: currentEstimate.contract.ccFeePercent || 0,
+        ccGrossUp: currentEstimate.contract.ccGrossUp || false,
+        contactName: currentContact ? getContactDisplayName(currentContact) : '',
+        contactEmail: currentContact ? (currentContact.email || '') : '',
+        billingAddress: currentContact ? (currentContact.billingAddress || '') : '',
+        billingContactName: revBillingContact ? getContactDisplayName(revBillingContact) : '',
+        billingContactEmail: revBillingContact ? (revBillingContact.email || '') : ''
+      };
+
+      // If this contract was signed, reset signing fields
+      if (currentEstimate.signingStatus === 'signed') {
+        revisionPayload.revisionReset = true;
+      }
+
       await fetch(GOOGLE_SHEETS_URL, {
         method: 'POST',
-        body: JSON.stringify({
-          updateContract: true,
-          contractId: currentEstimate.contractId,
-          propertyAddress: currentEstimate.propertyAddress,
-          assignedCrew: crew,
-          preferredDay: preferredDay,
-          startDate: startDate,
-          endDate: endDate,
-          contractMonths: contractMonths,
-          monthlyPayment: Math.round(monthlyPayment * 100) / 100,
-          paymentTerms: currentEstimate.contract.paymentTerms || 'Net 30',
-          contractValue: Math.round(fixedAnnual * 100) / 100,
-          ccFeePercent: currentEstimate.contract.ccFeePercent || 0,
-          ccGrossUp: currentEstimate.contract.ccGrossUp || false,
-          contactName: currentContact ? getContactDisplayName(currentContact) : '',
-          contactEmail: currentContact ? (currentContact.email || '') : '',
-          billingAddress: currentContact ? (currentContact.billingAddress || '') : '',
-          billingContactName: revBillingContact ? getContactDisplayName(revBillingContact) : '',
-          billingContactEmail: revBillingContact ? (revBillingContact.email || '') : ''
-        })
+        body: JSON.stringify(revisionPayload)
       });
 
       // Step 3: Delete future scheduled tickets (status = 'scheduled' AND date > today)
@@ -11848,6 +11958,15 @@ async function finalizeEstimate() {
       currentEstimate.status = 'Finalized';
       currentEstimate.revisionCount = newRevisionCount;
       estimateDirty = false;
+
+      // Clear local signing fields if revision reset was applied
+      if (revisionPayload.revisionReset) {
+        currentEstimate.signingStatus = 'revised';
+        currentEstimate.signedName = '';
+        currentEstimate.signedAt = '';
+        currentEstimate.signedPdfUrl = '';
+        currentEstimate.signedPdfFileId = '';
+      }
 
       showToast(`Contract ${currentEstimate.contractId} updated. ${existingTicketInfo.completed} completed tickets kept, ${futureTickets.length} future tickets regenerated. (Revision #${newRevisionCount})`, 'success', 5000);
       await loadBids();
@@ -12642,6 +12761,15 @@ function closeFinalizeModal() {
 }
 
 function enterRevisionMode() {
+  // Warn if contract has been signed
+  if (currentEstimate.signingStatus === 'signed') {
+    if (!confirm(
+      'This contract has been signed by the customer.\n\n' +
+      'Revising will void the signature. The customer will need to sign again.\n\n' +
+      'Continue?'
+    )) return;
+  }
+
   if (!confirm('This will allow you to edit the estimate. Changes won\'t affect the contract until you click "Update Contract."')) return;
   currentEstimate.status = 'Revision';
   updateHeaderActions();
@@ -12681,6 +12809,8 @@ function renderEstimateHeader() {
     badgesHtml = '<span class="status-badge status-finalized">Finalized</span>';
     if (isSigned) {
       badgesHtml += '<span class="status-badge status-signed">Signed</span>';
+    } else if (sigStatus === 'revised') {
+      badgesHtml += '<span class="status-badge status-revised">Needs Re-signing</span>';
     } else if (sigStatus === 'sent' || sigStatus === 'viewed') {
       badgesHtml += '<span class="status-badge status-awaiting">Awaiting Signature</span>';
     }
@@ -13013,7 +13143,7 @@ async function openContractDetail(contractId, propertyAddress) {
       calendarMonth.setDate(1);
     }
 
-    // Update contract detail header
+    // Update contract detail header (for tickets sub-view)
     document.getElementById('contracts-property-address').textContent = propertyAddress || scheduleContract?.propertyAddress || '';
     document.getElementById('contracts-contract-id').textContent = contractId || '';
     document.getElementById('contracts-date-range').textContent =
@@ -13022,10 +13152,12 @@ async function openContractDetail(contractId, propertyAddress) {
       scheduleContract ? `Crew: ${scheduleContract.assignedCrew || 'Unassigned'}` : '';
     document.getElementById('contracts-ticket-count').textContent = `${scheduleTickets.length} tickets`;
 
-    // Switch to contract detail view
+    // Switch to contract detail view — show summary panel
     scheduleScope = 'contract';
     document.getElementById('contracts-list-panel').style.display = 'none';
     document.getElementById('contracts-contract-detail').style.display = 'block';
+    document.getElementById('contracts-summary-panel').style.display = 'block';
+    document.getElementById('contracts-tickets-subview').style.display = 'none';
 
     // Make sure we're on the contracts view
     if (currentView !== 'contracts') {
@@ -13036,12 +13168,8 @@ async function openContractDetail(contractId, propertyAddress) {
     document.getElementById('header-title').textContent = 'Contracts';
     document.getElementById('header-subtitle').textContent = scheduleContract?.propertyAddress || '';
 
-    // Render current sub-view
-    if (scheduleViewMode === 'service') {
-      renderServiceSchedule();
-    } else {
-      renderCalendar();
-    }
+    // Render contract summary
+    renderContractSummary();
 
   } catch (err) {
     console.error('Error loading contract:', err);
@@ -13065,6 +13193,280 @@ function setContractsView(mode) {
     renderServiceSchedule();
   } else {
     renderCalendar();
+  }
+}
+
+/**
+ * Render the contract summary panel with details + action buttons
+ */
+function renderContractSummary() {
+  const c = scheduleContract;
+  if (!c) return;
+
+  // Address + status badge
+  document.getElementById('contract-summary-address').textContent = c.propertyAddress || 'No Address';
+
+  const statusBadge = document.getElementById('contract-summary-status-badge');
+  const status = (c.Status || c.status || 'active').toLowerCase();
+  const signingStatus = (c.signingStatus || '').toLowerCase();
+  let badgeText = 'Active';
+  let badgeClass = 'contract-status-active';
+
+  if (status === 'terminated') {
+    badgeText = 'Terminated';
+    badgeClass = 'contract-status-terminated';
+  } else if (signingStatus === 'signed') {
+    badgeText = 'Signed';
+    badgeClass = 'contract-status-signed';
+  } else if (signingStatus === 'revised') {
+    badgeText = 'Needs Re-signing';
+    badgeClass = 'contract-status-revised';
+  } else if (signingStatus === 'sent' || signingStatus === 'viewed') {
+    badgeText = signingStatus.charAt(0).toUpperCase() + signingStatus.slice(1);
+    badgeClass = 'contract-status-active';
+  } else if (!signingStatus || signingStatus === 'unsent') {
+    badgeText = 'Unsent';
+    badgeClass = 'contract-status-unsent';
+  }
+
+  statusBadge.textContent = badgeText;
+  statusBadge.className = badgeClass;
+
+  // Action button visibility
+  const pdfBtn = document.getElementById('contract-summary-view-pdf');
+  const signedBtn = document.getElementById('contract-summary-view-signed');
+  const terminateBtn = document.getElementById('contract-summary-terminate');
+
+  pdfBtn.style.display = c.pdfUrl || c['PDF URL'] ? 'inline-flex' : 'none';
+  signedBtn.style.display = c.signedPdfUrl ? 'inline-flex' : 'none';
+  terminateBtn.style.display = status === 'terminated' ? 'none' : 'inline-flex';
+
+  // Ticket stats
+  const totalTickets = scheduleTickets.length;
+  const completedTickets = scheduleTickets.filter(t => t.status === 'completed').length;
+  const scheduledTickets = scheduleTickets.filter(t => t.status === 'scheduled').length;
+  const skippedTickets = scheduleTickets.filter(t => t.status === 'skipped').length;
+
+  // Signing info
+  let signingDetail = badgeText;
+  if (signingStatus === 'signed' && c.signedName) {
+    signingDetail = `Signed by ${c.signedName}`;
+    if (c.signedAt) {
+      try {
+        signingDetail += ` on ${new Date(c.signedAt).toLocaleDateString()}`;
+      } catch(e) { signingDetail += ` on ${c.signedAt}`; }
+    }
+  }
+
+  // Details grid
+  const monthly = parseFloat(c.monthlyPayment || c['Monthly Payment'] || 0);
+  const annual = parseFloat(c.contractValue || c['Contract Value'] || 0);
+
+  const detailsHtml = `
+    <div class="contract-detail-row">
+      <span class="contract-detail-label">Contract ID</span>
+      <span class="contract-detail-value">${c.contractId || c['Contract ID'] || ''}</span>
+    </div>
+    <div class="contract-detail-row">
+      <span class="contract-detail-label">Date Range</span>
+      <span class="contract-detail-value">${c.startDate || ''} &rarr; ${c.endDate || ''}</span>
+    </div>
+    <div class="contract-detail-row">
+      <span class="contract-detail-label">Monthly Payment</span>
+      <span class="contract-detail-value">${formatCurrency(monthly)}/mo</span>
+    </div>
+    <div class="contract-detail-row">
+      <span class="contract-detail-label">Annual Contract Value</span>
+      <span class="contract-detail-value">${formatCurrency(annual)}</span>
+    </div>
+    <div class="contract-detail-row">
+      <span class="contract-detail-label">Payment Terms</span>
+      <span class="contract-detail-value">${c.paymentTerms || c['Payment Terms'] || 'Net 30'}</span>
+    </div>
+    <div class="contract-detail-row">
+      <span class="contract-detail-label">Assigned Crew</span>
+      <span class="contract-detail-value">${c.assignedCrew || c['Assigned Crew'] || 'Unassigned'}</span>
+    </div>
+    <div class="contract-detail-row">
+      <span class="contract-detail-label">Contact Name</span>
+      <span class="contract-detail-value">${c.contactName || c['Contact Name'] || '-'}</span>
+    </div>
+    <div class="contract-detail-row">
+      <span class="contract-detail-label">Contact Email</span>
+      <span class="contract-detail-value">${c.contactEmail || c['Contact Email'] || '-'}</span>
+    </div>
+    <div class="contract-detail-row full-width">
+      <span class="contract-detail-label">Billing Address</span>
+      <span class="contract-detail-value">${c.billingAddress || c['Billing Address'] || '-'}</span>
+    </div>
+    <div class="contract-detail-row">
+      <span class="contract-detail-label">Signing Status</span>
+      <span class="contract-detail-value">${signingDetail}</span>
+    </div>
+    <div class="contract-detail-row">
+      <span class="contract-detail-label">Tickets</span>
+      <span class="contract-detail-value">${totalTickets} total (${completedTickets} completed, ${scheduledTickets} scheduled${skippedTickets ? ', ' + skippedTickets + ' skipped' : ''})</span>
+    </div>
+    ${status === 'terminated' ? `
+    <div class="contract-detail-row">
+      <span class="contract-detail-label">Terminated Date</span>
+      <span class="contract-detail-value">${c.terminatedDate || '-'}</span>
+    </div>
+    <div class="contract-detail-row">
+      <span class="contract-detail-label">Termination Reason</span>
+      <span class="contract-detail-value">${c.terminationReason || '-'}</span>
+    </div>
+    ` : ''}
+  `;
+
+  document.getElementById('contract-summary-details').innerHTML = detailsHtml;
+
+  // Services list — parse from the linked bid
+  let servicesHtml = '';
+  const bid = savedBids.find(b => b.contractId === (c.contractId || c['Contract ID']));
+  if (bid && bid.sections && bid.sections.length > 0) {
+    const serviceItems = bid.sections
+      .filter(s => s.tier === 'fixed' || s.includeInContract)
+      .map(s => {
+        const freq = s.frequency || s.serviceFrequency || '';
+        return `<div class="contract-service-item">
+          <span>${s.sectionName || s.name || 'Service'}</span>
+          <span class="service-freq">${freq}</span>
+        </div>`;
+      });
+    if (serviceItems.length > 0) {
+      servicesHtml = `<h4>Services</h4>${serviceItems.join('')}`;
+    }
+  }
+
+  // Fallback: derive services from tickets
+  if (!servicesHtml && scheduleTickets.length > 0) {
+    const serviceNames = new Set();
+    scheduleTickets.forEach(t => {
+      (t.services || []).forEach(s => serviceNames.add(s.name || s.serviceName || ''));
+    });
+    if (serviceNames.size > 0) {
+      const items = [...serviceNames].filter(Boolean).map(n =>
+        `<div class="contract-service-item"><span>${n}</span><span class="service-freq"></span></div>`
+      );
+      servicesHtml = `<h4>Services</h4>${items.join('')}`;
+    }
+  }
+
+  document.getElementById('contract-summary-services').innerHTML = servicesHtml;
+}
+
+/**
+ * Switch from summary to tickets sub-view
+ */
+function showContractTickets() {
+  document.getElementById('contracts-summary-panel').style.display = 'none';
+  document.getElementById('contracts-tickets-subview').style.display = 'block';
+
+  // Render current sub-view
+  if (scheduleViewMode === 'service') {
+    renderServiceSchedule();
+  } else {
+    renderCalendar();
+  }
+}
+
+/**
+ * Go back from tickets sub-view to contract summary
+ */
+function showContractSummaryFromTickets() {
+  document.getElementById('contracts-tickets-subview').style.display = 'none';
+  document.getElementById('contracts-summary-panel').style.display = 'block';
+}
+
+/**
+ * Open the linked estimate in the builder
+ */
+function openEstimateFromContract() {
+  if (!scheduleContract) return;
+  const bidId = scheduleContract.bidId || scheduleContract['Bid ID'];
+  if (!bidId) {
+    showToast('No linked estimate found for this contract.', 'error');
+    return;
+  }
+  openSavedEstimate(bidId);
+}
+
+/**
+ * Open the contract PDF in a new tab
+ */
+function openContractPdf() {
+  if (!scheduleContract) return;
+  const url = scheduleContract.pdfUrl || scheduleContract['PDF URL'];
+  if (url) window.open(url, '_blank');
+}
+
+/**
+ * Open the signed contract PDF in a new tab
+ */
+function openSignedPdf() {
+  if (!scheduleContract) return;
+  const url = scheduleContract.signedPdfUrl;
+  if (url) window.open(url, '_blank');
+}
+
+/**
+ * Show the terminate contract dialog
+ */
+function showTerminateDialog() {
+  document.getElementById('terminate-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('terminate-reason').value = '';
+  document.getElementById('terminate-contract-dialog').style.display = 'flex';
+}
+
+/**
+ * Close the terminate contract dialog
+ */
+function closeTerminateDialog() {
+  document.getElementById('terminate-contract-dialog').style.display = 'none';
+}
+
+/**
+ * Execute contract termination
+ */
+async function confirmTerminateContract() {
+  if (!scheduleContract) return;
+  const terminatedDate = document.getElementById('terminate-date').value;
+  const terminationReason = document.getElementById('terminate-reason').value.trim();
+
+  if (!terminatedDate) {
+    showToast('Please select an effective date.', 'error');
+    return;
+  }
+
+  if (!confirm(`Terminate contract ${scheduleContract.contractId}?\n\nThis will delete all future scheduled tickets after ${terminatedDate}. Completed work will be preserved.`)) {
+    return;
+  }
+
+  try {
+    const resp = await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        terminateContract: true,
+        contractId: scheduleContract.contractId,
+        terminatedDate: terminatedDate,
+        terminationReason: terminationReason
+      })
+    });
+    const result = await resp.json();
+
+    if (result.success) {
+      closeTerminateDialog();
+      showToast(`Contract terminated. ${result.deletedTickets || 0} future tickets deleted.`, 'success', 5000);
+
+      // Refresh contract data and re-render summary
+      await openContractDetail(scheduleContract.contractId, scheduleContract.propertyAddress);
+    } else {
+      showToast('Error terminating contract: ' + (result.error || 'Unknown'), 'error');
+    }
+  } catch (err) {
+    console.error('Error terminating contract:', err);
+    showToast('Error terminating contract. Check your connection.', 'error');
   }
 }
 

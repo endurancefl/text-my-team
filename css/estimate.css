@@ -671,6 +671,7 @@ body {
 .status-revision { background: var(--yellow-light); color: #B06000; }
 .status-signed { background: var(--green-light); color: var(--green); }
 .status-awaiting { background: var(--blue-lighter); color: var(--blue-primary); }
+.status-revised { background: var(--yellow-light); color: #B06000; }
 
 /* ═══════════════════════════════════════════════════════════════ */
 /*  SCHEDULE VIEW                                                  */
@@ -7098,6 +7099,202 @@ select option:checked {
   .marvin-panel.open {
     width: 100vw;
     min-width: 100vw;
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   CONTRACT SUMMARY PANEL
+   ═══════════════════════════════════════════════════ */
+
+#contracts-summary-panel {
+  padding: 0 16px 24px;
+}
+
+.contract-summary-back {
+  margin-bottom: 12px;
+}
+
+.contract-summary-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.contract-summary-header h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.contract-summary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.contract-summary-actions .btn {
+  font-size: 13px;
+  padding: 6px 14px;
+}
+
+.btn-danger {
+  background: #dc3545;
+  color: #fff;
+  border: none;
+  border-radius: var(--gw-radius-md, 6px);
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.btn-danger:hover {
+  background: #c82333;
+}
+
+.contract-summary-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  border: 1px solid var(--gw-border, #e0e0e0);
+  border-radius: var(--gw-radius-md, 6px);
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+
+.contract-detail-row {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--gw-border, #e0e0e0);
+  min-width: 0;
+}
+
+.contract-detail-row:nth-child(odd) {
+  border-right: 1px solid var(--gw-border, #e0e0e0);
+}
+
+.contract-detail-row.full-width {
+  grid-column: 1 / -1;
+  border-right: none;
+}
+
+.contract-detail-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--gw-text-secondary, #888);
+  margin-bottom: 2px;
+}
+
+.contract-detail-value {
+  font-size: 14px;
+  color: var(--gw-text-primary, #333);
+  word-break: break-word;
+}
+
+.contract-summary-services {
+  margin-bottom: 24px;
+}
+
+.contract-summary-services h4 {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.contract-service-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border: 1px solid var(--gw-border, #e0e0e0);
+  border-radius: var(--gw-radius-sm, 4px);
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
+.contract-service-item .service-freq {
+  font-size: 12px;
+  color: var(--gw-text-secondary, #888);
+}
+
+/* Status badges for contract summary */
+.contract-status-signed {
+  background: #d4edda;
+  color: #155724;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.contract-status-active {
+  background: #cce5ff;
+  color: #004085;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.contract-status-terminated {
+  background: #f8d7da;
+  color: #721c24;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.contract-status-revised {
+  background: #fff3cd;
+  color: #856404;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.contract-status-unsent {
+  background: #e2e3e5;
+  color: #383d41;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Terminate dialog uses .modal-overlay from existing styles */
+#terminate-contract-dialog {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+#terminate-contract-dialog.active {
+  display: flex;
+}
+
+#terminate-contract-dialog .modal-content {
+  background: #fff;
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+}
+
+@media (max-width: 600px) {
+  .contract-summary-details {
+    grid-template-columns: 1fr;
+  }
+  .contract-detail-row:nth-child(odd) {
+    border-right: none;
   }
 }
 

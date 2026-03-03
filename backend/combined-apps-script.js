@@ -20,6 +20,8 @@ function doGet(e) {
       case 'getInitData':
         var remindersResult;
         try { remindersResult = getReminders(); } catch(re) { remindersResult = { success: true, reminders: [] }; }
+        var contractsResult;
+        try { contractsResult = getContracts(); } catch(ce) { contractsResult = { success: true, contracts: [] }; }
         return jsonResponse({
           success: true,
           itemCatalog: getItemCatalog(),
@@ -31,7 +33,8 @@ function doGet(e) {
           properties: getEstimatingProperties(),
           propertyContacts: getPropertyContacts(),
           subContractors: getSubContractors(),
-          reminders: remindersResult
+          reminders: remindersResult,
+          contracts: contractsResult
         });
 
       // ─── Estimate Builder ───
@@ -137,6 +140,9 @@ function doPost(e) {
     }
     if (data.deleteFutureTickets) {
       return jsonResponse(deleteFutureTickets(data));
+    }
+    if (data.terminateContract) {
+      return jsonResponse(terminateContract(data));
     }
     if (data.updateTicketStatus) {
       return jsonResponse(updateTicketStatus(data));
@@ -981,6 +987,16 @@ function updateContract(data) {
         'ticketsGenerated': data.ticketsGenerated
       };
 
+      // Reset signing fields on revision
+      if (data.revisionReset) {
+        fieldsToUpdate['signingStatus'] = 'revised';
+        fieldsToUpdate['signedName'] = '';
+        fieldsToUpdate['signedAt'] = '';
+        fieldsToUpdate['signedPdfUrl'] = '';
+        fieldsToUpdate['signedPdfFileId'] = '';
+        fieldsToUpdate['pdfHash'] = '';
+      }
+
       for (var field in fieldsToUpdate) {
         var col = headers.indexOf(field);
         if (col >= 0 && fieldsToUpdate[field] !== undefined) {
@@ -1031,6 +1047,55 @@ function deleteFutureTickets(data) {
   }
 
   return { success: true, deletedCount: deletedCount };
+}
+
+function terminateContract(data) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Contracts');
+  if (!sheet) return { success: false, error: 'Contracts sheet not found' };
+
+  // Ensure terminatedDate and terminationReason columns exist
+  var tempHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  ['terminatedDate', 'terminationReason'].forEach(function(colName) {
+    if (tempHeaders.indexOf(colName) === -1) {
+      var nextCol = tempHeaders.length + 1;
+      sheet.getRange(1, nextCol).setValue(colName).setFontWeight('bold');
+      tempHeaders.push(colName);
+    }
+  });
+
+  var rows = sheet.getDataRange().getValues();
+  var headers = rows[0];
+
+  var contractIdCol = headers.indexOf('Contract ID');
+  if (contractIdCol === -1) contractIdCol = headers.indexOf('contractId');
+  if (contractIdCol === -1) return { success: false, error: 'Contract ID column not found' };
+
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][contractIdCol]) === String(data.contractId)) {
+      // Set status to terminated
+      var statusCol = headers.indexOf('Status');
+      if (statusCol >= 0) sheet.getRange(i + 1, statusCol + 1).setValue('terminated');
+
+      // Write terminated date
+      var tdCol = headers.indexOf('terminatedDate');
+      if (tdCol >= 0) sheet.getRange(i + 1, tdCol + 1).setValue(data.terminatedDate || new Date().toISOString().split('T')[0]);
+
+      // Write termination reason
+      var trCol = headers.indexOf('terminationReason');
+      if (trCol >= 0) sheet.getRange(i + 1, trCol + 1).setValue(data.terminationReason || '');
+
+      // Delete future scheduled tickets
+      var deletedResult = deleteFutureTickets({
+        contractId: data.contractId,
+        afterDate: data.terminatedDate || new Date().toISOString().split('T')[0]
+      });
+
+      return { success: true, deletedTickets: deletedResult.deletedCount || 0 };
+    }
+  }
+
+  return { success: false, error: 'Contract not found: ' + data.contractId };
 }
 
 function getContracts() {
