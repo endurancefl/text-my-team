@@ -4581,7 +4581,10 @@ function setTakeoffInputMode(sectionId, mode) {
 
 function buildEquipmentSelect(currentName, idx) {
   const items = itemCatalog.filter(c => c.category === 'Mowing' || c.item.includes('Mower') || c.item.includes('Trimmer') || c.item === 'Blade Edge');
-  let opts = items.map(it => `<option value="${it.item}"${it.item === currentName ? ' selected' : ''}>${it.item}</option>`).join('');
+  let opts = items.map(it => {
+    const escaped = it.item.replace(/"/g, '&quot;');
+    return `<option value="${escaped}"${it.item === currentName ? ' selected' : ''}>${it.item}</option>`;
+  }).join('');
   return `<select class="mower-name-select" data-index="${idx}" onchange="updateMowerName(${idx}, this.value)" style="font-size:12px;border:none;background:transparent;max-width:120px;">${opts}</select>`;
 }
 
@@ -4668,10 +4671,10 @@ function onTakeoffInput(input) {
   switch (section) {
     case 'lawnEquipment': {
       const rawSF = t.lawn.rawSF || 0;
-      if (rawSF > 0 && t.lawn.equipment[rowIdx]) {
+      if (t.lawn.equipment[rowIdx]) {
         if (field === 'pct') {
           t.lawn.equipment[rowIdx].percentage = rawVal;
-        } else {
+        } else if (rawSF > 0) {
           t.lawn.equipment[rowIdx].percentage = rawVal / rawSF * 100;
         }
       }
