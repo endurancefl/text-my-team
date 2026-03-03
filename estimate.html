@@ -12811,7 +12811,9 @@ function renderEstimateHeader() {
     actionsHtml += `<button class="btn btn-sm btn-success" onclick="openFinalizeModal()">Update Contract</button>`;
   } else if (status === 'Finalized') {
     actionsHtml += `<button class="btn btn-secondary" onclick="enterRevisionMode()">Revise Estimate</button>`;
-    actionsHtml += `<button class="btn btn-secondary" onclick="openContractDetail('${contractId}', '${address.replace(/'/g, "\\'")}')">View Schedule</button>`;
+    if (isSigned && hasTickets) {
+      actionsHtml += `<button class="btn btn-secondary" onclick="openContractDetail('${contractId}', '${address.replace(/'/g, "\\'")}')">View Schedule</button>`;
+    }
 
     // PDF actions
     if (hasPdf && hasSignedPdf) {
@@ -13001,21 +13003,28 @@ async function loadContractsList() {
 function renderContractsList() {
   const container = document.getElementById('contracts-list-content');
 
-  if (allContracts.length === 0) {
+  // Only show signed or terminated contracts (pre-signing workflow stays in Estimates)
+  const visibleContracts = allContracts.filter(c => {
+    const sigStatus = (c.signingStatus || '').toLowerCase();
+    const status = (c.status || 'active').toLowerCase();
+    return sigStatus === 'signed' || status === 'terminated';
+  });
+
+  if (visibleContracts.length === 0) {
     container.innerHTML = `
       <div class="empty-state">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
           <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
         </svg>
-        <h3>No Contracts Yet</h3>
-        <p>Finalize an estimate to create a contract and generate scheduled tickets.</p>
+        <h3>No Signed Contracts Yet</h3>
+        <p>Contracts appear here after the customer has signed. Manage the signing workflow from Estimates.</p>
       </div>
     `;
     return;
   }
 
   // Sort: active first, then by start date descending
-  const sorted = [...allContracts].sort((a, b) => {
+  const sorted = [...visibleContracts].sort((a, b) => {
     if (a.status === 'active' && b.status !== 'active') return -1;
     if (b.status === 'active' && a.status !== 'active') return 1;
     return (b.startDate || '').localeCompare(a.startDate || '');
