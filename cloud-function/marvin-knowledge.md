@@ -29,7 +29,7 @@ PDF generation and AI features run on AWS Lambda.
 | `contacts` | Contacts | CRM: manage contacts with stages (Lead, Prospect, Customer) |
 | `contracts` | Contracts | Active service contracts with schedule and signing status |
 | `properties` | Properties | Property entities with measurements, contacts, sub-contractors |
-| `schedule` | Schedule | Calendar for contract-based tickets, filterable by crew and division |
+| `schedule` | Schedule | Calendar for contract-based tickets, filterable by crew and division. Shows hours badges per day — green when under Daily Crew Capacity, red when over. |
 
 ### Financials
 | View ID | Name | Purpose |
@@ -237,9 +237,23 @@ Lawn, Mulch Bed, Gravel Bed, Hedge, Hardscape (auto = Driveway + Pavement + Side
 | Commercial Material Markup | 100% | Doubles material cost for commercial |
 | Commercial Sub Markup | 10% | Subcontractor markup for commercial |
 | Default Travel Time | 30% | Added to labor hours |
+| Daily Crew Capacity | 33 man-hours | Max crew workload per day. Schedule hours badges turn red when a day exceeds this. Editable in Settings → Daily Crew Capacity (Man-Hours). |
 | Division | Maintenance | Currently only MNT is fully built |
 
 Estimate-level overrides take precedence over bid settings. Property type (Residential/Commercial) determines which markup set is used.
+
+---
+
+## Schedule View
+
+The Schedule view shows a calendar (month and week views) of all tickets generated from active contracts. Key features:
+
+- **Hours badges**: Each day shows total estimated man-hours for all tickets on that day. Color-coded against the **Daily Crew Capacity** setting (default 33 man-hours, editable in Settings). Green = under capacity, red = over capacity. This helps the user spot overloaded days at a glance.
+- **Week view**: Shows daily hour totals per day with ticket details. Hours badge also appears per day.
+- **Filtering**: Can filter by crew assignment and division.
+- **Ticket cards**: Click a day to see individual tickets — each shows property, services, estimated hours, assigned crew.
+
+The Daily Crew Capacity setting is found in **Settings → Daily Crew Capacity (Man-Hours)** and represents the total man-hours your crew can handle in a single day.
 
 ---
 

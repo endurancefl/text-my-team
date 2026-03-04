@@ -70,7 +70,7 @@ text-my-team/
 ├── cloud-function/                # AWS Lambda PDF generation
 │   ├── pdf_generator.py           # PDF library (WeasyPrint + ReportLab)
 │   ├── lambda_function.py         # AWS Lambda handler (~943 lines)
-│   ├── marvin-knowledge.md        # MARVIN AI knowledge base (~441 lines, loaded at cold start)
+│   ├── marvin-knowledge.md        # MARVIN AI knowledge base (~455 lines, loaded at cold start)
 │   ├── Dockerfile                 # WeasyPrint container image
 │   ├── requirements.txt
 │   ├── templates/                 # Jinja2 HTML/CSS templates for PDFs
