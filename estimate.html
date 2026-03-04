@@ -17272,6 +17272,7 @@ let schedDragTicketId = null;
 let schedDragSourceIdx = null;
 let schedDayDragCrew = null;
 let schedDayDragging = false;
+let schedDayDropAbove = false;
 let schedQueueMode = false;
 let schedQueueCount = 0;
 let rescheduleQueueCache = [];
@@ -17325,8 +17326,16 @@ async function loadScheduleCrewFilter() {
     var data = await resp.json();
     if (data.success && data.crews) {
       schedCrewSizes = data.crewSizes || {};
-      // Deduplicate crews (trim whitespace to prevent phantom duplicates)
-      var uniqueCrews = [...new Set(data.crews.map(function(c) { return c.trim(); }))];
+      // Deduplicate crews (normalize whitespace and invisible chars)
+      var seen = {};
+      var uniqueCrews = [];
+      data.crews.forEach(function(c) {
+        var name = c.replace(/\s+/g, ' ').trim();
+        if (name && !seen[name]) {
+          seen[name] = true;
+          uniqueCrews.push(name);
+        }
+      });
       uniqueCrews.forEach(function(crew, i) {
         var opt = document.createElement('option');
         opt.value = crew;
@@ -17567,11 +17576,14 @@ function schedDayDragOver(e) {
   e.preventDefault();
   var card = e.target.closest('.sched-stop-card');
   if (!card) return;
-  card.closest('.sched-day-stops').querySelectorAll('.sched-stop-card').forEach(function(c) {
+  var container = card.closest('.sched-day-stops');
+  if (container) container.querySelectorAll('.sched-stop-card').forEach(function(c) {
     c.classList.remove('drag-over-above', 'drag-over-below');
   });
   var rect = card.getBoundingClientRect();
-  if (e.clientY < rect.top + rect.height / 2) card.classList.add('drag-over-above');
+  var isAbove = e.clientY < rect.top + rect.height / 2;
+  schedDayDropAbove = isAbove;
+  if (isAbove) card.classList.add('drag-over-above');
   else card.classList.add('drag-over-below');
 }
 
@@ -17581,7 +17593,20 @@ function schedDayDrop(e, dropIdx, dropCrew) {
     c.classList.remove('drag-over-above', 'drag-over-below', 'dragging');
   });
 
-  if (schedDayDragCrew !== dropCrew || schedDragSourceIdx === dropIdx) {
+  if (schedDayDragCrew !== dropCrew) {
+    schedDragTicketId = null; schedDragSourceIdx = null; schedDayDragCrew = null;
+    return;
+  }
+
+  // Calculate the actual insert position based on above/below indicator
+  var insertIdx = schedDayDropAbove ? dropIdx : dropIdx + 1;
+  var srcIdx = schedDragSourceIdx;
+
+  // Adjust for removal: if dragging from before the insert point, removing shifts indices down
+  if (srcIdx < insertIdx) insertIdx--;
+
+  // No-op if position unchanged
+  if (srcIdx === insertIdx) {
     schedDragTicketId = null; schedDragSourceIdx = null; schedDayDragCrew = null;
     return;
   }
@@ -17591,9 +17616,9 @@ function schedDayDrop(e, dropIdx, dropCrew) {
     return t.eventDate === dateStr && (t.assignedCrew || 'Unassigned') === dropCrew;
   }).sort(function(a, b) { return (a.stopOrder || 999) - (b.stopOrder || 999); });
 
-  var moved = crewTickets.splice(schedDragSourceIdx, 1)[0];
+  var moved = crewTickets.splice(srcIdx, 1)[0];
   if (!moved) { schedDragTicketId = null; schedDragSourceIdx = null; schedDayDragCrew = null; return; }
-  crewTickets.splice(dropIdx, 0, moved);
+  crewTickets.splice(insertIdx, 0, moved);
   crewTickets.forEach(function(t, i) { t.stopOrder = i + 1; });
 
   fetch(GOOGLE_SHEETS_URL, {
