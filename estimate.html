@@ -5940,6 +5940,9 @@ function captureElementContext(el) {
   const classes = Array.from(el.classList).join(' ');
   const textContent = (el.textContent || '').trim().slice(0, 200);
   const onclickAttr = el.getAttribute('onclick') || '';
+  const titleAttr = el.getAttribute('title') || '';
+  const ariaLabel = el.getAttribute('aria-label') || '';
+  const placeholder = el.getAttribute('placeholder') || '';
 
   // Data attributes
   const dataAttrs = {};
@@ -5947,6 +5950,45 @@ function captureElementContext(el) {
     if (attr.name.startsWith('data-')) {
       dataAttrs[attr.name] = attr.value.slice(0, 100);
     }
+  }
+
+  // Visual state — colors and visibility cues
+  const computed = window.getComputedStyle(el);
+  const visualState = {};
+  const color = computed.color;
+  const bgColor = computed.backgroundColor;
+  if (color && !color.includes('0, 0, 0')) visualState.textColor = color;
+  if (bgColor && bgColor !== 'rgba(0, 0, 0, 0)' && bgColor !== 'transparent') visualState.bgColor = bgColor;
+  if (computed.fontWeight >= 600) visualState.bold = true;
+
+  // Surrounding context — sibling text and parent container text
+  const surroundingContext = {};
+  // Previous sibling
+  const prevSib = el.previousElementSibling;
+  if (prevSib) surroundingContext.before = (prevSib.textContent || '').trim().slice(0, 100);
+  // Next sibling
+  const nextSib = el.nextElementSibling;
+  if (nextSib) surroundingContext.after = (nextSib.textContent || '').trim().slice(0, 100);
+  // Parent's full text (gives label + value context)
+  if (el.parentElement && el.parentElement !== document.body) {
+    surroundingContext.parentText = (el.parentElement.textContent || '').trim().slice(0, 300);
+  }
+  // Grandparent text for even broader context (e.g. a card or row)
+  const grandparent = el.parentElement?.parentElement;
+  if (grandparent && grandparent !== document.body) {
+    surroundingContext.grandparentText = (grandparent.textContent || '').trim().slice(0, 400);
+  }
+
+  // Input-specific info
+  const inputInfo = {};
+  if (tag === 'input' || tag === 'select' || tag === 'textarea') {
+    inputInfo.type = el.type || '';
+    inputInfo.value = (el.value || '').slice(0, 100);
+    inputInfo.name = el.name || '';
+    if (placeholder) inputInfo.placeholder = placeholder;
+    // Find associated label
+    const label = el.id ? document.querySelector('label[for="' + el.id + '"]') : null;
+    if (label) inputInfo.label = label.textContent.trim().slice(0, 100);
   }
 
   // Parent chain (up to 5 levels)
@@ -5975,7 +6017,12 @@ function captureElementContext(el) {
     classes,
     text: textContent,
     onclick: onclickAttr,
+    title: titleAttr || undefined,
+    ariaLabel: ariaLabel || undefined,
     dataAttributes: Object.keys(dataAttrs).length ? dataAttrs : undefined,
+    visualState: Object.keys(visualState).length ? visualState : undefined,
+    surroundingContext,
+    inputInfo: Object.keys(inputInfo).length ? inputInfo : undefined,
     parentChain,
     closestContainer,
     currentView: typeof currentView !== 'undefined' ? currentView : 'unknown'
