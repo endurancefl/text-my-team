@@ -17398,9 +17398,11 @@ function renderSchedWeek() {
   }
   html += '</div>';
 
+  var weekCapacity = bidSettings.dailyCrewCapacity || 33;
   html += '<div class="sched-week-totals-row">';
   for (var t = 0; t < 7; t++) {
-    html += '<div class="sched-week-day-total">' + (dayTotals[t] > 0 ? dayTotals[t].toFixed(2) + ' hrs' : '—') + '</div>';
+    var overCls = dayTotals[t] > weekCapacity ? ' style="color:#c5221f;font-weight:700;"' : '';
+    html += '<div class="sched-week-day-total"' + overCls + '>' + (dayTotals[t] > 0 ? dayTotals[t].toFixed(2) + ' hrs' : '—') + '</div>';
   }
   html += '</div>';
 
@@ -17481,7 +17483,14 @@ function renderSchedMonth() {
     var isToday = cellDate.getTime() === today.getTime();
     var dayTickets = ticketsByDate[dateStr] || [];
 
-    var cls = 'calendar-cell' + (isOther ? ' other-month' : '') + (isToday ? ' today' : '');
+    var dayTotalHours = 0;
+    dayTickets.forEach(function(t) {
+      dayTotalHours += (parseFloat(t.totalEstHours) || 0) + (parseFloat(t.travelHours) || 0);
+    });
+    var capacity = bidSettings.dailyCrewCapacity || 33;
+    var isOverCap = dayTotalHours > capacity;
+
+    var cls = 'calendar-cell' + (isOther ? ' other-month' : '') + (isToday ? ' today' : '') + (isOverCap ? ' over-capacity' : '');
 
     html += '<div class="' + cls + '" data-date="' + dateStr + '"';
     html += ' ondragover="event.preventDefault(); this.style.background=\'#e8f0fe\'"';
@@ -17489,6 +17498,9 @@ function renderSchedMonth() {
     html += ' ondrop="schedMonthDrop(event, \'' + dateStr + '\')"';
     html += ' ondblclick="schedDate = new Date(\'' + dateStr + 'T00:00:00\'); setSchedMode(\'day\')">';
     html += '<div class="calendar-day-number">' + cellDate.getDate() + '</div>';
+    if (dayTotalHours > 0) {
+      html += '<div class="calendar-day-hours' + (isOverCap ? ' over-capacity' : '') + '">' + dayTotalHours.toFixed(1) + ' hrs</div>';
+    }
 
     dayTickets.slice(0, 4).forEach(function(ticket) {
       var colorIdx = schedCrewColors[ticket.assignedCrew || ''] || 0;
