@@ -34,19 +34,19 @@ PDF generation and AI features run on AWS Lambda.
 ### Financials
 | View ID | Name | Purpose |
 |---------|------|---------|
-| `invoices` | Invoices | Invoice management (draft, sent, overdue, paid) |
-| `financials` | Financials | Financial reporting dashboard |
+| `invoices` | Invoices | Invoice lifecycle: draft → sent → overdue → paid. Summary cards, batch generation, Record Payment, Stripe auto-pay. |
+| `financials` | Financials | Revenue dashboard: Collected vs Earned vs Deferred, monthly bar chart, active contracts table. |
 
 ### Configuration
 | View ID | Name | Purpose |
 |---------|------|---------|
 | `catalog` | Item Catalog | Labor and material items with production rates by difficulty |
 | `services` | Service Catalog | Pre-configured services with default items, visits, billing tiers |
-| `production` | Production Rates | Actual vs estimated production analysis |
-| `worktickets` | Reminders | Reminder management (active, permanent, completed) |
-| `reports` | Reports | Weekly reports view |
-| `templates` | Templates | Save/load/duplicate estimate templates |
-| `settings` | Settings | Global bid settings (rates, markups, travel, knowledge base) |
+| `production` | Production Rates | Actual vs estimated production analysis by crew, date range, service, and item. |
+| `worktickets` | Reminders | Crew reminders — Active, Permanent, Completed filters. Assign to crew with date. |
+| `reports` | Reports | Weekly property reports: visits per property, email to customers, bulk send. |
+| `templates` | Templates | Save/load/duplicate estimate templates. Template picker appears when starting a new estimate. |
+| `settings` | Settings | Company rates, markups, travel %, Daily Crew Capacity, MARVIN Knowledge Base. |
 
 ---
 
@@ -246,14 +246,151 @@ Estimate-level overrides take precedence over bid settings. Property type (Resid
 
 ## Schedule View
 
-The Schedule view shows a calendar (month and week views) of all tickets generated from active contracts. Key features:
+The Schedule view shows a calendar of all tickets generated from active contracts. Three modes:
 
-- **Hours badges**: Each day shows total estimated man-hours for all tickets on that day. Color-coded against the **Daily Crew Capacity** setting (default 33 man-hours, editable in Settings). Green = under capacity, red = over capacity. This helps the user spot overloaded days at a glance.
-- **Week view**: Shows daily hour totals per day with ticket details. Hours badge also appears per day.
-- **Filtering**: Can filter by crew assignment and division.
-- **Ticket cards**: Click a day to see individual tickets — each shows property, services, estimated hours, assigned crew.
+- **Month view**: Calendar grid with hours badges per day. Color-coded against **Daily Crew Capacity** (default 33 man-hours, editable in Settings → Daily Crew Capacity). Green = under capacity, red = over capacity. Helps spot overloaded days at a glance.
+- **Week view**: 7-day grid showing ticket cards per day. Hours badges per day, same capacity color coding. Supports drag-and-drop to reschedule tickets to different days.
+- **Day view**: Detailed stop list for a single day per crew. Drag-to-reorder stops within the same crew.
+- **Filtering**: Filter by crew assignment and/or division (MNT, IRR, CON, ENH).
+- **Needs Reschedule queue**: Button with badge count shows skipped tickets that need new dates. Can reschedule individual tickets from the queue.
+- **Ticket cards**: Each shows property address, services, estimated hours, assigned crew, and status.
 
 The Daily Crew Capacity setting is found in **Settings → Daily Crew Capacity (Man-Hours)** and represents the total man-hours your crew can handle in a single day.
+
+---
+
+## Financials View
+
+Revenue dashboard showing the health of all active contracts:
+
+- **Summary cards**: Collected To Date (green), Earned To Date (blue), Deferred Revenue or "Ahead of Schedule" (orange or green). Deferred means you've collected more than you've earned — Ahead of Schedule means you've earned more than collected.
+- **Monthly Revenue Chart**: Bar chart comparing Earned vs Collected per month. Paginate through months with Older/Newer buttons.
+- **Active Contracts Table**: Lists all active contracts with their collected and earned totals.
+
+Revenue is calculated from completed tickets (earned) vs recorded invoice payments (collected). This view helps the user understand cash flow and whether work is keeping pace with billing.
+
+---
+
+## Invoices View
+
+Full invoice lifecycle management:
+
+- **Summary cards**: Outstanding balance, Overdue amount, Collected this month, Draft count.
+- **Status filters**: All, Draft, Sent, Overdue, Paid.
+- **Invoice statuses**: `draft` (not finalized) → `sent` (delivered to customer) → `overdue` (past due date) → `paid` (fully paid). Also `partial` (partially paid).
+- **Generate Invoices**: Batch-generates monthly invoices for all active contracts with deduplication (won't create duplicates for already-invoiced months).
+- **Invoice detail**: Shows contract info, line items, payment history. Actions: Finalize (locks draft), Send (emails to customer), Void (cancels), Record Payment (amount, method: check/cash/card/ACH, date, notes).
+- **Auto-pay (Stripe)**: Contracts can be set up for automatic payment via credit card (2.9% surcharge) or ACH. Configured from the contract detail view.
+
+---
+
+## Properties View
+
+Property profiles with all linked data:
+
+- **Property list**: Searchable grid of all properties. Filter by contract status.
+- **Property profile** (click a property): Shows full details with sub-panels:
+  - **Linked Contacts**: People associated with this property, with roles.
+  - **Active Contract**: Current contract info if one exists.
+  - **Bids/Estimates**: All draft or past estimates for this property.
+  - **Projects**: One-off work (Enhancement, Construction, Irrigation jobs).
+  - **Service History**: Timeline of completed work at this property.
+  - **Sub-Contractors**: Third-party vendors linked to this property.
+- **Create Estimate**: Can start a new estimate directly from a property profile, pre-filling the property info.
+
+---
+
+## Contacts View (CRM)
+
+Contact management with sales pipeline stages:
+
+- **Stages**: Lead → Prospect → Customer. Contacts auto-upgrade to "Customer" when a contract is signed and finalized.
+- **Contact list**: Searchable, filterable by stage. Shows initials avatar, name, company.
+- **Contact profile** (click a contact): Shows linked properties, associated estimates/contracts, and a "Start Estimate" action to begin a new bid for that contact.
+- **Stage workflow**: Manually change stages via dropdown in profile, or they auto-upgrade on contract finalization.
+
+---
+
+## Contracts View
+
+Shows only **signed** contracts (the signing workflow happens in Estimates):
+
+- **Contract list**: Cards with property address, dates, assigned crew, status badge. Shows "Needs Schedule" indicator for signed contracts that don't have tickets generated yet.
+- **Contract detail** (click a contract):
+  - Summary panel: address, status, signing info (who signed, when, IP).
+  - Actions: View Tickets, View PDF, View Signed PDF, Generate Schedule, Terminate Contract.
+  - **Generate Schedule**: Two-phase process — first Preview (shows proposed tickets), then Finalize (creates actual tickets). Can cancel preview.
+  - **Tickets sub-view**: Service list view or Calendar view (drag-and-drop scheduling).
+- **Contract statuses**: `active` (running), `signed` (pre-schedule), `terminated` (ended early).
+- **Signing statuses**: `unsent` → `sent` → `viewed` → `signed`. Also `revised` (contract changed, needs re-signing).
+- **Auto-pay setup**: Can set up Stripe auto-pay (card or ACH) from the contract detail.
+
+---
+
+## Reports View
+
+Weekly property reports for emailing to customers:
+
+- **Week selector**: Navigate between weeks with Prev/Next buttons.
+- **Summary**: Properties Serviced count, Total Visits count, Ready to Send count.
+- **Report cards**: One per property serviced that week. Shows customer name/email, list of visits with dates and services performed.
+- **Email Report**: Send individual report to customer (requires email on file — shows "No Email" if missing).
+- **Send All Reports**: Bulk-send all reports for the selected week.
+
+---
+
+## Reminders View (Work Tickets)
+
+Crew reminders and standing instructions, separate from recurring service tickets:
+
+- **Filters**: Active (default), Permanent (recurring/standing reminders), Completed, All.
+- **Search**: Filter reminders by text.
+- **Create Reminder**: Modal with property selector, description, scheduled date, assign to crew.
+- **Permanent reminders**: Standing instructions that persist (e.g., "Gate code changed to 1234" or "Dog in backyard — use side gate").
+
+---
+
+## Templates View
+
+Save and reuse estimate configurations:
+
+- **Template list**: Grid of saved templates with Edit, Duplicate, Delete actions.
+- **Save as Template**: Save the current estimate's services and configuration as a reusable template (name + description).
+- **Template picker**: When starting a new estimate, a template picker modal appears letting the user choose a saved template to pre-fill services and line items.
+- **Duplicate**: Clone a template to create variations.
+
+---
+
+## Production Analysis View
+
+Compare actual crew performance against estimates:
+
+- **Date range picker**: Select a date range to analyze.
+- **Crew filter**: Filter by specific crew or all crews.
+- **Services tab**: Shows each service with estimated vs actual man-hours, highlighting over/under performance.
+- **Item Rates tab**: Shows actual production rates vs catalog rates for individual items (e.g., actual mowing SF/hour vs the catalog rate).
+- Helps identify where estimates are too generous or too tight, and which crews are most efficient.
+
+---
+
+## Estimate Builder Details
+
+### Job Type Picker
+When starting a new estimate, user chooses:
+- **Recurring Contract**: Standard monthly maintenance with scheduled visits. Services can use any billing tier.
+- **Work Ticket**: One-off or multi-day project. All services forced to fixed billing, visits = 1. Optional deposit (default 25%).
+
+### Contract Settings Card
+- **Recurring**: Start/End dates, Duration (months), Payment months, Price increase %, Payment terms (Net 30), CC fee.
+- **Work Ticket**: Project name, Schedule type (Single/Multi-day), Start/End dates, Deposit enabled + percentage.
+- **Rate Overrides**: Labor rate, Labor/Material/Sub markup percentages, Travel %. These override the global settings for this estimate only.
+
+### Summary Panel
+Shows calculated totals for the current estimate:
+- Annual total, Monthly payment, Per-visit price
+- Internal cost, Profit, Margin %
+- Labor hours breakdown (work hours + travel hours)
+- **Finalize button**: Locks the estimate, creates the contract, generates PDF for signing.
 
 ---
 
