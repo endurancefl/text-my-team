@@ -13297,11 +13297,15 @@ function renderContractsList() {
         const monthly = contract.monthlyPayment || 0;
         const months = contract.contractMonths || 12;
         const yearly = monthly * months;
+        const needsSchedule = (contract.signingStatus || '').toLowerCase() === 'signed'
+          && contract.ticketsGenerated !== 'Yes'
+          && (contract.status || 'active').toLowerCase() !== 'terminated';
 
         return `
           <div class="estimate-card" onclick="openContractDetail('${contract.contractId}', '${(contract.propertyAddress || '').replace(/'/g, "\\'")}')">
             <div class="estimate-card-header">
               <span class="division-badge division-mnt">MNT</span>
+              ${needsSchedule ? '<span class="needs-schedule-badge">Needs Schedule</span>' : ''}
               <div class="estimate-card-address">${contract.propertyAddress || 'No Address'}</div>
               <div class="estimate-card-date">${contract.contractId} &middot; ${contract.startDate || ''} → ${contract.endDate || ''} &middot; Crew: ${contract.assignedCrew || 'Unassigned'}</div>
             </div>
