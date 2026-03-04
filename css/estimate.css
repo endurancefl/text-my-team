@@ -890,6 +890,31 @@ body {
 
 .sched-stop-grip { color: var(--gw-border); cursor: grab; flex-shrink: 0; font-size: 16px; }
 
+.sched-stop-arrows {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: 0;
+  margin-right: -4px;
+}
+.sched-arrow-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 20px;
+  border: none;
+  background: none;
+  color: var(--gw-text-secondary);
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 0;
+}
+.sched-arrow-btn:hover { background: var(--gw-surface-container); color: var(--gw-text-primary); }
+.sched-arrow-btn:active { background: var(--gw-border); }
+.sched-arrow-btn .material-icons-outlined { font-size: 18px; }
+.sched-arrow-btn.invisible { visibility: hidden; }
+
 .sched-skip-day-btn {
   font-size: 12px; color: #c5221f; background: none; border: none; cursor: pointer;
   padding: 2px 8px; border-radius: 4px; font-weight: 500; white-space: nowrap;
