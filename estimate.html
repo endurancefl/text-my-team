@@ -17271,6 +17271,7 @@ let schedCrewsLoaded = false;
 let schedDragTicketId = null;
 let schedDragSourceIdx = null;
 let schedDayDragCrew = null;
+let schedDayDragging = false;
 let schedQueueMode = false;
 let schedQueueCount = 0;
 let rescheduleQueueCache = [];
@@ -17528,7 +17529,7 @@ function renderSchedDay() {
       html += ' ondragover="schedDayDragOver(event)"';
       html += ' ondrop="schedDayDrop(event, ' + idx + ', \'' + escapedCrew + '\')"';
       html += ' ondragend="schedDayDragEnd(event)"';
-      html += ' onclick="showSchedTicketDetail(\'' + ticket.ticketId + '\')">';
+      html += ' onclick="if(!schedDayDragging) showSchedTicketDetail(\'' + ticket.ticketId + '\')">';
       html += '<div class="sched-stop-grip">&#x2807;</div>';
       html += '<div class="sched-stop-number' + numberClass + '">' + (idx + 1) + '</div>';
       html += '<div class="sched-stop-info">';
@@ -17556,7 +17557,9 @@ function schedDayDragStart(e, ticketId, idx, crew) {
   schedDragTicketId = ticketId;
   schedDragSourceIdx = idx;
   schedDayDragCrew = crew;
+  schedDayDragging = true;
   e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', ticketId);
   e.target.closest('.sched-stop-card').classList.add('dragging');
 }
 
@@ -17611,6 +17614,7 @@ function schedDayDragEnd(e) {
   document.querySelectorAll('.sched-stop-card').forEach(function(c) {
     c.classList.remove('drag-over-above', 'drag-over-below', 'dragging');
   });
+  setTimeout(function() { schedDayDragging = false; }, 0);
 }
 
 function renderSchedWeek() {
