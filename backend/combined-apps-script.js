@@ -5136,6 +5136,39 @@ function sendContractForSigning(data) {
           }
         }
       }
+      // Resolve contact info from Contacts sheet if missing on contract row
+      if (bidJson && bidJson.contactId && (!contactName || !billingAddress)) {
+        try {
+          var contactSheet = ss.getSheetByName('Contacts');
+          if (contactSheet) {
+            var cData = contactSheet.getDataRange().getValues();
+            var cHeaders = cData[0];
+            var cIdCol = cHeaders.indexOf('contactId');
+            var cEmailCol = cHeaders.indexOf('email');
+            var cFirstCol = cHeaders.indexOf('firstName');
+            var cLastCol = cHeaders.indexOf('lastName');
+            var cDisplayCol = cHeaders.indexOf('displayName');
+            var cBillingCol = cHeaders.indexOf('billingAddress');
+            for (var ci = 1; ci < cData.length; ci++) {
+              if (String(cData[ci][cIdCol]) === String(bidJson.contactId)) {
+                if (!contactName) {
+                  contactName = cData[ci][cDisplayCol] || ((cData[ci][cFirstCol] || '') + ' ' + (cData[ci][cLastCol] || '')).trim();
+                }
+                if (!email) {
+                  email = cData[ci][cEmailCol] || '';
+                }
+                if (!billingAddress) {
+                  billingAddress = cData[ci][cBillingCol] || '';
+                }
+                break;
+              }
+            }
+          }
+        } catch (e2) {
+          Logger.log('sendContractForSigning: Contact lookup failed: ' + e2);
+        }
+      }
+
     } catch (e) {
       Logger.log('sendContractForSigning: Error loading bid data: ' + e);
     }
