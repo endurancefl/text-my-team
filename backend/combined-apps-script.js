@@ -5469,8 +5469,47 @@ function generateAndEmailSignedPdf(contract, signedName, signedAt, sheet, row, h
   var bidId = contract['Bid ID'] || '';
   var billingAddress = contract['Billing Address'] || '';
 
+  // Fallback: look up email from Contacts sheet via Bid → Contact linkage
+  if (!contactEmail && bidId) {
+    try {
+      var ss2 = SpreadsheetApp.getActiveSpreadsheet();
+      var bidSheet2 = ss2.getSheetByName('Bids');
+      if (bidSheet2) {
+        var bidData2 = bidSheet2.getDataRange().getValues();
+        var bidHeaders2 = bidData2[0];
+        var bidIdCol2 = bidHeaders2.indexOf('bidId');
+        var jsonCol2 = bidHeaders2.indexOf('json');
+        for (var b2 = 1; b2 < bidData2.length; b2++) {
+          if (String(bidData2[b2][bidIdCol2]) === String(bidId) && bidData2[b2][jsonCol2]) {
+            var bidJson2 = JSON.parse(bidData2[b2][jsonCol2]);
+            var contactId = bidJson2.contactId || '';
+            if (contactId) {
+              var contactSheet = ss2.getSheetByName('Contacts');
+              if (contactSheet) {
+                var cData = contactSheet.getDataRange().getValues();
+                var cHeaders = cData[0];
+                var cIdCol = cHeaders.indexOf('contactId');
+                var cEmailCol = cHeaders.indexOf('email');
+                for (var ci = 1; ci < cData.length; ci++) {
+                  if (String(cData[ci][cIdCol]) === String(contactId)) {
+                    contactEmail = cData[ci][cEmailCol] || '';
+                    if (!contactName) contactName = (cData[ci][cHeaders.indexOf('firstName')] || '') + ' ' + (cData[ci][cHeaders.indexOf('lastName')] || '');
+                    break;
+                  }
+                }
+              }
+            }
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      Logger.log('generateAndEmailSignedPdf: Fallback email lookup failed: ' + e);
+    }
+  }
+
   if (!contactEmail) {
-    Logger.log('generateAndEmailSignedPdf: No contact email, skipping');
+    Logger.log('generateAndEmailSignedPdf: No contact email found anywhere, skipping');
     return { signedPdfUrl: '', signedPdfFileId: '', emailSent: false };
   }
 
@@ -5540,6 +5579,8 @@ function generateAndEmailSignedPdf(contract, signedName, signedAt, sheet, row, h
     contractValue: contractValue,
     paymentTerms: paymentTerms,
     services: services,
+    companySigner: contract['companySigner'] || 'Jack McMahon',
+    companySignedAt: contract['companySignedAt'] || '',
     signedName: signedName,
     signedAt: signedAt
   };

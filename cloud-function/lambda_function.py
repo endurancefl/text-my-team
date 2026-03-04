@@ -261,7 +261,11 @@ def _handle_generate_pdf(event, allowed, headers):
 def _handle_json_request(raw_body, allowed):
     """Handle JSON request with S3 keys for photos."""
     data = json.loads(raw_body)
-    metadata = data
+    # Support nested metadata string (Apps Script sends { metadata: JSON.stringify(...) })
+    if "metadata" in data and isinstance(data["metadata"], str):
+        metadata = json.loads(data["metadata"])
+    else:
+        metadata = data
     report_type = metadata.get("type", "standard")
 
     # Select rendering engine

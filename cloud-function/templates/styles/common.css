@@ -24,7 +24,7 @@
 }
 
 .info-box .info-label {
-  background: var(--gray-header);
+  background: var(--green);
   color: var(--white);
   font-weight: bold;
   font-size: 8pt;
@@ -46,12 +46,12 @@
 
 .title-rule {
   border: none;
-  border-top: 1px solid black;
+  border-top: 2px solid var(--green);
   margin: 8px 0 14px 0;
 }
 
 .category-header {
-  background: var(--gray-header);
+  background: var(--green);
   color: var(--white);
   font-weight: bold;
   font-size: 10pt;
@@ -61,5 +61,12 @@
 
 .footer-text {
   font-size: 8pt;
+  color: var(--gray-header);
+}
+
+/* Running header element — positioned into @top-left via CSS */
+.running-header {
+  position: running(running-header);
+  font-size: 7pt;
   color: var(--gray-header);
 }

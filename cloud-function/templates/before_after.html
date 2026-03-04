@@ -7,6 +7,10 @@
 <link rel="stylesheet" href="{{ css_url('before_after.css') }}">
 {% endblock %}
 
+{% block running_header_content %}
+<div class="running-header">Endurance Services | {{ address }}</div>
+{% endblock %}
+
 {% block content %}
 {# ── Page 1 Header ── #}
 <div class="report-header">
@@ -37,7 +41,7 @@
 {# ── Photo Pairs by Category ── #}
 {% for cat_name, pairs in categories.items() %}
 <div class="category-section">
-  <div class="category-header">{{ cat_name }}</div>
+  <div class="category-header" style="bookmark-level: 1; bookmark-label: '{{ cat_name }}';">{{ cat_name }}</div>
   {% for pair in pairs %}
   <div class="pair-row">
     <div class="pair-grid">

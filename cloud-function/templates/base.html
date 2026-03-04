@@ -7,6 +7,7 @@
 <style>
 :root {
   --green: #3A5F4B;
+  --green-light: #E8F0EC;
   --dark: #1A2E24;
   --gray-header: #666666;
   --light-gray: #CCCCCC;
@@ -38,6 +39,31 @@
   }
 }
 
+@page cover {
+  margin-top: 30px;
+
+  @top-left { content: none; }
+  @bottom-left {
+    content: "{{ footer_text }}";
+    font-family: Helvetica, Arial, sans-serif;
+    font-size: 8pt;
+    color: var(--gray-header);
+  }
+}
+
+@page content {
+  @top-left {
+    content: element(running-header);
+    font-family: Helvetica, Arial, sans-serif;
+    font-size: 7pt;
+    color: var(--gray-header);
+  }
+}
+
+@page :first {
+  @top-left { content: none; }
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -49,11 +75,14 @@ body {
   font-size: 9pt;
   color: var(--dark);
   line-height: 1.3;
+  orphans: 3;
+  widows: 3;
 }
 </style>
 {% block extra_css %}{% endblock %}
 </head>
 <body>
+{% block running_header_content %}{% endblock %}
 {% block content %}{% endblock %}
 </body>
 </html>

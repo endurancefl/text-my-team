@@ -12,6 +12,8 @@
   <div class="logo">
     {% if logo_data_uri %}
     <img src="{{ logo_data_uri }}" alt="Endurance Services">
+    {% elif logo_uri %}
+    <img src="{{ logo_uri }}" alt="Endurance Services">
     {% else %}
     <h2 style="color: var(--green);">Endurance Services</h2>
     {% endif %}
@@ -21,6 +23,8 @@
     <div class="invoice-id">{{ invoice_id }}</div>
   </div>
 </div>
+
+<hr class="invoice-header-rule">
 
 <div class="invoice-info-row">
   <div class="invoice-bill-to">
@@ -32,11 +36,11 @@
   <div class="invoice-details-box">
     <div class="invoice-detail-row">
       <span class="invoice-detail-label">Invoice Date</span>
-      <span class="invoice-detail-value">{{ invoice_date }}</span>
+      <span class="invoice-detail-value">{{ invoice_date | format_date }}</span>
     </div>
     <div class="invoice-detail-row">
       <span class="invoice-detail-label">Due Date</span>
-      <span class="invoice-detail-value">{{ due_date }}</span>
+      <span class="invoice-detail-value">{{ due_date | format_date }}</span>
     </div>
     <div class="invoice-detail-row">
       <span class="invoice-detail-label">Terms</span>
@@ -44,7 +48,7 @@
     </div>
     <div class="invoice-detail-row">
       <span class="invoice-detail-label">Billing Period</span>
-      <span class="invoice-detail-value">{{ billing_period_start }} — {{ billing_period_end }}</span>
+      <span class="invoice-detail-value">{{ billing_period_start | format_month }}</span>
     </div>
   </div>
 </div>

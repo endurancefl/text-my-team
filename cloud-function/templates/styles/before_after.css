@@ -21,7 +21,8 @@
   font-size: 10pt;
   text-align: center;
   padding: 3px 0;
-  border: 0.5px solid black;
+  border: 0.5px solid var(--light-gray);
+  border-radius: 3px 3px 0 0;
 }
 
 .pair-label.before {
@@ -29,11 +30,11 @@
 }
 
 .pair-label.after {
-  background: var(--after-green);
+  background: var(--green);
 }
 
 .pair-photo {
-  border: 0.5px solid black;
+  border: 0.5px solid var(--light-gray);
   width: 100%;
   aspect-ratio: 258 / 178;
   overflow: hidden;
@@ -50,8 +51,9 @@
 }
 
 .pair-note {
-  border: 0.5px solid black;
+  border: 0.5px solid var(--light-gray);
   border-top: none;
+  border-radius: 0 0 3px 3px;
   min-height: 30px;
   padding: 2px 4px;
   font-size: 8pt;

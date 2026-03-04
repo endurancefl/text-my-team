@@ -18,6 +18,13 @@
   margin-top: 2px;
 }
 
+/* Green rule under header */
+.invoice-header-rule {
+  border: none;
+  border-top: 2px solid var(--green);
+  margin: 8px 0 0 0;
+}
+
 .invoice-info-row {
   display: flex;
   justify-content: space-between;
@@ -52,6 +59,7 @@
 
 .invoice-details-box {
   border: 0.5px solid var(--light-gray);
+  border-left: 3px solid var(--green);
   padding: 8px 12px;
   font-size: 9pt;
   min-width: 200px;
@@ -71,6 +79,7 @@
 .invoice-detail-value {
   color: var(--dark);
   text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .invoice-property {
@@ -143,7 +152,7 @@
 }
 
 .grand-total {
-  border-top: 2px solid var(--dark);
+  border-top: 2px solid var(--green);
   margin-top: 4px;
   padding-top: 6px;
   font-size: 14pt;
