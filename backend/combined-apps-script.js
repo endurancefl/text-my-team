@@ -898,6 +898,54 @@ function createContract(data) {
   var now = new Date();
   var dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
+  // Resolve contact info from Contacts sheet if not provided by frontend
+  if (data.bidId && (!data.contactName || !data.contactEmail || !data.billingAddress)) {
+    try {
+      var bidSheet2 = ss.getSheetByName('Bids');
+      if (bidSheet2) {
+        var bData = bidSheet2.getDataRange().getValues();
+        var bHeaders = bData[0];
+        var bIdCol = bHeaders.indexOf('bidId');
+        var bJsonCol = bHeaders.indexOf('json');
+        for (var bi = 1; bi < bData.length; bi++) {
+          if (String(bData[bi][bIdCol]) === String(data.bidId) && bData[bi][bJsonCol]) {
+            var bJson = JSON.parse(bData[bi][bJsonCol]);
+            if (bJson.contactId) {
+              var cSheet = ss.getSheetByName('Contacts');
+              if (cSheet) {
+                var cRows = cSheet.getDataRange().getValues();
+                var cH = cRows[0];
+                var ciCol = cH.indexOf('contactId');
+                var ceCol = cH.indexOf('email');
+                var cfCol = cH.indexOf('firstName');
+                var clCol = cH.indexOf('lastName');
+                var cdCol = cH.indexOf('displayName');
+                var cbCol = cH.indexOf('billingAddress');
+                for (var cx = 1; cx < cRows.length; cx++) {
+                  if (String(cRows[cx][ciCol]) === String(bJson.contactId)) {
+                    if (!data.contactName) {
+                      data.contactName = cRows[cx][cdCol] || ((cRows[cx][cfCol] || '') + ' ' + (cRows[cx][clCol] || '')).trim();
+                    }
+                    if (!data.contactEmail) {
+                      data.contactEmail = cRows[cx][ceCol] || '';
+                    }
+                    if (!data.billingAddress) {
+                      data.billingAddress = cRows[cx][cbCol] || '';
+                    }
+                    break;
+                  }
+                }
+              }
+            }
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      Logger.log('createContract: Contact lookup failed: ' + e);
+    }
+  }
+
   // Build row array matching actual column positions
   var row = [];
   for (var c = 0; c < numCols; c++) {
