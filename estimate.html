@@ -1848,6 +1848,9 @@
           </div>
         </div>
         <div class="marvin-panel-actions">
+          <button class="marvin-panel-btn" id="marvin-identify-btn" onclick="toggleMarvinIdentifyMode()" title="Identify element">
+            <span class="material-icons-outlined">my_location</span>
+          </button>
           <button class="marvin-panel-btn" onclick="clearMarvinChat()" title="New conversation">
             <span class="material-icons-outlined">add_comment</span>
           </button>
@@ -5152,6 +5155,7 @@ let marvinChatHistory = [];   // [{role, content}] for panel conversations
 let marvinPanelOpen = false;
 let marvinIsThinking = false;
 let marvinTypewriterActive = null; // tracks active typewriter animation
+let marvinIdentifyMode = false;
 
 const MARVIN_CHAT_URL = 'https://ibjyxrp542.execute-api.us-east-1.amazonaws.com/prod/marvin';
 
@@ -5203,6 +5207,8 @@ function toggleMarvinPanel() {
     setTimeout(() => input.focus(), 350);
     // Check morning briefing when panel opens
     checkMorningBriefing();
+  } else {
+    if (marvinIdentifyMode) exitMarvinIdentifyMode();
   }
 }
 
@@ -5810,6 +5816,230 @@ async function sendMarvinBriefingMessage(promptText) {
     marvinIsThinking = false;
     document.getElementById('marvin-typing').style.display = 'none';
   }
+}
+
+// ─── MARVIN Identify Mode ─────────────────────────────────────
+
+function toggleMarvinIdentifyMode() {
+  if (marvinIdentifyMode) {
+    exitMarvinIdentifyMode();
+  } else {
+    enterMarvinIdentifyMode();
+  }
+}
+
+function enterMarvinIdentifyMode() {
+  marvinIdentifyMode = true;
+  document.body.classList.add('marvin-identify-active');
+  document.getElementById('marvin-identify-btn').classList.add('active');
+
+  // Create highlight overlay
+  const highlight = document.createElement('div');
+  highlight.className = 'marvin-identify-highlight';
+  highlight.id = 'marvin-identify-highlight';
+  document.body.appendChild(highlight);
+
+  // Create tooltip
+  const tooltip = document.createElement('div');
+  tooltip.className = 'marvin-identify-tooltip';
+  tooltip.id = 'marvin-identify-tooltip';
+  document.body.appendChild(tooltip);
+
+  // Attach capture-phase listeners
+  document.addEventListener('mouseover', marvinIdentifyHover, true);
+  document.addEventListener('mouseout', marvinIdentifyMouseOut, true);
+  document.addEventListener('click', marvinIdentifyClick, true);
+  document.addEventListener('keydown', marvinIdentifyKeydown, true);
+}
+
+function exitMarvinIdentifyMode() {
+  marvinIdentifyMode = false;
+  document.body.classList.remove('marvin-identify-active');
+  const btn = document.getElementById('marvin-identify-btn');
+  if (btn) btn.classList.remove('active');
+
+  // Remove highlight + tooltip
+  const highlight = document.getElementById('marvin-identify-highlight');
+  if (highlight) highlight.remove();
+  const tooltip = document.getElementById('marvin-identify-tooltip');
+  if (tooltip) tooltip.remove();
+
+  // Remove listeners
+  document.removeEventListener('mouseover', marvinIdentifyHover, true);
+  document.removeEventListener('mouseout', marvinIdentifyMouseOut, true);
+  document.removeEventListener('click', marvinIdentifyClick, true);
+  document.removeEventListener('keydown', marvinIdentifyKeydown, true);
+}
+
+function marvinIdentifyHover(e) {
+  const el = e.target;
+  const panel = document.getElementById('marvin-panel');
+  if (panel && panel.contains(el)) return;
+  if (el === document.body || el === document.documentElement) return;
+
+  const rect = el.getBoundingClientRect();
+  const highlight = document.getElementById('marvin-identify-highlight');
+  const tooltip = document.getElementById('marvin-identify-tooltip');
+  if (!highlight || !tooltip) return;
+
+  highlight.style.display = 'block';
+  highlight.style.top = rect.top + 'px';
+  highlight.style.left = rect.left + 'px';
+  highlight.style.width = rect.width + 'px';
+  highlight.style.height = rect.height + 'px';
+
+  // Build tag#id.class label
+  let label = el.tagName.toLowerCase();
+  if (el.id) label += '#' + el.id;
+  if (el.classList.length) label += '.' + Array.from(el.classList).join('.');
+
+  tooltip.textContent = label;
+  tooltip.style.display = 'block';
+  // Position tooltip above element
+  const tooltipTop = rect.top - 28;
+  tooltip.style.top = (tooltipTop < 4 ? rect.bottom + 4 : tooltipTop) + 'px';
+  tooltip.style.left = Math.max(4, rect.left) + 'px';
+}
+
+function marvinIdentifyMouseOut(e) {
+  const panel = document.getElementById('marvin-panel');
+  const related = e.relatedTarget;
+  if (related && panel && panel.contains(related)) {
+    const highlight = document.getElementById('marvin-identify-highlight');
+    const tooltip = document.getElementById('marvin-identify-tooltip');
+    if (highlight) highlight.style.display = 'none';
+    if (tooltip) tooltip.style.display = 'none';
+  }
+}
+
+function marvinIdentifyClick(e) {
+  const el = e.target;
+  const panel = document.getElementById('marvin-panel');
+  if (panel && panel.contains(el)) return; // let panel clicks through
+  if (el === document.body || el === document.documentElement) return;
+
+  e.preventDefault();
+  e.stopPropagation();
+
+  const context = captureElementContext(el);
+  exitMarvinIdentifyMode();
+  sendMarvinIdentifyMessage(context);
+}
+
+function marvinIdentifyKeydown(e) {
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    e.stopPropagation();
+    exitMarvinIdentifyMode();
+  }
+}
+
+function captureElementContext(el) {
+  const tag = el.tagName.toLowerCase();
+  const id = el.id || '';
+  const classes = Array.from(el.classList).join(' ');
+  const textContent = (el.textContent || '').trim().slice(0, 200);
+  const onclickAttr = el.getAttribute('onclick') || '';
+
+  // Data attributes
+  const dataAttrs = {};
+  for (const attr of el.attributes) {
+    if (attr.name.startsWith('data-')) {
+      dataAttrs[attr.name] = attr.value.slice(0, 100);
+    }
+  }
+
+  // Parent chain (up to 5 levels)
+  const parentChain = [];
+  let current = el.parentElement;
+  for (let i = 0; i < 5 && current && current !== document.body; i++) {
+    parentChain.push({
+      tag: current.tagName.toLowerCase(),
+      id: current.id || '',
+      classes: Array.from(current.classList).join(' ')
+    });
+    current = current.parentElement;
+  }
+
+  // Find closest meaningful container
+  const containerEl = el.closest('.view, .card, .modal, .overlay, [class*="panel"], [class*="section"], [class*="header"], [class*="sidebar"]');
+  const closestContainer = containerEl ? {
+    tag: containerEl.tagName.toLowerCase(),
+    id: containerEl.id || '',
+    classes: Array.from(containerEl.classList).join(' ')
+  } : null;
+
+  return {
+    tag,
+    id,
+    classes,
+    text: textContent,
+    onclick: onclickAttr,
+    dataAttributes: Object.keys(dataAttrs).length ? dataAttrs : undefined,
+    parentChain,
+    closestContainer,
+    currentView: typeof currentView !== 'undefined' ? currentView : 'unknown'
+  };
+}
+
+function sendMarvinIdentifyMessage(context) {
+  // Build short user-visible summary
+  let summary = context.tag;
+  if (context.id) summary += '#' + context.id;
+  if (context.text) summary += ' — "' + context.text.slice(0, 60) + (context.text.length > 60 ? '…' : '') + '"';
+
+  // Show user bubble
+  appendMarvinMessage('user', '🔍 Identify: ' + summary);
+
+  // Build prompt with full context
+  const prompt = `The user clicked on a UI element and wants to understand what it does. Here is the element context:\n\n${JSON.stringify(context, null, 2)}\n\nExplain what this element is and what it does in 3-5 sentences. Be practical and specific — mention what happens when they interact with it, what data it shows, and where it fits in the app workflow. If you recognize the element from the app's features, reference the feature by name.`;
+
+  marvinChatHistory.push({ role: 'user', content: prompt });
+
+  // Show typing, send to API
+  marvinIsThinking = true;
+  document.getElementById('marvin-typing').style.display = 'flex';
+  const messages = document.getElementById('marvin-panel-messages');
+  messages.scrollTop = messages.scrollHeight;
+
+  const context_data = buildMarvinContext();
+  fetch(MARVIN_CHAT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      prompt,
+      history: marvinChatHistory.slice(0, -1),
+      mode: 'chat',
+      context: context_data
+    })
+  })
+  .then(resp => resp.json())
+  .then(data => {
+    if (!data.success) throw new Error(data.error || 'Request failed');
+    const result = data.result;
+    const message = result.message || result.raw || 'I couldn\'t identify that element.';
+
+    document.getElementById('marvin-typing').style.display = 'none';
+    const refs = appendMarvinMessage('assistant', message);
+    marvinChatHistory.push({ role: 'assistant', content: message });
+    if (refs) {
+      typewriterEffect(refs.bubble, message, null, refs.actionContainer, refs.messagesEl);
+    }
+  })
+  .catch(err => {
+    console.error('MARVIN identify error:', err);
+    const errMsg = 'Sorry, I couldn\'t identify that element. Please try again.';
+    document.getElementById('marvin-typing').style.display = 'none';
+    const refs = appendMarvinMessage('assistant', errMsg);
+    marvinChatHistory.push({ role: 'assistant', content: errMsg });
+    if (refs) {
+      typewriterEffect(refs.bubble, errMsg, null, refs.actionContainer, refs.messagesEl);
+    }
+  })
+  .finally(() => {
+    marvinIsThinking = false;
+    document.getElementById('marvin-typing').style.display = 'none';
+  });
 }
 
 function applyMarvinAction(actionId, btn) {

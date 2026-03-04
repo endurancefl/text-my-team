@@ -7190,6 +7190,58 @@ select option:checked {
   }
 }
 
+/* ─── MARVIN Identify Mode ─────────────────────── */
+
+body.marvin-identify-active * {
+  cursor: crosshair !important;
+}
+body.marvin-identify-active .marvin-panel,
+body.marvin-identify-active .marvin-panel * {
+  cursor: default !important;
+}
+
+.marvin-identify-highlight {
+  position: fixed;
+  border: 2px solid #10b981;
+  background: rgba(16, 185, 129, 0.08);
+  pointer-events: none;
+  z-index: 199;
+  box-shadow: 0 0 0 2000px rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+  transition: top 0.08s ease, left 0.08s ease, width 0.08s ease, height 0.08s ease;
+  display: none;
+}
+
+.marvin-identify-tooltip {
+  position: fixed;
+  background: #1e293b;
+  color: #10b981;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 199;
+  white-space: nowrap;
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: none;
+}
+
+.marvin-panel-btn.active {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+.marvin-panel-btn.active:hover {
+  background: rgba(16, 185, 129, 0.25);
+}
+
+body.marvin-identify-active .main-content {
+  box-shadow: inset 0 0 0 2px rgba(16, 185, 129, 0.2);
+  transition: box-shadow 0.3s ease;
+}
+
 /* ═══════════════════════════════════════════════════
    CONTRACT SUMMARY PANEL
    ═══════════════════════════════════════════════════ */
