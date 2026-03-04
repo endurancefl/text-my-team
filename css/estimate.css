@@ -6962,6 +6962,16 @@ select option:checked {
   51%, 100% { opacity: 0; }
 }
 
+/* Thinking indicator (subtle label when extended thinking is active) */
+.marvin-msg.assistant .marvin-msg-bubble[data-thinking]::before {
+  content: 'Reasoning...';
+  display: block;
+  font-size: 11px;
+  color: #9AA0A6;
+  margin-bottom: 4px;
+  font-style: italic;
+}
+
 /* Action Cards */
 .marvin-action-card {
   margin-top: 8px;
@@ -7191,6 +7201,9 @@ select option:checked {
 }
 .marvin-send-btn:active {
   transform: scale(0.93);
+}
+.marvin-send-btn.streaming {
+  background: linear-gradient(135deg, #EA4335, #d93025);
 }
 .marvin-send-btn .material-icons-outlined {
   font-size: 18px;

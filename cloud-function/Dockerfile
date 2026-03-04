@@ -1,5 +1,8 @@
 FROM public.ecr.aws/lambda/python:3.12
 
+# Add Lambda Web Adapter for streaming support (activates when AWS_LWA_INVOKE_MODE is set)
+COPY --from=public.ecr.aws/awsguru/aws-lambda-web-adapter:0.8.4 /lambda-adapter /opt/extensions/lambda-adapter
+
 # Install system dependencies required by WeasyPrint
 # AL2023 uses dnf and ships Pango 1.54+ (WeasyPrint needs >= 1.44)
 RUN dnf install -y \
@@ -21,6 +24,7 @@ COPY lambda_function.py ${LAMBDA_TASK_ROOT}/
 COPY main.py ${LAMBDA_TASK_ROOT}/
 COPY pdf_generator.py ${LAMBDA_TASK_ROOT}/
 COPY marvin-knowledge.md ${LAMBDA_TASK_ROOT}/
+COPY marvin_stream.py ${LAMBDA_TASK_ROOT}/
 
 # Copy assets and templates
 COPY assets/ ${LAMBDA_TASK_ROOT}/assets/

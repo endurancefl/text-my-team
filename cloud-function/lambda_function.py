@@ -690,7 +690,7 @@ def _handle_marvin(event, allowed):
         client = anthropic.Anthropic(api_key=api_key)
 
         system_prompt = _build_chat_system_prompt(data.get("context", {}))
-        max_tokens = 4096
+        max_tokens = 8192
 
         # Build messages: include conversation history for iterative refinement
         messages = []
@@ -703,10 +703,11 @@ def _handle_marvin(event, allowed):
 
         # Build API call kwargs with web search and custom data tools
         api_kwargs = {
-            "model": "claude-sonnet-4-20250514",
+            "model": "claude-opus-4-5-20251101",
             "max_tokens": max_tokens,
-            "system": system_prompt,
+            "system": [{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}],
             "messages": messages,
+            "thinking": {"type": "enabled", "budget_tokens": 4096},
             "tools": [
                 {
                     "type": "web_search_20250305",
@@ -741,8 +742,8 @@ def _handle_marvin(event, allowed):
                 continue
 
             if message.stop_reason == "tool_use":
-                if tool_use_count >= 2:
-                    break  # Safety cap: API Gateway has 30s hard timeout
+                if tool_use_count >= 5:
+                    break  # Safety cap: prevent runaway tool loops
                 tool_use_count += 1
                 total_iterations += 1
 

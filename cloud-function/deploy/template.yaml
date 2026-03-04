@@ -94,6 +94,45 @@ Resources:
       DockerContext: ../
       Dockerfile: Dockerfile
 
+  MarvinStreamFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      PackageType: Image
+      ImageConfig:
+        Command: ["python", "marvin_stream.py"]
+      Architectures:
+        - x86_64
+      MemorySize: 2048
+      Timeout: 300
+      Policies:
+        - S3CrudPolicy:
+            BucketName: !Ref PhotoUploadBucket
+      Environment:
+        Variables:
+          PHOTO_BUCKET: !Ref PhotoUploadBucket
+          ANTHROPIC_API_KEY: '{{resolve:secretsmanager:marvin-api-key:SecretString:key}}'
+          AWS_LWA_INVOKE_MODE: RESPONSE_STREAM
+          PORT: '8080'
+      FunctionUrlConfig:
+        AuthType: NONE
+        InvokeMode: RESPONSE_STREAM
+        Cors:
+          AllowOrigins:
+            - "https://endurancefl.github.io"
+            - "https://enduranceservices.github.io"
+            - "http://localhost:8000"
+            - "http://127.0.0.1:8000"
+          AllowMethods:
+            - "POST"
+            - "OPTIONS"
+          AllowHeaders:
+            - "Content-Type"
+          MaxAge: 3600
+    Metadata:
+      DockerTag: latest
+      DockerContext: ../
+      Dockerfile: Dockerfile
+
   PdfApi:
     Type: AWS::Serverless::HttpApi
     Properties:
@@ -113,3 +152,6 @@ Outputs:
   FunctionArn:
     Description: Lambda function ARN
     Value: !GetAtt PdfGeneratorFunction.Arn
+  MarvinStreamUrl:
+    Description: MARVIN streaming Function URL
+    Value: !GetAtt MarvinStreamFunctionUrl.FunctionUrl

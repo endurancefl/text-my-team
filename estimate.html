@@ -5156,8 +5156,10 @@ let marvinPanelOpen = false;
 let marvinIsThinking = false;
 let marvinTypewriterActive = null; // tracks active typewriter animation
 let marvinIdentifyMode = false;
+let marvinStreamController = null;
 
 const MARVIN_CHAT_URL = 'https://ibjyxrp542.execute-api.us-east-1.amazonaws.com/prod/marvin';
+const MARVIN_STREAM_URL = ''; // Set after first deploy from SAM output (e.g. https://XXXXX.lambda-url.us-east-1.on.aws/)
 
 // Field map: fieldId → { domId, path in currentEstimate, label }
 const MARVIN_FIELD_MAP = {
@@ -5311,6 +5313,123 @@ function skipTypewriter() {
   messagesEl.scrollTop = messagesEl.scrollHeight;
   marvinTypewriterActive = null;
   resolve();
+}
+
+// ─── SSE Streaming Helpers ───────────────────────────────────
+
+function parseSSEBuffer(buffer) {
+  const parsed = [];
+  let currentEvent = null;
+  let currentData = null;
+  let lastParsedEnd = 0;
+
+  const lines = buffer.split('\n');
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    if (line.startsWith('event: ')) {
+      currentEvent = line.slice(7).trim();
+    } else if (line.startsWith('data: ')) {
+      currentData = line.slice(6);
+    } else if (line === '') {
+      if (currentEvent && currentData !== null) {
+        try {
+          parsed.push({ event: currentEvent, data: JSON.parse(currentData) });
+        } catch(e) { /* skip malformed JSON */ }
+        lastParsedEnd = lines.slice(0, i + 1).join('\n').length + 1;
+      }
+      currentEvent = null;
+      currentData = null;
+    }
+  }
+
+  const remainder = buffer.slice(lastParsedEnd);
+  return { parsed, remainder };
+}
+
+async function streamMarvinResponse(prompt, historySlice, context, refs) {
+  const controller = new AbortController();
+  marvinStreamController = controller;
+
+  const resp = await fetch(MARVIN_STREAM_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    signal: controller.signal,
+    body: JSON.stringify({ prompt, history: historySlice, mode: 'chat', context })
+  });
+
+  if (!resp.ok) throw new Error('Stream request failed: ' + resp.status);
+
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let fullText = '';
+  let action = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const result = parseSSEBuffer(buffer);
+    buffer = result.remainder;
+
+    for (const evt of result.parsed) {
+      switch (evt.event) {
+        case 'text':
+          fullText += evt.data.delta;
+          refs.bubble.innerHTML = formatMarvinText(fullText);
+          refs.messagesEl.scrollTop = refs.messagesEl.scrollHeight;
+          break;
+        case 'thinking':
+          refs.bubble.setAttribute('data-thinking', 'true');
+          break;
+        case 'tool_start':
+          refs.bubble.innerHTML = formatMarvinText(fullText + '\n\n*Searching...*');
+          refs.messagesEl.scrollTop = refs.messagesEl.scrollHeight;
+          break;
+        case 'tool_result':
+          refs.bubble.innerHTML = formatMarvinText(fullText);
+          break;
+        case 'done':
+          fullText = evt.data.message || fullText;
+          action = evt.data.action || null;
+          break;
+        case 'error':
+          throw new Error(evt.data.error || 'Stream error');
+      }
+    }
+  }
+
+  refs.bubble.innerHTML = formatMarvinText(fullText);
+  refs.bubble.classList.remove('typing');
+  refs.bubble.removeAttribute('data-thinking');
+  if (action && refs.actionContainer) {
+    refs.actionContainer.innerHTML = renderMarvinActionCard(action);
+  }
+  refs.messagesEl.scrollTop = refs.messagesEl.scrollHeight;
+
+  return { message: fullText, action };
+}
+
+function updateMarvinSendButton(isStreaming) {
+  const btn = document.getElementById('marvin-send-btn');
+  if (isStreaming) {
+    btn.innerHTML = '<span class="material-icons-outlined">stop_circle</span>';
+    btn.classList.add('streaming');
+    btn.onclick = stopMarvinStream;
+  } else {
+    btn.innerHTML = '<span class="material-icons-outlined">send</span>';
+    btn.classList.remove('streaming');
+    btn.onclick = sendMarvinMessage;
+  }
+}
+
+function stopMarvinStream() {
+  if (marvinStreamController) {
+    marvinStreamController.abort();
+  }
 }
 
 function appendMarvinMessage(role, content, action) {
@@ -5685,61 +5804,70 @@ async function sendMarvinMessage() {
   const text = input.value.trim();
   if (!text || marvinIsThinking) return;
 
-  // Skip any active typewriter animation before processing new message
   skipTypewriter();
 
-  // Show user message
   appendMarvinMessage('user', text);
   marvinChatHistory.push({ role: 'user', content: text });
   input.value = '';
   input.style.height = 'auto';
 
-  // Show typing indicator
   marvinIsThinking = true;
-  document.getElementById('marvin-typing').style.display = 'flex';
+  updateMarvinSendButton(true);
+  const refs = appendMarvinMessage('assistant', '', null);
+  refs.bubble.classList.add('typing');
   const messages = document.getElementById('marvin-panel-messages');
   messages.scrollTop = messages.scrollHeight;
 
   try {
     const context = buildMarvinContext();
-    const resp = await fetch(MARVIN_CHAT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        prompt: text,
-        history: marvinChatHistory.slice(0, -1),
-        mode: 'chat',
-        context
-      })
-    });
 
-    const data = await resp.json();
-    if (!data.success) throw new Error(data.error || 'Request failed');
-
-    const result = data.result;
-    const message = result.message || result.raw || 'I couldn\'t generate a response.';
-    const action = result.action || null;
-
-    // Hide typing indicator, then animate response
-    document.getElementById('marvin-typing').style.display = 'none';
-    const refs = appendMarvinMessage('assistant', message, action);
-    marvinChatHistory.push({ role: 'assistant', content: message });
-    if (refs) {
-      await typewriterEffect(refs.bubble, message, action, refs.actionContainer, refs.messagesEl);
+    if (MARVIN_STREAM_URL) {
+      // Streaming path — real-time SSE via Function URL
+      const result = await streamMarvinResponse(
+        text, marvinChatHistory.slice(0, -1), context, refs
+      );
+      marvinChatHistory.push({ role: 'assistant', content: result.message });
+    } else {
+      // Fallback — synchronous request via API Gateway
+      const resp = await fetch(MARVIN_CHAT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: text,
+          history: marvinChatHistory.slice(0, -1),
+          mode: 'chat',
+          context
+        })
+      });
+      const data = await resp.json();
+      if (!data.success) throw new Error(data.error || 'Request failed');
+      const result = data.result;
+      const message = result.message || result.raw || 'I couldn\'t generate a response.';
+      const action = result.action || null;
+      refs.bubble.innerHTML = formatMarvinText(message);
+      refs.bubble.classList.remove('typing');
+      if (action && refs.actionContainer) {
+        refs.actionContainer.innerHTML = renderMarvinActionCard(action);
+      }
+      refs.messagesEl.scrollTop = refs.messagesEl.scrollHeight;
+      marvinChatHistory.push({ role: 'assistant', content: message });
     }
 
   } catch (err) {
-    console.error('MARVIN chat error:', err);
-    const errMsg = 'Sorry, I had trouble processing that. Please try again.';
-    document.getElementById('marvin-typing').style.display = 'none';
-    const refs = appendMarvinMessage('assistant', errMsg);
-    marvinChatHistory.push({ role: 'assistant', content: errMsg });
-    if (refs) {
-      await typewriterEffect(refs.bubble, errMsg, null, refs.actionContainer, refs.messagesEl);
+    if (err.name === 'AbortError') {
+      marvinChatHistory.push({ role: 'assistant', content: '(stopped)' });
+    } else {
+      console.error('MARVIN chat error:', err);
+      const errMsg = 'Sorry, I had trouble processing that. Please try again.';
+      refs.bubble.innerHTML = formatMarvinText(errMsg);
+      refs.bubble.classList.remove('typing');
+      marvinChatHistory.push({ role: 'assistant', content: errMsg });
     }
   } finally {
     marvinIsThinking = false;
+    marvinStreamController = null;
     document.getElementById('marvin-typing').style.display = 'none';
+    updateMarvinSendButton(false);
   }
 }
 
@@ -5767,53 +5895,56 @@ function checkMorningBriefing() {
 async function sendMarvinBriefingMessage(promptText) {
   if (marvinIsThinking) return;
 
-  // Push to history (system-initiated — no user bubble)
   marvinChatHistory.push({ role: 'user', content: promptText });
 
-  // Show typing indicator
   marvinIsThinking = true;
-  document.getElementById('marvin-typing').style.display = 'flex';
+  const refs = appendMarvinMessage('assistant', '', null);
+  refs.bubble.classList.add('typing');
   const messages = document.getElementById('marvin-panel-messages');
   messages.scrollTop = messages.scrollHeight;
 
   try {
     const context = buildMarvinContext();
-    const resp = await fetch(MARVIN_CHAT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        prompt: promptText,
-        history: marvinChatHistory.slice(0, -1),
-        mode: 'chat',
-        context
-      })
-    });
 
-    const data = await resp.json();
-    if (!data.success) throw new Error(data.error || 'Request failed');
-
-    const result = data.result;
-    const message = result.message || result.raw || 'Good morning! Briefing couldn\'t load, but I\'m here.';
-    const action = result.action || null;
-
-    document.getElementById('marvin-typing').style.display = 'none';
-    const refs = appendMarvinMessage('assistant', message, action);
-    marvinChatHistory.push({ role: 'assistant', content: message });
-    if (refs) {
-      await typewriterEffect(refs.bubble, message, action, refs.actionContainer, refs.messagesEl);
+    if (MARVIN_STREAM_URL) {
+      const result = await streamMarvinResponse(
+        promptText, marvinChatHistory.slice(0, -1), context, refs
+      );
+      marvinChatHistory.push({ role: 'assistant', content: result.message });
+    } else {
+      const resp = await fetch(MARVIN_CHAT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: promptText,
+          history: marvinChatHistory.slice(0, -1),
+          mode: 'chat',
+          context
+        })
+      });
+      const data = await resp.json();
+      if (!data.success) throw new Error(data.error || 'Request failed');
+      const result = data.result;
+      const message = result.message || result.raw || 'Good morning! Briefing couldn\'t load, but I\'m here.';
+      const action = result.action || null;
+      refs.bubble.innerHTML = formatMarvinText(message);
+      refs.bubble.classList.remove('typing');
+      if (action && refs.actionContainer) {
+        refs.actionContainer.innerHTML = renderMarvinActionCard(action);
+      }
+      refs.messagesEl.scrollTop = refs.messagesEl.scrollHeight;
+      marvinChatHistory.push({ role: 'assistant', content: message });
     }
 
   } catch (err) {
     console.error('MARVIN briefing error:', err);
     const fallback = 'Good morning! Briefing couldn\'t load, but I\'m here — ask me anything.';
-    document.getElementById('marvin-typing').style.display = 'none';
-    const refs = appendMarvinMessage('assistant', fallback);
+    refs.bubble.innerHTML = formatMarvinText(fallback);
+    refs.bubble.classList.remove('typing');
     marvinChatHistory.push({ role: 'assistant', content: fallback });
-    if (refs) {
-      await typewriterEffect(refs.bubble, fallback, null, refs.actionContainer, refs.messagesEl);
-    }
   } finally {
     marvinIsThinking = false;
+    marvinStreamController = null;
     document.getElementById('marvin-typing').style.display = 'none';
   }
 }
@@ -6032,61 +6163,60 @@ function captureElementContext(el) {
 async function sendMarvinIdentifyMessage(context) {
   if (marvinIsThinking) return;
 
-  // Build short user-visible summary
   let summary = context.tag;
   if (context.id) summary += '#' + context.id;
   if (context.text) summary += ' — "' + context.text.slice(0, 60) + (context.text.length > 60 ? '…' : '') + '"';
 
-  // Show user bubble
   appendMarvinMessage('user', '🔍 Identify: ' + summary);
 
-  // Build concise prompt — tell MARVIN to skip web search / tools to avoid timeout
   const prompt = 'The user pointed at something on screen. Do NOT use web search or data tools.\n\nElement: ' + JSON.stringify(context) + '\n\nRESPONSE RULES (strict):\n- MAXIMUM 2 sentences. No exceptions. No extra paragraphs.\n- Plain English only. Never mention HTML tags, CSS classes, or code.\n- Say what it does and if it connects to a setting elsewhere, name that setting.\n- If it is editable, offer to navigate there.';
 
   marvinChatHistory.push({ role: 'user', content: prompt });
 
-  // Show typing indicator
   marvinIsThinking = true;
-  document.getElementById('marvin-typing').style.display = 'flex';
+  const refs = appendMarvinMessage('assistant', '', null);
+  refs.bubble.classList.add('typing');
   const messagesEl = document.getElementById('marvin-panel-messages');
   messagesEl.scrollTop = messagesEl.scrollHeight;
 
   try {
     const ctx = buildMarvinContext();
-    const resp = await fetch(MARVIN_CHAT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        prompt,
-        history: marvinChatHistory.slice(0, -1),
-        mode: 'chat',
-        context: ctx
-      })
-    });
 
-    const data = await resp.json();
-    if (!data.success) throw new Error(data.error || 'Request failed');
-
-    const result = data.result;
-    const message = result.message || result.raw || 'I couldn\'t identify that element.';
-
-    document.getElementById('marvin-typing').style.display = 'none';
-    const refs = appendMarvinMessage('assistant', message);
-    marvinChatHistory.push({ role: 'assistant', content: message });
-    if (refs) {
-      await typewriterEffect(refs.bubble, message, null, refs.actionContainer, refs.messagesEl);
+    if (MARVIN_STREAM_URL) {
+      const result = await streamMarvinResponse(
+        prompt, marvinChatHistory.slice(0, -1), ctx, refs
+      );
+      marvinChatHistory.push({ role: 'assistant', content: result.message });
+    } else {
+      const resp = await fetch(MARVIN_CHAT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
+          history: marvinChatHistory.slice(0, -1),
+          mode: 'chat',
+          context: ctx
+        })
+      });
+      const data = await resp.json();
+      if (!data.success) throw new Error(data.error || 'Request failed');
+      const result = data.result;
+      const message = result.message || result.raw || 'I couldn\'t identify that element.';
+      refs.bubble.innerHTML = formatMarvinText(message);
+      refs.bubble.classList.remove('typing');
+      refs.messagesEl.scrollTop = refs.messagesEl.scrollHeight;
+      marvinChatHistory.push({ role: 'assistant', content: message });
     }
+
   } catch (err) {
     console.error('MARVIN identify error:', err);
     const errMsg = 'Sorry, I couldn\'t identify that element. Please try again.';
-    document.getElementById('marvin-typing').style.display = 'none';
-    const refs = appendMarvinMessage('assistant', errMsg);
+    refs.bubble.innerHTML = formatMarvinText(errMsg);
+    refs.bubble.classList.remove('typing');
     marvinChatHistory.push({ role: 'assistant', content: errMsg });
-    if (refs) {
-      await typewriterEffect(refs.bubble, errMsg, null, refs.actionContainer, refs.messagesEl);
-    }
   } finally {
     marvinIsThinking = false;
+    marvinStreamController = null;
     document.getElementById('marvin-typing').style.display = 'none';
   }
 }
