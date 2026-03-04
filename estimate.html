@@ -17325,8 +17325,8 @@ async function loadScheduleCrewFilter() {
     var data = await resp.json();
     if (data.success && data.crews) {
       schedCrewSizes = data.crewSizes || {};
-      // Deduplicate crews
-      var uniqueCrews = [...new Set(data.crews)];
+      // Deduplicate crews (trim whitespace to prevent phantom duplicates)
+      var uniqueCrews = [...new Set(data.crews.map(function(c) { return c.trim(); }))];
       uniqueCrews.forEach(function(crew, i) {
         var opt = document.createElement('option');
         opt.value = crew;
@@ -17589,9 +17589,10 @@ function schedDayDrop(e, dropIdx, dropCrew) {
   var dateStr = schedDate.toISOString().split('T')[0];
   var crewTickets = schedTicketsCache.filter(function(t) {
     return t.eventDate === dateStr && (t.assignedCrew || 'Unassigned') === dropCrew;
-  });
+  }).sort(function(a, b) { return (a.stopOrder || 999) - (b.stopOrder || 999); });
 
   var moved = crewTickets.splice(schedDragSourceIdx, 1)[0];
+  if (!moved) { schedDragTicketId = null; schedDragSourceIdx = null; schedDayDragCrew = null; return; }
   crewTickets.splice(dropIdx, 0, moved);
   crewTickets.forEach(function(t, i) { t.stopOrder = i + 1; });
 
