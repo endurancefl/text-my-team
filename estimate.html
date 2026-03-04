@@ -5982,7 +5982,9 @@ function captureElementContext(el) {
   };
 }
 
-function sendMarvinIdentifyMessage(context) {
+async function sendMarvinIdentifyMessage(context) {
+  if (marvinIsThinking) return;
+
   // Build short user-visible summary
   let summary = context.tag;
   if (context.id) summary += '#' + context.id;
@@ -5991,31 +5993,33 @@ function sendMarvinIdentifyMessage(context) {
   // Show user bubble
   appendMarvinMessage('user', '🔍 Identify: ' + summary);
 
-  // Build prompt with full context
-  const prompt = `The user clicked on a UI element and wants to understand what it does. Here is the element context:\n\n${JSON.stringify(context, null, 2)}\n\nExplain what this element is and what it does in 3-5 sentences. Be practical and specific — mention what happens when they interact with it, what data it shows, and where it fits in the app workflow. If you recognize the element from the app's features, reference the feature by name.`;
+  // Build concise prompt — tell MARVIN to skip web search / tools to avoid timeout
+  const prompt = 'Identify this UI element. Do NOT use web search or data tools — answer purely from your knowledge of this app.\n\nElement: ' + JSON.stringify(context) + '\n\nWhat is this element and what does it do? 3-5 sentences max. Be practical and specific.';
 
   marvinChatHistory.push({ role: 'user', content: prompt });
 
-  // Show typing, send to API
+  // Show typing indicator
   marvinIsThinking = true;
   document.getElementById('marvin-typing').style.display = 'flex';
-  const messages = document.getElementById('marvin-panel-messages');
-  messages.scrollTop = messages.scrollHeight;
+  const messagesEl = document.getElementById('marvin-panel-messages');
+  messagesEl.scrollTop = messagesEl.scrollHeight;
 
-  const context_data = buildMarvinContext();
-  fetch(MARVIN_CHAT_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      prompt,
-      history: marvinChatHistory.slice(0, -1),
-      mode: 'chat',
-      context: context_data
-    })
-  })
-  .then(resp => resp.json())
-  .then(data => {
+  try {
+    const ctx = buildMarvinContext();
+    const resp = await fetch(MARVIN_CHAT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt,
+        history: marvinChatHistory.slice(0, -1),
+        mode: 'chat',
+        context: ctx
+      })
+    });
+
+    const data = await resp.json();
     if (!data.success) throw new Error(data.error || 'Request failed');
+
     const result = data.result;
     const message = result.message || result.raw || 'I couldn\'t identify that element.';
 
@@ -6023,23 +6027,21 @@ function sendMarvinIdentifyMessage(context) {
     const refs = appendMarvinMessage('assistant', message);
     marvinChatHistory.push({ role: 'assistant', content: message });
     if (refs) {
-      typewriterEffect(refs.bubble, message, null, refs.actionContainer, refs.messagesEl);
+      await typewriterEffect(refs.bubble, message, null, refs.actionContainer, refs.messagesEl);
     }
-  })
-  .catch(err => {
+  } catch (err) {
     console.error('MARVIN identify error:', err);
     const errMsg = 'Sorry, I couldn\'t identify that element. Please try again.';
     document.getElementById('marvin-typing').style.display = 'none';
     const refs = appendMarvinMessage('assistant', errMsg);
     marvinChatHistory.push({ role: 'assistant', content: errMsg });
     if (refs) {
-      typewriterEffect(refs.bubble, errMsg, null, refs.actionContainer, refs.messagesEl);
+      await typewriterEffect(refs.bubble, errMsg, null, refs.actionContainer, refs.messagesEl);
     }
-  })
-  .finally(() => {
+  } finally {
     marvinIsThinking = false;
     document.getElementById('marvin-typing').style.display = 'none';
-  });
+  }
 }
 
 function applyMarvinAction(actionId, btn) {
