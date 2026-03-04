@@ -1131,6 +1131,10 @@
                   <span class="settings-row-label">Default Travel Time %</span>
                   <input type="number" class="settings-input" id="setting-travel-time" step="1">
                 </div>
+                <div class="settings-row">
+                  <span class="settings-row-label">Daily Crew Capacity (Man-Hours)</span>
+                  <input type="number" class="settings-input" id="setting-daily-capacity" step="0.5">
+                </div>
               </div>
             </div>
             <div class="settings-card">
@@ -2673,7 +2677,8 @@ let bidSettings = {
   commercialSubMarkup: 10,
   defaultTravelTime: 30,
   division: 'Maintenance',
-  marvinKnowledgeBase: ''
+  marvinKnowledgeBase: '',
+  dailyCrewCapacity: 33
 };
 let savedBids = [];
 let savedTemplates = [];
@@ -10709,19 +10714,7 @@ function showView(viewId) {
       </button>
     `;
   } else if (viewId === 'schedule') {
-    if (scheduleScope === 'contract' && scheduleContract) {
-      actionsEl.innerHTML = `
-        <button class="btn btn-secondary" onclick="openSavedEstimate('${scheduleContract.bidId || ''}')">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-            <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-          </svg>
-          View Estimate
-        </button>
-      `;
-    } else {
-      actionsEl.innerHTML = '';
-    }
+    actionsEl.innerHTML = '';
   } else {
     actionsEl.innerHTML = '';
   }
@@ -11024,6 +11017,7 @@ function renderSettingsForm() {
   document.getElementById('setting-com-material-markup').value = bidSettings.commercialMaterialMarkup;
   document.getElementById('setting-com-sub-markup').value = bidSettings.commercialSubMarkup;
   document.getElementById('setting-travel-time').value = bidSettings.defaultTravelTime;
+  document.getElementById('setting-daily-capacity').value = bidSettings.dailyCrewCapacity;
   const kbEl = document.getElementById('setting-marvin-kb');
   if (kbEl) kbEl.value = bidSettings.marvinKnowledgeBase || '';
 }
@@ -12612,6 +12606,8 @@ async function generateScheduleFromContract() {
   calendarMonth = new Date(startDate + 'T00:00:00');
   calendarMonth.setDate(1);
 
+  await loadAllTicketsForMonth();
+
   // Update tickets sub-view header
   document.getElementById('contracts-property-address').textContent = scheduleContract.propertyAddress || '';
   document.getElementById('contracts-contract-id').textContent = contractId || '';
@@ -13216,6 +13212,7 @@ let allContracts = [];           // All contracts for the contracts list
 let scheduleScope = 'list';      // 'list' = contracts list, 'contract' = single contract detail
 let schedulePreviewMode = false;     // true = viewing generated-but-unsaved tickets
 let schedulePreviewEstimate = null;  // estimate data used during preview
+let allTicketsByDate = {};           // {YYYY-MM-DD: [{totalEstHours, travelHours}, ...]} — ALL contracts
 
 function normalizeDate(d) {
   if (!d) return '';
@@ -13228,6 +13225,44 @@ function normalizeDate(d) {
     return parsed.toISOString().split('T')[0];
   } catch (e) {
     return '';
+  }
+}
+
+/**
+ * Load all tickets (across all contracts) for the calendar's visible 6-week range.
+ * Populates allTicketsByDate keyed by YYYY-MM-DD.
+ */
+async function loadAllTicketsForMonth() {
+  if (!calendarMonth) return;
+  const year = calendarMonth.getFullYear();
+  const month = calendarMonth.getMonth();
+  const firstOfMonth = new Date(year, month, 1);
+  const startDay = firstOfMonth.getDay();
+  const mondayOffset = startDay === 0 ? -6 : 1 - startDay;
+  const calStart = new Date(year, month, 1 + mondayOffset);
+  const calEnd = new Date(calStart);
+  calEnd.setDate(calStart.getDate() + 41);
+
+  const startDate = calStart.toISOString().split('T')[0];
+  const endDate = calEnd.toISOString().split('T')[0];
+
+  try {
+    const resp = await fetch(GOOGLE_SHEETS_URL + '?action=getTickets&startDate=' + startDate + '&endDate=' + endDate);
+    const data = await resp.json();
+    allTicketsByDate = {};
+    if (data.success) {
+      (data.tickets || []).forEach(t => {
+        const d = normalizeDate(t.eventDate);
+        if (!d) return;
+        if (!allTicketsByDate[d]) allTicketsByDate[d] = [];
+        allTicketsByDate[d].push({
+          totalEstHours: parseFloat(t.totalEstHours) || 0,
+          travelHours: parseFloat(t.travelHours) || 0
+        });
+      });
+    }
+  } catch (e) {
+    console.error('Failed to load all tickets for month:', e);
   }
 }
 
@@ -13377,6 +13412,8 @@ async function openContractDetail(contractId, propertyAddress) {
       calendarMonth = new Date();
       calendarMonth.setDate(1);
     }
+
+    await loadAllTicketsForMonth();
 
     // Update contract detail header (for tickets sub-view)
     document.getElementById('contracts-property-address').textContent = propertyAddress || scheduleContract?.propertyAddress || '';
@@ -13893,12 +13930,32 @@ function renderCalendar() {
     const isToday = cellDate.getTime() === today.getTime();
     const dayTickets = ticketsByDate[dateStr] || [];
 
+    // Total hours from ALL contracts on this day
+    const allDayTickets = allTicketsByDate[dateStr] || [];
+    let dayTotalHours = 0;
+    allDayTickets.forEach(t => {
+      dayTotalHours += t.totalEstHours + t.travelHours;
+    });
+
+    // In preview mode, also add preview tickets (they aren't in allTicketsByDate yet)
+    if (schedulePreviewMode) {
+      dayTickets.forEach(t => {
+        if (String(t.ticketId).startsWith('preview-')) {
+          dayTotalHours += (t.totalEstHours || 0) + (t.travelHours || 0);
+        }
+      });
+    }
+
+    const capacity = bidSettings.dailyCrewCapacity || 33;
+    const isOverCapacity = dayTotalHours > capacity;
+
     const holiday = getHoliday(cellDate);
 
     let cellClasses = 'calendar-cell';
     if (isOtherMonth) cellClasses += ' other-month';
     if (isToday) cellClasses += ' today';
     if (holiday) cellClasses += ' holiday';
+    if (isOverCapacity) cellClasses += ' over-capacity';
 
     html += `<div class="${cellClasses}" data-date="${dateStr}"
       ondragover="event.preventDefault(); this.classList.add('drag-over')"
@@ -13907,6 +13964,9 @@ function renderCalendar() {
       onclick="showDayDetail('${dateStr}')">`;
 
     html += `<div class="calendar-day-number">${cellDate.getDate()}</div>`;
+    if (dayTotalHours > 0) {
+      html += `<div class="calendar-day-hours${isOverCapacity ? ' over-capacity' : ''}">${dayTotalHours.toFixed(1)} hrs</div>`;
+    }
     if (holiday) {
       html += `<div class="calendar-holiday-label">${holiday}</div>`;
     }
@@ -13942,12 +14002,12 @@ function renderCalendar() {
 
 function calendarPrevMonth() {
   calendarMonth.setMonth(calendarMonth.getMonth() - 1);
-  renderCalendar();
+  loadAllTicketsForMonth().then(() => renderCalendar());
 }
 
 function calendarNextMonth() {
   calendarMonth.setMonth(calendarMonth.getMonth() + 1);
-  renderCalendar();
+  loadAllTicketsForMonth().then(() => renderCalendar());
 }
 
 function showDayDetail(dateStr) {
@@ -13957,7 +14017,18 @@ function showDayDetail(dateStr) {
 
   const dayTickets = scheduleTickets.filter(t => t.eventDate === dateStr);
 
-  if (dayTickets.length === 0) {
+  // Compute total hours across ALL contracts for this day
+  const allDayData = allTicketsByDate[dateStr] || [];
+  let dayTotal = 0;
+  allDayData.forEach(t => { dayTotal += t.totalEstHours + t.travelHours; });
+  // Add preview tickets if applicable
+  if (schedulePreviewMode) {
+    dayTickets.filter(t => String(t.ticketId).startsWith('preview-')).forEach(t => {
+      dayTotal += (t.totalEstHours || 0) + (t.travelHours || 0);
+    });
+  }
+
+  if (dayTickets.length === 0 && dayTotal === 0) {
     panel.style.display = 'none';
     return;
   }
@@ -13967,7 +14038,16 @@ function showDayDetail(dateStr) {
   });
   dateLabel.textContent = displayDate;
 
+  const cap = bidSettings.dailyCrewCapacity || 33;
+  const isOver = dayTotal > cap;
+  const diff = isOver ? (dayTotal - cap).toFixed(1) : (cap - dayTotal).toFixed(1);
+
   let html = '';
+  if (dayTotal > 0) {
+    html += `<div style="padding: 8px 12px; margin-bottom: 8px; border-radius: 8px; font-size: 13px; font-weight: 600; background: ${isOver ? '#fce8e6' : '#e6f4ea'}; color: ${isOver ? '#c5221f' : '#137333'};">
+      ${dayTotal.toFixed(1)} hrs scheduled &mdash; capacity: ${cap} hrs (${isOver ? diff + ' over' : diff + ' available'})
+    </div>`;
+  }
   dayTickets.forEach(ticket => {
     html += '<div class="detail-ticket-card">';
     ticket.services.forEach(svc => {
@@ -16641,7 +16721,8 @@ document.addEventListener('DOMContentLoaded', function() {
     'setting-com-sub-markup': 'commercialSubMarkup',
     'setting-travel-time': 'defaultTravelTime',
     'setting-mulch-depth': 'defaultMulchDepth',
-    'setting-mulch-price': 'defaultMulchPricePerYard'
+    'setting-mulch-price': 'defaultMulchPricePerYard',
+    'setting-daily-capacity': 'dailyCrewCapacity'
   };
 
   Object.keys(settingsMap).forEach(inputId => {
@@ -16678,7 +16759,8 @@ document.addEventListener('DOMContentLoaded', function() {
       defaultTravelTime: bidSettings.defaultTravelTime,
       defaultMulchDepth: bidSettings.defaultMulchDepth,
       defaultMulchPricePerYard: bidSettings.defaultMulchPricePerYard,
-      marvinKnowledgeBase: bidSettings.marvinKnowledgeBase || ''
+      marvinKnowledgeBase: bidSettings.marvinKnowledgeBase || '',
+      dailyCrewCapacity: bidSettings.dailyCrewCapacity
     };
 
     const result = await saveBidSettings(settings);

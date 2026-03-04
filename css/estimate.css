@@ -1235,6 +1235,36 @@ body {
   opacity: 0.85;
 }
 
+.calendar-day-hours {
+  font-size: 9px;
+  color: #137333;
+  font-weight: 600;
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  background: #e6f4ea;
+  padding: 1px 5px;
+  border-radius: 8px;
+  line-height: 14px;
+}
+
+.calendar-day-hours.over-capacity {
+  color: #c5221f;
+  background: #fce8e6;
+}
+
+.calendar-cell.over-capacity {
+  background: #fff0f0;
+}
+
+.calendar-cell.over-capacity:hover {
+  background: #ffe5e5;
+}
+
+.calendar-cell.other-month.over-capacity {
+  background: #faf0f0;
+}
+
 .schedule-finalize-bar {
   display: flex;
   align-items: center;
