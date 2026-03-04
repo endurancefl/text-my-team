@@ -5225,6 +5225,16 @@ function sendContractForSigning(data) {
   if (companySignedAtCol >= 0) sheet.getRange(contractRow, companySignedAtCol + 1).setValue(companySignedAt);
   if (companySignedIPCol >= 0) sheet.getRange(contractRow, companySignedIPCol + 1).setValue(data.companySignedIP || '');
 
+  // Backfill Contact Name and Contact Email if blank on the sheet
+  var contactNameCol = headers.indexOf('Contact Name');
+  var contactEmailCol = headers.indexOf('Contact Email');
+  if (contactNameCol >= 0 && !contract['Contact Name'] && contactName) {
+    sheet.getRange(contractRow, contactNameCol + 1).setValue(contactName);
+  }
+  if (contactEmailCol >= 0 && !contract['Contact Email'] && email) {
+    sheet.getRange(contractRow, contactEmailCol + 1).setValue(email);
+  }
+
   // Generate signing token and set status
   var token = Utilities.getUuid();
   var tokenCol = headers.indexOf('signingToken');
