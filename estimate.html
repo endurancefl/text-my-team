@@ -17489,7 +17489,7 @@ function renderSchedDay() {
 
   var html = '';
   Object.keys(crewGroups).sort().forEach(function(crew) {
-    var stops = crewGroups[crew];
+    var stops = crewGroups[crew].sort(function(a, b) { return (a.stopOrder || 999) - (b.stopOrder || 999); });
     var totalManHours = stops.reduce(function(sum, t) { return sum + (parseFloat(t.totalEstHours) || 0); }, 0);
     var totalTravelHours = stops.reduce(function(sum, t) { return sum + (parseFloat(t.travelHours) || 0); }, 0);
     var crewSize = getCrewSizeForCrew(crew);
