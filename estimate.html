@@ -1317,6 +1317,12 @@
                   </svg>
                   View Signed PDF
                 </button>
+                <button class="btn btn-primary" id="contract-summary-generate-schedule" onclick="generateScheduleFromContract()" style="display:none;">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;vertical-align:-3px;margin-right:4px;">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/>
+                  </svg>
+                  Generate Schedule
+                </button>
                 <button class="btn btn-danger" id="contract-summary-terminate" onclick="showTerminateDialog()" style="display:none;">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;vertical-align:-3px;margin-right:4px;">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
@@ -1363,6 +1369,14 @@
               <!-- SERVICE VIEW -->
               <div id="contracts-service-view" class="schedule-detail-view active">
                 <div id="contracts-service-list"></div>
+                <!-- Finalize bar for service view -->
+                <div id="schedule-finalize-bar-service" class="schedule-finalize-bar" style="display:none;">
+                  <span class="finalize-bar-label">Schedule Preview — Switch to Calendar view for drag-and-drop</span>
+                  <div class="finalize-bar-actions">
+                    <button class="btn btn-secondary" onclick="cancelSchedulePreview()">Cancel</button>
+                    <button class="btn btn-success" onclick="finalizeSchedule()">Finalize Schedule</button>
+                  </div>
+                </div>
               </div>
 
               <!-- CALENDAR VIEW -->
@@ -1379,6 +1393,14 @@
                     <button onclick="document.getElementById('calendar-day-detail').style.display='none'" style="background:none;border:none;font-size:18px;cursor:pointer;">&times;</button>
                   </div>
                   <div id="calendar-day-detail-content"></div>
+                </div>
+                <!-- Finalize bar for calendar view -->
+                <div id="schedule-finalize-bar" class="schedule-finalize-bar" style="display:none;">
+                  <span class="finalize-bar-label">Schedule Preview — Drag tickets to adjust dates</span>
+                  <div class="finalize-bar-actions">
+                    <button class="btn btn-secondary" onclick="cancelSchedulePreview()">Cancel</button>
+                    <button class="btn btn-success" onclick="finalizeSchedule()">Finalize Schedule</button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -10733,7 +10755,7 @@ function renderEstimatesList() {
     if (!bid.contractId) return true;
     const contract = allContracts.find(c => c.contractId === bid.contractId);
     if (!contract) return true;
-    return !(contract.signingStatus === 'signed' && contract.ticketsGenerated === 'Yes');
+    return contract.signingStatus !== 'signed';
   });
 
   if (activeBids.length === 0) {
@@ -12464,6 +12486,241 @@ async function generateScheduleFromSigned() {
 }
 
 // ═══════════════════════════════════════════════════════════════
+//  TWO-PHASE SCHEDULE: PREVIEW → FINALIZE (from Contracts view)
+// ═══════════════════════════════════════════════════════════════
+
+async function generateScheduleFromContract() {
+  if (!scheduleContract) {
+    showToast('No contract loaded.', 'error');
+    return;
+  }
+
+  const contractId = scheduleContract.contractId;
+  const bidId = scheduleContract.bidId || scheduleContract['Bid ID'];
+  if (!bidId) {
+    showToast('No linked estimate found for this contract.', 'error');
+    return;
+  }
+
+  // Find the bid to get the estimateFileId
+  let bid = savedBids.find(b => b.bidId === bidId);
+  if (!bid || !bid.estimateFileId) {
+    // Reload bids in case they're stale
+    await loadBids();
+    bid = savedBids.find(b => b.bidId === bidId);
+  }
+  if (!bid || !bid.estimateFileId) {
+    showToast('Cannot find estimate data for this contract. Open the linked estimate first.', 'error');
+    return;
+  }
+
+  // Fetch full estimate data from Drive
+  showToast('Loading estimate data...', 'info');
+  let estimateData;
+  try {
+    const response = await fetch(GOOGLE_SHEETS_URL + '?action=getReportData&fileId=' + encodeURIComponent(bid.estimateFileId));
+    const result = await response.json();
+    if (!result.success || !result.data) {
+      showToast('Could not load estimate data: ' + (result.error || 'Unknown'), 'error');
+      return;
+    }
+    estimateData = result.data;
+  } catch (err) {
+    console.error('Error fetching estimate data:', err);
+    showToast('Error loading estimate data. Check your connection.', 'error');
+    return;
+  }
+
+  // Extract schedule parameters from contract
+  const crew = scheduleContract.assignedCrew || '';
+  const preferredDay = parseInt(scheduleContract.preferredDay) || 0;
+  const startDate = scheduleContract.startDate;
+  const contractMonths = parseInt(scheduleContract.contractMonths) || 12;
+
+  if (!startDate) {
+    showToast('Contract is missing a start date.', 'error');
+    return;
+  }
+
+  const start = new Date(startDate + 'T00:00:00');
+  const end = new Date(start);
+  end.setMonth(end.getMonth() + contractMonths);
+  end.setDate(end.getDate() - 1);
+  const endDate = end.toISOString().split('T')[0];
+
+  const services = estimateData.services || [];
+  if (services.length === 0) {
+    showToast('No services found in the estimate.', 'error');
+    return;
+  }
+
+  const seasonalAnchor = Math.max(...services.map(s => s.visits || 0));
+  const travelPercent = estimateData.travelPercent || bidSettings.defaultTravelTime || 30;
+
+  // Generate tickets locally (pure function — no backend call)
+  const tickets = generateAllTickets({
+    services,
+    startDate,
+    endDate,
+    preferredDay,
+    seasonalAnchor,
+    travelPercent
+  });
+
+  if (tickets.length === 0) {
+    showToast('No tickets generated. Check service visit counts and contract dates.', 'error');
+    return;
+  }
+
+  // Calculate earned value and internal cost per ticket
+  const bidTotal = parseFloat(bid.bidTotal) || 0;
+  const internalCost = parseFloat(bid.internalCost) || 0;
+  const allTicketHours = tickets.reduce((sum, t) => sum + (t.totalEstHours || 0) + (t.travelHours || 0), 0);
+
+  if (allTicketHours > 0 && bidTotal > 0) {
+    let runningEV = 0;
+    let runningIC = 0;
+    tickets.forEach((ticket, idx) => {
+      const ticketHours = (ticket.totalEstHours || 0) + (ticket.travelHours || 0);
+      const share = ticketHours / allTicketHours;
+      if (idx < tickets.length - 1) {
+        ticket.earnedValue = Math.round(bidTotal * share * 100) / 100;
+        ticket.internalCost = Math.round(internalCost * share * 100) / 100;
+        runningEV += ticket.earnedValue;
+        runningIC += ticket.internalCost;
+      } else {
+        ticket.earnedValue = Math.round((bidTotal - runningEV) * 100) / 100;
+        ticket.internalCost = Math.round((internalCost - runningIC) * 100) / 100;
+      }
+    });
+  } else {
+    tickets.forEach(ticket => {
+      ticket.earnedValue = 0;
+      ticket.internalCost = 0;
+    });
+  }
+
+  // Assign temporary preview IDs and set contract metadata
+  tickets.forEach((ticket, idx) => {
+    ticket.ticketId = `preview-${idx + 1}`;
+    ticket.contractId = contractId;
+    ticket.propertyAddress = scheduleContract.propertyAddress || '';
+    ticket.assignedCrew = crew;
+    ticket.status = 'scheduled';
+  });
+
+  // Enter preview mode
+  schedulePreviewMode = true;
+  schedulePreviewEstimate = estimateData;
+  scheduleTickets = tickets;
+
+  // Set calendar month to contract start
+  calendarMonth = new Date(startDate + 'T00:00:00');
+  calendarMonth.setDate(1);
+
+  // Update tickets sub-view header
+  document.getElementById('contracts-property-address').textContent = scheduleContract.propertyAddress || '';
+  document.getElementById('contracts-contract-id').textContent = contractId || '';
+  document.getElementById('contracts-date-range').textContent = `${startDate} → ${endDate}`;
+  document.getElementById('contracts-crew').textContent = `Crew: ${crew || 'Unassigned'}`;
+  document.getElementById('contracts-ticket-count').textContent = `${tickets.length} tickets (preview)`;
+
+  // Switch to tickets sub-view in calendar mode
+  document.getElementById('contracts-summary-panel').style.display = 'none';
+  document.getElementById('contracts-tickets-subview').style.display = 'block';
+  setContractsView('calendar');
+
+  showToast(`${tickets.length} tickets generated. Review and click Finalize Schedule when ready.`, 'success', 5000);
+}
+
+async function finalizeSchedule() {
+  if (!schedulePreviewMode || !scheduleContract) return;
+
+  const tickets = scheduleTickets;
+  if (tickets.length === 0) {
+    showToast('No tickets to save.', 'error');
+    return;
+  }
+
+  if (!confirm(`Save ${tickets.length} tickets and make the schedule live?\n\nThis will create all tickets in the backend.`)) return;
+
+  const crew = scheduleContract.assignedCrew || '';
+  const contractId = scheduleContract.contractId;
+
+  // Build ticket payload (strip preview- IDs)
+  const ticketPayload = tickets.map(t => ({
+    contractId: contractId,
+    propertyAddress: t.propertyAddress || scheduleContract.propertyAddress || '',
+    assignedCrew: crew,
+    eventDate: t.eventDate,
+    services: t.services,
+    totalEstHours: t.totalEstHours,
+    travelHours: t.travelHours || 0,
+    earnedValue: t.earnedValue || 0,
+    internalCost: t.internalCost || 0
+  }));
+
+  try {
+    // Save tickets to backend
+    const ticketResult = await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        saveTickets: true,
+        tickets: ticketPayload
+      })
+    });
+    const ticketData = await ticketResult.json();
+
+    if (!ticketData.success) {
+      showToast('Error saving tickets: ' + (ticketData.error || 'Unknown'), 'error');
+      return;
+    }
+
+    // Mark ticketsGenerated on contract
+    await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        updateContract: true,
+        contractId: contractId,
+        ticketsGenerated: 'Yes'
+      })
+    });
+
+    // Update local state
+    if (scheduleContract) scheduleContract.ticketsGenerated = 'Yes';
+    const cachedContract = allContracts.find(c => c.contractId === contractId);
+    if (cachedContract) cachedContract.ticketsGenerated = 'Yes';
+
+    // Exit preview mode
+    schedulePreviewMode = false;
+    schedulePreviewEstimate = null;
+
+    // Reload contract detail to get real ticket IDs
+    showToast(`${tickets.length} tickets saved and schedule is now live.`, 'success', 5000);
+    await openContractDetail(contractId, scheduleContract.propertyAddress || '');
+
+  } catch (err) {
+    console.error('Error finalizing schedule:', err);
+    showToast('Error saving schedule. Check your connection and try again.', 'error');
+  }
+}
+
+function cancelSchedulePreview() {
+  schedulePreviewMode = false;
+  schedulePreviewEstimate = null;
+  scheduleTickets = [];
+
+  // Return to contract summary
+  document.getElementById('contracts-tickets-subview').style.display = 'none';
+  document.getElementById('contracts-summary-panel').style.display = 'block';
+
+  // Re-render summary to restore correct state
+  renderContractSummary();
+
+  showToast('Schedule preview discarded.', 'info');
+}
+
+// ═══════════════════════════════════════════════════════════════
 //  CONTRACT PDF GENERATION
 // ═══════════════════════════════════════════════════════════════
 
@@ -12840,7 +13097,7 @@ function renderEstimateHeader() {
     } else if (!isSigned && sigStatus !== 'sent' && sigStatus !== 'viewed') {
       actionsHtml += `<button class="btn btn-sm btn-primary" onclick="sendContractForSigning()">Send Contract</button>`;
     } else if (isSigned && !hasTickets) {
-      actionsHtml += `<button class="btn btn-sm btn-primary" onclick="generateScheduleFromSigned()">Generate Schedule</button>`;
+      actionsHtml += `<button class="btn btn-sm btn-primary" onclick="openContractDetail('${contractId}', '${address.replace(/'/g, "\\'")}')">View in Contracts</button>`;
     } else if (isSigned && !hasSignedPdf) {
       actionsHtml += `<button class="btn btn-sm btn-primary" onclick="generateSignedPdf()">Generate Signed PDF</button>`;
     }
@@ -12963,6 +13220,8 @@ let calendarMonth = null;        // Currently displayed month (Date object, 1st 
 let draggedTicketId = null;      // Ticket being dragged
 let allContracts = [];           // All contracts for the contracts list
 let scheduleScope = 'list';      // 'list' = contracts list, 'contract' = single contract detail
+let schedulePreviewMode = false;     // true = viewing generated-but-unsaved tickets
+let schedulePreviewEstimate = null;  // estimate data used during preview
 
 function normalizeDate(d) {
   if (!d) return '';
@@ -13065,6 +13324,8 @@ function showContractsList() {
   scheduleScope = 'list';
   scheduleContract = null;
   scheduleTickets = [];
+  schedulePreviewMode = false;
+  schedulePreviewEstimate = null;
 
   document.getElementById('contracts-list-panel').style.display = 'block';
   document.getElementById('contracts-contract-detail').style.display = 'none';
@@ -13170,6 +13431,12 @@ function setContractsView(mode) {
   } else {
     renderCalendar();
   }
+
+  // Show/hide finalize bars based on preview mode
+  const calBar = document.getElementById('schedule-finalize-bar');
+  const svcBar = document.getElementById('schedule-finalize-bar-service');
+  if (calBar) calBar.style.display = (schedulePreviewMode && mode === 'calendar') ? 'flex' : 'none';
+  if (svcBar) svcBar.style.display = (schedulePreviewMode && mode === 'service') ? 'flex' : 'none';
 }
 
 /**
@@ -13216,6 +13483,13 @@ function renderContractSummary() {
   pdfBtn.style.display = c.pdfUrl || c['PDF URL'] ? 'inline-flex' : 'none';
   signedBtn.style.display = c.signedPdfUrl ? 'inline-flex' : 'none';
   terminateBtn.style.display = status === 'terminated' ? 'none' : 'inline-flex';
+
+  const genScheduleBtn = document.getElementById('contract-summary-generate-schedule');
+  if (genScheduleBtn) {
+    const isSigned = signingStatus === 'signed';
+    const hasTickets = (c.ticketsGenerated === 'Yes');
+    genScheduleBtn.style.display = (isSigned && !hasTickets && status !== 'terminated') ? 'inline-flex' : 'none';
+  }
 
   // Ticket stats
   const totalTickets = scheduleTickets.length;
@@ -13339,20 +13613,26 @@ function showContractTickets() {
   document.getElementById('contracts-summary-panel').style.display = 'none';
   document.getElementById('contracts-tickets-subview').style.display = 'block';
 
-  // Render current sub-view
-  if (scheduleViewMode === 'service') {
-    renderServiceSchedule();
-  } else {
-    renderCalendar();
-  }
+  // Render current sub-view (also handles finalize bar visibility)
+  setContractsView(scheduleViewMode);
 }
 
 /**
  * Go back from tickets sub-view to contract summary
  */
 function showContractSummaryFromTickets() {
+  // If in preview mode, cancel the preview and discard tickets
+  if (schedulePreviewMode) {
+    schedulePreviewMode = false;
+    schedulePreviewEstimate = null;
+    scheduleTickets = [];
+  }
+
   document.getElementById('contracts-tickets-subview').style.display = 'none';
   document.getElementById('contracts-summary-panel').style.display = 'block';
+
+  // Re-render summary to restore correct button state
+  renderContractSummary();
 }
 
 /**
@@ -13642,7 +13922,8 @@ function renderCalendar() {
         ? ticket.services[0].name.substring(0, 15)
         : ticket.services.length + ' Services';
 
-      html += `<div class="calendar-ticket status-${ticket.status || 'scheduled'}"
+      const previewClass = schedulePreviewMode ? ' preview-ticket' : '';
+      html += `<div class="calendar-ticket status-${ticket.status || 'scheduled'}${previewClass}"
         draggable="true"
         ondragstart="handleTicketDragStart(event, '${ticket.ticketId}')"
         ondragend="handleTicketDragEnd(event)"
@@ -13764,9 +14045,12 @@ async function handleTicketDrop(event, newDate) {
   const ticketIdToMove = draggedTicketId;
   draggedTicketId = null;
 
-  // Optimistic update — move it immediately in the UI
+  // Local update
   ticket.eventDate = newDate;
   renderCalendar();
+
+  // In preview mode, done — no backend save needed
+  if (schedulePreviewMode) return;
 
   // Then persist to backend (with retry)
   let success = false;
