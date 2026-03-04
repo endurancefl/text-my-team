@@ -5088,14 +5088,14 @@ function sendContractForSigning(data) {
 
   var contractId = contract['Contract ID'] || '';
   var propertyAddr = contract['Property Address'] || '';
-  var contactName = contract['Contact Name'] || '';
+  var contactName = contract['Contact Name'] || data.contactName || '';
   var monthly = parseFloat(contract['Monthly Payment']) || 0;
   var contractValue = parseFloat(contract['Contract Value']) || 0;
   var startDate = contract['Start Date'] || '';
   var endDate = contract['End Date'] || '';
   var paymentTerms = contract['Payment Terms'] || 'Net 30';
   var bidId = contract['Bid ID'] || '';
-  var billingAddress = contract['Billing Address'] || '';
+  var billingAddress = contract['Billing Address'] || data.billingAddress || '';
   var companySignedAt = new Date().toISOString();
 
   // Look up bid JSON for services, termsAndConditionsHtml, propertyType
@@ -5225,14 +5225,18 @@ function sendContractForSigning(data) {
   if (companySignedAtCol >= 0) sheet.getRange(contractRow, companySignedAtCol + 1).setValue(companySignedAt);
   if (companySignedIPCol >= 0) sheet.getRange(contractRow, companySignedIPCol + 1).setValue(data.companySignedIP || '');
 
-  // Backfill Contact Name and Contact Email if blank on the sheet
+  // Backfill Contact Name, Contact Email, and Billing Address if blank on the sheet
   var contactNameCol = headers.indexOf('Contact Name');
   var contactEmailCol = headers.indexOf('Contact Email');
+  var billingAddrCol = headers.indexOf('Billing Address');
   if (contactNameCol >= 0 && !contract['Contact Name'] && contactName) {
     sheet.getRange(contractRow, contactNameCol + 1).setValue(contactName);
   }
   if (contactEmailCol >= 0 && !contract['Contact Email'] && email) {
     sheet.getRange(contractRow, contactEmailCol + 1).setValue(email);
+  }
+  if (billingAddrCol >= 0 && !contract['Billing Address'] && billingAddress) {
+    sheet.getRange(contractRow, billingAddrCol + 1).setValue(billingAddress);
   }
 
   // Generate signing token and set status

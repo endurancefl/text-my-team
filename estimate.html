@@ -18899,6 +18899,8 @@ async function sendContractForSigning() {
         sendContractForSigning: true,
         contractId: currentEstimate.contractId,
         contactEmail: email,
+        contactName: ct ? getContactDisplayName(ct) : '',
+        billingAddress: ct ? (ct.billingAddress || '') : '',
         companySignedIP: companySignedIP
       })
     });
