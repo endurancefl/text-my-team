@@ -6041,7 +6041,7 @@ async function sendMarvinIdentifyMessage(context) {
   appendMarvinMessage('user', '🔍 Identify: ' + summary);
 
   // Build concise prompt — tell MARVIN to skip web search / tools to avoid timeout
-  const prompt = 'The user pointed at something on screen and wants to know what it does. Do NOT use web search or data tools — answer from your knowledge of this app.\n\nElement: ' + JSON.stringify(context) + '\n\nKeep it short — 1-2 sentences max. Plain English, no HTML/CSS/technical markup. Say what it does and why it matters. If it connects to a setting or value elsewhere in the app, mention where. If it is an input or editable value, offer to take them there.';
+  const prompt = 'The user pointed at something on screen. Do NOT use web search or data tools.\n\nElement: ' + JSON.stringify(context) + '\n\nRESPONSE RULES (strict):\n- MAXIMUM 2 sentences. No exceptions. No extra paragraphs.\n- Plain English only. Never mention HTML tags, CSS classes, or code.\n- Say what it does and if it connects to a setting elsewhere, name that setting.\n- If it is editable, offer to navigate there.';
 
   marvinChatHistory.push({ role: 'user', content: prompt });
 
