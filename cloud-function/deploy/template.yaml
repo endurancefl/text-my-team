@@ -42,7 +42,9 @@ Resources:
   PdfGeneratorFunction:
     Type: AWS::Serverless::Function
     Properties:
-      PackageType: Image
+      Runtime: python3.12
+      Handler: lambda_function.lambda_handler
+      CodeUri: ../
       Architectures:
         - x86_64
       Policies:
@@ -91,10 +93,6 @@ Resources:
             ApiId: !Ref PdfApi
             Path: /marvin
             Method: OPTIONS
-    Metadata:
-      DockerTag: latest
-      DockerContext: ../
-      Dockerfile: Dockerfile
 
   MarvinStreamFunction:
     Type: AWS::Serverless::Function

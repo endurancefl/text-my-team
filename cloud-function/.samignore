@@ -1,0 +1,11 @@
+# Exclude files not needed in the Lambda zip package
+main.py
+pdf_generator.py
+test_local.py
+test_output/
+deploy/
+marvin-stream/
+__pycache__/
+Dockerfile
+README.md
+.samignore

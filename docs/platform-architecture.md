@@ -75,7 +75,8 @@ text-my-team/
 │   │   ├── handler.py             # SSE streaming handler (native Lambda Function URL response streaming)
 │   │   ├── requirements.txt       # anthropic>=0.51.0 (standalone, no Docker)
 │   │   └── marvin-knowledge.md    # MARVIN knowledge base (copy, bundled in zip)
-│   ├── Dockerfile                 # DocRaptor container image (lightweight, no C libraries)
+│   ├── .samignore                 # Excludes unnecessary files from zip builds (doesn't fully work with --use-container)
+│   ├── Dockerfile                 # Vestigial — not used by any function in the stack (was for Docker/ECR deployment)
 │   ├── requirements.txt
 │   ├── templates/                 # Jinja2 HTML/CSS templates for PDFs
 │   │   ├── base.html
@@ -88,7 +89,7 @@ text-my-team/
 │   │   ├── logo.png
 │   │   └── fonts/DancingScript-Bold.ttf  # Cursive font for e-signature rendering
 │   └── deploy/
-│       ├── template.yaml          # SAM template (PdfGeneratorFunction Docker + MarvinStreamFunction zip)
+│       ├── template.yaml          # SAM template (both functions zip-based, Runtime: python3.12)
 │       └── deploy.sh
 ├── docs/
 │   └── platform-architecture.md   # This document
@@ -358,7 +359,7 @@ text-my-team/
 
 ### Backend & Infrastructure
 - **Backend** — Single consolidated Google Apps Script (Code.gs) serving Estimating, Crew, Invoicing, and Signing endpoints from one "Estimating" spreadsheet
-- **PDF Generation** — AWS Lambda + API Gateway (Python/DocRaptor container image). Jinja2 templates rendered locally, HTML sent to DocRaptor API (PrinceXML) for PDF conversion. Rich text HTML from Quill.js editors rendered natively via `.rich-text-content` CSS class. Template variable resolution via `_resolve_template_vars()` for T&C placeholders. Previously used WeasyPrint (local rendering) with ReportLab fallback.
+- **PDF Generation** — AWS Lambda + API Gateway (Python zip package, Runtime: python3.12). Jinja2 templates rendered locally, HTML sent to DocRaptor API (PrinceXML) for PDF conversion. Rich text HTML from Quill.js editors rendered natively via `.rich-text-content` CSS class. Template variable resolution via `_resolve_template_vars()` for T&C placeholders. Previously used WeasyPrint (local rendering) with ReportLab fallback. Docker/ECR completely eliminated from the deployment pipeline.
 - **Hosting** — GitHub Pages (endurancefl.github.io). `.nojekyll` file + `_config.yml` (excludes `cloud-function/` and `backend/` dirs) prevent Jekyll from processing Jinja2 template syntax (`{% if %}`, `{{ }}`) in `cloud-function/templates/` which caused build failures
 - **Auth** — Crew leaders: phone number against Crew Members sheet (Role = "Leader"). Customers: 4-digit PIN against Properties sheet.
 - **Data storage** — Google Sheets as database, Google Drive for files (estimates JSON, photos, site reports, invoice PDFs), localStorage for auto-save
@@ -645,7 +646,7 @@ Both apps live in the same monorepo, share the component library (`packages/ui`)
 - `lambda_function.py` — Lambda handler: routes by path (`/upload-urls` → pre-signed URL generation, `/marvin` → MARVIN AI chat, `/generate_site_report` → PDF generation). PDF path detects content type: `application/json` → S3 flow (looks for `s3Keys`/`beforeS3Keys`/`afterS3Keys`), `multipart/form-data` → legacy multipart flow. Imports all PDF generation functions from `docraptor_service`. Routes by `metadata.type`: `invoice` → `generate_invoice_pdf()`, `contract` → `generate_contract_pdf()`, `before_after` → `generate_before_after_report()`, `standard` → `generate_standard_report()`. Removed renderer switching logic (`WEASYPRINT_AVAILABLE`, `DEFAULT_RENDERER`). Added `DOCRAPTOR_TEST_MODE` env var support.
 - **MARVIN AI endpoint**: Two Lambda functions serve MARVIN — separate packaging, separate runtimes:
   - **Streaming (primary)**: `MarvinStreamFunction` — a **separate zip-based Lambda** (`Runtime: python3.12`) with a Function URL (`InvokeMode: RESPONSE_STREAM`). Self-contained in `cloud-function/marvin-stream/` directory (`handler.py`, `requirements.txt`, `marvin-knowledge.md`). Uses **native Lambda Function URL response streaming** — no Docker, no Web Adapter. Entry point: `handler.handler`. Streams SSE events (`thinking`, `text`, `tool_start`, `tool_result`, `done`, `error`) in real-time. No API Gateway timeout constraints. Frontend connects via `MARVIN_STREAM_URL` constant in estimate.html using `fetch()` + `ReadableStream`.
-  - **Fallback (sync)**: `PdfGeneratorFunction` (Docker/Image) — existing API Gateway `/marvin` route. Same `_handle_marvin()` handler in `lambda_function.py`. Used when `MARVIN_STREAM_URL` is empty. Zero cost when unused.
+  - **Fallback (sync)**: `PdfGeneratorFunction` (zip package) — existing API Gateway `/marvin` route. Same `_handle_marvin()` handler in `lambda_function.py`. Used when `MARVIN_STREAM_URL` is empty. Zero cost when unused.
   - **Model**: `claude-opus-4-5-20251101` (Opus 4.5). Pricing: ~$5/M input, ~$25/M output tokens. With prompt caching, repeated system prompts cost ~$0.63/M (cache read).
   - **Extended thinking**: Enabled with `budget_tokens: 4096`. Thinking blocks sent as `event: thinking` (streaming) — frontend shows subtle "Reasoning..." indicator. Filtered from text extraction in sync fallback.
   - **Prompt caching**: System prompt uses `cache_control: {"type": "ephemeral"}` content block format. Caches the knowledge base + personality + action schemas across requests within the same Lambda instance. Reduces repeated system prompt cost significantly with Opus 4.5 pricing.
@@ -668,13 +669,15 @@ Both apps live in the same monorepo, share the component library (`packages/ui`)
     Backend calls use `urllib.request` with 25s timeout. Results truncated (100 tickets, 200 invoices/properties max). System prompt instructs Claude to prefer context data (faster) and only use tools when data is missing or a different filter is needed. Max 5 tool_use rounds (streaming removes the 30s API Gateway timeout constraint).
   - **Knowledge file** (`cloud-function/marvin-knowledge.md`, ~441 lines): Local markdown file loaded once at Lambda cold start into the `_MARVIN_KNOWLEDGE` global variable. Injected into the chat system prompt as the "Platform & Industry Knowledge" section. Contains: platform overview, all views and their field IDs, full item catalog with production rates, service catalog, calculation formulas, billing tiers, takeoff sections, bid settings, contract system, crew operations, customer portal, backend schemas, and industry benchmarks. Replaces the ~60 lines of hardcoded knowledge that was previously inline in the Lambda. Must be updated whenever the codebase changes (same discipline as `platform-architecture.md`). Redeploy Lambda after changes.
 - **Lambda config**: Two functions in the `endurance-pdf-generator` stack:
-  - `PdfGeneratorFunction` — **Docker/Image** (ECR). Python 3.12, 2048MB memory, 300s timeout. Handles API Gateway routes: `/generate_site_report`, `/upload-urls`, `/marvin` (sync fallback). Requires Docker Desktop for builds.
-  - `MarvinStreamFunction` — **zip/python3.12** (no Docker). 2048MB memory, 300s timeout. Lambda Function URL with `RESPONSE_STREAM` invoke mode. Self-contained in `cloud-function/marvin-stream/`. Entry point: `handler.handler`. No Docker dependency — SAM builds the zip from the `marvin-stream/` directory.
-- **Deployment**: `PdfGeneratorFunction` uses **Docker container image on ECR**. SAM builds the Dockerfile locally (requires Docker Desktop running), pushes to ECR, and updates the Lambda. Base image: `public.ecr.aws/lambda/python:3.12` (Amazon Linux 2023). No system C libraries needed — DocRaptor handles PDF rendering remotely. Docker image is dramatically smaller and faster to build than the previous WeasyPrint image (which required pango, cairo, gdk-pixbuf2, harfbuzz, fontconfig, freetype). Still Docker-based because the MARVIN fallback (`/marvin`) route shares this Lambda. `MarvinStreamFunction` is zip-packaged — no Docker required. Redeployment: `cd cloud-function/deploy && ./deploy-docker.sh` (builds both functions, pushes Docker image to ECR, updates stack).
-- **ECR repository**: `598386792755.dkr.ecr.us-east-1.amazonaws.com/endurancepdfgeneratorab3806a9/pdfgeneratorfunctionb84ef44frepo`
+  - `PdfGeneratorFunction` — **zip/python3.12** (Runtime: python3.12, Handler: lambda_function.lambda_handler, CodeUri: ../). 2048MB memory, 300s timeout. Handles API Gateway routes: `/generate_site_report`, `/upload-urls`, `/marvin` (sync fallback). No Docker dependency.
+  - `MarvinStreamFunction` — **zip/python3.12** (Runtime: python3.12, Handler: handler.handler, CodeUri: ../marvin-stream/). 2048MB memory, 300s timeout. Lambda Function URL with `RESPONSE_STREAM` invoke mode. Self-contained in `cloud-function/marvin-stream/`. No Docker dependency.
+  - Both functions are zip-based. Docker is completely eliminated from the deployment pipeline.
+- **Deployment**: Both functions are **zip-based** — no Docker, no ECR, no container images. SAM builds the zip packages (using `--use-container` for a consistent build environment) and deploys via CloudFormation. No Docker Desktop required at runtime; `--use-container` uses a SAM build container but does not produce a Docker image for Lambda. Redeployment: `cd cloud-function/deploy && sam build --use-container && sam deploy --no-confirm-changeset`. The old `deploy-docker.sh` script and ECR repository are no longer used. `image_repositories` removed from `samconfig.toml`.
+- **ECR repository (no longer used)**: `598386792755.dkr.ecr.us-east-1.amazonaws.com/endurancepdfgeneratorab3806a9/pdfgeneratorfunctionb84ef44frepo` — vestigial from the Docker/Image era. Not referenced by any deploy config.
+- **.samignore**: `cloud-function/.samignore` excludes unnecessary files from the zip package (main.py, pdf_generator.py, test files, deploy/, marvin-stream/, Dockerfile, etc.). Note: `.samignore` does not fully work with `--use-container` builds — SAM copies all files into the build container before applying the ignore list, so build times may include extra files.
 - **Function name**: `endurance-pdf-generator-PdfGeneratorFunction-p2cuwitYNO8d`
 - **AWS CLI location** (macOS/Homebrew): `/opt/homebrew/Cellar/awscli/2.33.28/libexec/bin/aws`
-- **DocRaptor is ACTIVE**: Lambda renders Jinja2 HTML/CSS templates locally, then sends the complete HTML to DocRaptor's API (PrinceXML) for PDF generation. No local PDF rendering — no system C libraries needed. `DOCRAPTOR_API_KEY` and `DOCRAPTOR_TEST_MODE` environment variables configured in `template.yaml`. Cost: ~$15-29/month based on document count. Eliminates Docker build time issues and cross-architecture problems that plagued WeasyPrint.
+- **DocRaptor is ACTIVE**: Lambda renders Jinja2 HTML/CSS templates locally, then sends the complete HTML to DocRaptor's API (PrinceXML) for PDF generation. No local PDF rendering — no system C libraries needed. `DOCRAPTOR_API_KEY` and `DOCRAPTOR_TEST_MODE` environment variables configured in `template.yaml`. Cost: ~$15-29/month based on document count. Switching to DocRaptor enabled the migration from Docker/Image to zip-based Lambda (no system C libraries = no need for a custom container image).
 - **Template structure**:
   ```
   cloud-function/templates/
