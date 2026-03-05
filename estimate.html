@@ -6164,9 +6164,14 @@ function captureElementContext(el) {
 async function sendMarvinIdentifyMessage(context) {
   if (marvinIsThinking) return;
 
-  let summary = context.tag;
-  if (context.id) summary += '#' + context.id;
-  if (context.text) summary += ' — "' + context.text.slice(0, 60) + (context.text.length > 60 ? '…' : '') + '"';
+  let summary = '';
+  if (context.text) {
+    summary = '"' + context.text.slice(0, 60) + (context.text.length > 60 ? '…' : '') + '"';
+  } else if (context.id) {
+    summary = '#' + context.id;
+  } else {
+    summary = context.tag;
+  }
 
   appendMarvinMessage('user', '🔍 Identify: ' + summary);
 
