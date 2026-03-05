@@ -98,15 +98,20 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Runtime: python3.12
-      Handler: handler.handler
+      Handler: run.sh
       CodeUri: ../marvin-stream/
       Architectures:
         - x86_64
       MemorySize: 2048
       Timeout: 300
+      Layers:
+        - !Sub arn:aws:lambda:${AWS::Region}:753240598075:layer:LambdaAdapterLayerX86:26
       Environment:
         Variables:
           ANTHROPIC_API_KEY: '{{resolve:secretsmanager:marvin-api-key:SecretString:key}}'
+          AWS_LAMBDA_EXEC_WRAPPER: /opt/bootstrap
+          AWS_LWA_INVOKE_MODE: response_stream
+          PORT: 8000
       FunctionUrlConfig:
         AuthType: NONE
         InvokeMode: RESPONSE_STREAM

@@ -1,17 +1,27 @@
-"""Native Lambda Function URL streaming handler for MARVIN AI chat.
+"""MARVIN AI streaming handler — HTTP server for Lambda Web Adapter.
 
-Deployed as a zip-based Lambda with InvokeMode: RESPONSE_STREAM.
-The runtime injects a `response_stream` parameter that we write SSE chunks to.
-Self-contained — no dependency on the Docker-based PDF Lambda.
+Deployed as a zip-based Lambda with Lambda Web Adapter layer.
+The adapter proxies HTTP requests to this server, enabling SSE streaming
+via Function URL with InvokeMode: RESPONSE_STREAM.
+Self-contained — no dependency on the PDF Lambda.
 """
 import json
 import os
 import urllib.request
 import urllib.parse
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 
-import anthropic
+# Defer anthropic import to first request (speeds up server startup for Web Adapter)
+_anthropic = None
+
+def _get_anthropic():
+    global _anthropic
+    if _anthropic is None:
+        import anthropic
+        _anthropic = anthropic
+    return _anthropic
 
 # ─── Knowledge Base ───────────────────────────────────────────────────────────
 
@@ -19,6 +29,20 @@ _MARVIN_KNOWLEDGE = ""
 _knowledge_path = Path(__file__).parent / "marvin-knowledge.md"
 if _knowledge_path.exists():
     _MARVIN_KNOWLEDGE = _knowledge_path.read_text(encoding="utf-8")
+
+# ─── CORS ────────────────────────────────────────────────────────────────────
+
+ALLOWED_ORIGINS = {
+    "https://endurancefl.github.io",
+    "https://enduranceservices.github.io",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+}
+
+
+def _cors_origin(origin):
+    return origin if origin in ALLOWED_ORIGINS else ""
+
 
 # ─── Backend ──────────────────────────────────────────────────────────────────
 
@@ -180,7 +204,6 @@ def _execute_tools_parallel(tool_uses):
 
 
 # ─── System Prompt Builder ────────────────────────────────────────────────────
-# Identical to _build_chat_system_prompt in lambda_function.py
 
 def _build_chat_system_prompt(context):
     knowledge_base = ""
@@ -256,9 +279,9 @@ The JSON below contains EVERYTHING currently loaded in the platform. This is aut
 - **knowledgeBase**: Company-specific instructions and preferences.
 
 ```json
-{ctx_str}
+{{ctx_str}}
 ```
-{kb_section}
+{{kb_section}}
 ## Data Tools (live backend access)
 
 You have tools to fetch FRESH data directly from the database: `get_schedule`, `get_contracts`, `get_invoices`, `get_production_data`, `get_properties`, `get_contacts`, `get_reminders`. These are more reliable than the Platform Data JSON for data that might not be loaded yet.
@@ -345,31 +368,13 @@ def _parse_chat_response(text):
 
 # ─── SSE Helpers ──────────────────────────────────────────────────────────────
 
-def _sse_event(event_type, data):
+def _sse_bytes(event_type, data):
     return f"event: {event_type}\ndata: {json.dumps(data)}\n\n".encode("utf-8")
 
 
-# ─── Lambda Handler (native response streaming) ──────────────────────────────
+# ─── Streaming Logic ─────────────────────────────────────────────────────────
 
-def handler(event, response_stream, context):
-    """Entry point for Lambda Function URL with InvokeMode: RESPONSE_STREAM."""
-    response_stream.content_type = "text/event-stream"
-
-    try:
-        body_str = event.get("body", "{}")
-        if event.get("isBase64Encoded"):
-            import base64
-            body_str = base64.b64decode(body_str).decode("utf-8")
-        data = json.loads(body_str)
-
-        _stream_marvin(data, response_stream)
-    except Exception as e:
-        response_stream.write(_sse_event("error", {"error": str(e)}))
-
-    response_stream.close()
-
-
-def _stream_marvin(data, response_stream):
+def _stream_marvin(data, wfile):
     prompt = data.get("prompt", "").strip()
     history = data.get("history", [])
     ctx = data.get("context", {})
@@ -377,10 +382,11 @@ def _stream_marvin(data, response_stream):
 
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key:
-        response_stream.write(_sse_event("error", {"error": "ANTHROPIC_API_KEY not configured"}))
+        wfile.write(_sse_bytes("error", {"error": "ANTHROPIC_API_KEY not configured"}))
+        wfile.flush()
         return
 
-    client = anthropic.Anthropic(api_key=api_key)
+    client = _get_anthropic().Anthropic(api_key=api_key)
 
     system_prompt = _build_chat_system_prompt(ctx)
     messages = []
@@ -432,9 +438,11 @@ def _stream_marvin(data, response_stream):
                 if evt.type == "content_block_delta":
                     if hasattr(evt.delta, "text"):
                         full_text += evt.delta.text
-                        response_stream.write(_sse_event("text", {"delta": evt.delta.text}))
+                        wfile.write(_sse_bytes("text", {"delta": evt.delta.text}))
+                        wfile.flush()
                     elif hasattr(evt.delta, "thinking"):
-                        response_stream.write(_sse_event("thinking", {"status": "reasoning"}))
+                        wfile.write(_sse_bytes("thinking", {"status": "reasoning"}))
+                        wfile.flush()
 
             final_message = stream.get_final_message()
 
@@ -453,9 +461,10 @@ def _stream_marvin(data, response_stream):
             tool_use_count += 1
 
             tool_use_blocks = [b for b in final_message.content if b.type == "tool_use"]
-            response_stream.write(_sse_event("tool_start", {
+            wfile.write(_sse_bytes("tool_start", {
                 "tools": [{"name": tu.name, "id": tu.id} for tu in tool_use_blocks]
             }))
+            wfile.flush()
 
             results = _execute_tools_parallel(tool_use_blocks)
 
@@ -468,9 +477,10 @@ def _stream_marvin(data, response_stream):
                     "content": json.dumps(result_data, default=str),
                 })
 
-            response_stream.write(_sse_event("tool_result", {
+            wfile.write(_sse_bytes("tool_result", {
                 "tools": [tu.name for tu in tool_use_blocks]
             }))
+            wfile.flush()
 
             messages.append({"role": "assistant", "content": final_message.content})
             messages.append({"role": "user", "content": tool_results})
@@ -483,7 +493,8 @@ def _stream_marvin(data, response_stream):
     action = parsed.get("action", None)
     message = parsed.get("message", full_text)
 
-    response_stream.write(_sse_event("done", {"message": message, "action": action}))
+    wfile.write(_sse_bytes("done", {"message": message, "action": action}))
+    wfile.flush()
 
 
 def _build_user_content(prompt, files):
@@ -503,3 +514,62 @@ def _build_user_content(prompt, files):
         elif f.get("type") == "text" and f.get("content"):
             blocks.append({"type": "text", "text": f["content"]})
     return blocks
+
+
+# ─── HTTP Server (Lambda Web Adapter proxies to this) ─────────────────────────
+
+class MarvinHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        # Health check for Lambda Web Adapter readiness probe
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain")
+        self.end_headers()
+        self.wfile.write(b"OK")
+
+    def do_OPTIONS(self):
+        origin = self.headers.get("Origin", "")
+        allowed = _cors_origin(origin)
+        self.send_response(204)
+        if allowed:
+            self.send_header("Access-Control-Allow-Origin", allowed)
+            self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            self.send_header("Access-Control-Max-Age", "3600")
+        self.end_headers()
+
+    def do_POST(self):
+        origin = self.headers.get("Origin", "")
+        allowed = _cors_origin(origin)
+        content_len = int(self.headers.get("Content-Length", 0))
+        body = json.loads(self.rfile.read(content_len)) if content_len else {}
+
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "keep-alive")
+        if allowed:
+            self.send_header("Access-Control-Allow-Origin", allowed)
+        self.end_headers()
+
+        try:
+            _stream_marvin(body, self.wfile)
+        except Exception as e:
+            self.wfile.write(_sse_bytes("error", {"error": str(e)}))
+            self.wfile.flush()
+
+    def log_message(self, fmt, *args):
+        # Suppress per-request logs to keep CloudWatch clean
+        pass
+
+
+def handler(event, context):
+    """Dummy handler — Lambda Web Adapter routes to the HTTP server instead."""
+    return {"statusCode": 200, "body": "OK"}
+
+
+PORT = int(os.environ.get("PORT", 8000))
+
+if __name__ == "__main__":
+    server = HTTPServer(("", PORT), MarvinHandler)
+    print(f"MARVIN streaming server listening on port {PORT}")
+    server.serve_forever()
