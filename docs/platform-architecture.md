@@ -436,6 +436,7 @@ text-my-team/
 | `updateTicketStatus` | Estimating | Updates ticket status/completed date; auto-sets `Needs Reschedule=TRUE` when status is `skipped` |
 | `rescheduleTicket` | Estimating | Moves ticket to new date; clears `Needs Reschedule` flag |
 | `bulkSkipDay` | Estimating | Bulk-skips all scheduled/partial tickets for a crew on a date — sets status to `skipped`, `Needs Reschedule=TRUE`, Notes to reason |
+| `updateTicketCrew` | Estimating | Reassigns ticket(s) to a different crew — accepts single `ticketId` or bulk `ticketIds[]` + `newCrew`. Updates the Assigned Crew column in Scheduled Tickets sheet |
 | `saveBid` | Estimating | Creates new bid row |
 | `updateBid` | Estimating | Updates existing bid row |
 | `saveBidSettings` | Estimating | Saves settings key-value pairs |
@@ -2595,6 +2596,10 @@ Before the full React/PostgreSQL migration, the ticket generation and schedule f
 2. ✅ Reschedule endpoint exists (`rescheduleTicket`) — now also clears `needsReschedule` flag
 3. ✅ Skip stop in crew app (`updateTicketStatus` with status = 'skipped') — now auto-sets `needsReschedule=TRUE`
 4. ✅ **Bulk skip + Needs Reschedule queue** — "Skip Day (N)" button on crew headers in day view, `bulkSkipDay` batch endpoint, "Needs Reschedule" queue toggle with badge count, queue view grouped by crew with reschedule controls. All skips (crew field, office single, bulk) enter the queue. Functions: `bulkSkipCrewDay()`, `fetchRescheduleQueue()`, `renderRescheduleQueue()`, `rescheduleFromQueue()`, `toggleRescheduleQueue()`, `updateRescheduleQueueCount()`
+5. ✅ **Individual ticket crew reassignment** — crew dropdown in ticket detail panel (`showSchedTicketDetail()`) allows moving a ticket to a different crew. Optimistic update + backend POST via `updateTicketCrew` endpoint. Function: `reassignTicketCrew(ticketId, newCrew)`. Completed/skipped tickets show read-only crew text.
+6. ✅ **Bulk route transfer** — "Transfer Route" button on crew header in day view opens modal to move all transferable tickets from one crew to another. Shows target crew capacity bars, projected load, and over-capacity warnings. Functions: `showTransferRouteModal(sourceCrew)`, `selectTransferTarget()`, `confirmTransferRoute()`, `closeTransferRouteModal()`. State: `transferRouteState`. Backend: bulk `updateTicketCrew` with `ticketIds[]`.
+7. ✅ **Preview capacity warnings** — after generating schedule preview, `analyzePreviewCapacity()` checks per-crew workload against `crewSize * 8` man-hours per day. Overloaded days shown in a dismissible amber banner with conflict details and suggested crews with available capacity. Functions: `analyzePreviewCapacity()`, `showCapacityWarningBanner(crew, conflicts)`, `buildCrewCapacityMap(additionalTickets)`. Banner removed on cancel/finalize. Data layer: `allTicketsByDate` now includes `assignedCrew` field.
+8. ✅ **Finalize preserves per-ticket crew changes** — `finalizeSchedule()` uses `t.assignedCrew || crew` so individual ticket reassignments during preview are preserved when saving to backend.
 
 ### Phase E: Earned Revenue Dashboard (estimate.html / management view) — 🔶 Partially Built
 1. ✅ **Monthly earned vs. collected bar chart** — side-by-side bars with pagination (`renderMonthlyChart()`, `calcMonthlyData()`)

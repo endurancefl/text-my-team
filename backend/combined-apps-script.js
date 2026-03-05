@@ -153,6 +153,9 @@ function doPost(e) {
     if (data.bulkSkipDay) {
       return jsonResponse(bulkSkipDay(data));
     }
+    if (data.updateTicketCrew) {
+      return jsonResponse(updateTicketCrew(data));
+    }
     if (data.saveBid) {
       return jsonResponse(saveBid(data.bidData));
     }
@@ -1674,6 +1677,52 @@ function bulkSkipDay(data) {
   }
 
   return { success: true, skippedCount: skippedCount, skippedIds: skippedIds };
+}
+
+// ─── Update Ticket Crew (single or bulk) ─────────────────────
+function updateTicketCrew(data) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Scheduled Tickets');
+
+  if (!sheet) {
+    return { success: false, error: 'Scheduled Tickets sheet not found' };
+  }
+
+  var sheetData = sheet.getDataRange().getValues();
+  var headers = sheetData[0];
+  var ticketIdCol = headers.indexOf('Ticket ID');
+  var assignedCrewCol = headers.indexOf('Assigned Crew');
+
+  if (ticketIdCol === -1) ticketIdCol = 0;
+  if (assignedCrewCol === -1) {
+    return { success: false, error: 'Assigned Crew column not found' };
+  }
+
+  var newCrew = String(data.newCrew || '');
+  if (!newCrew) {
+    return { success: false, error: 'newCrew is required' };
+  }
+
+  // Support single ticketId or array of ticketIds
+  var targetIds = [];
+  if (data.ticketIds && Array.isArray(data.ticketIds)) {
+    targetIds = data.ticketIds.map(function(id) { return String(id); });
+  } else if (data.ticketId) {
+    targetIds = [String(data.ticketId)];
+  } else {
+    return { success: false, error: 'ticketId or ticketIds is required' };
+  }
+
+  var updatedCount = 0;
+  for (var i = 1; i < sheetData.length; i++) {
+    var rowTicketId = String(sheetData[i][ticketIdCol] || '');
+    if (targetIds.indexOf(rowTicketId) !== -1) {
+      sheet.getRange(i + 1, assignedCrewCol + 1).setValue(newCrew);
+      updatedCount++;
+    }
+  }
+
+  return { success: true, updatedCount: updatedCount };
 }
 
 

@@ -7502,3 +7502,108 @@ body.marvin-identify-active .main-content {
   }
 }
 
+/* ─── Capacity Warning Banner ──────────────────────────────── */
+.capacity-warning-banner {
+  border: 1px solid #f9ab00;
+  background: #fff8f0;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+.capacity-warning-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: #fef3e0;
+  font-size: 14px;
+  color: #b45309;
+}
+.capacity-warning-body {
+  padding: 8px 14px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.capacity-conflict-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid #f0ebe3;
+  flex-wrap: wrap;
+}
+.capacity-conflict-row:last-child { border-bottom: none; }
+.crew-suggestion {
+  display: inline-block;
+  background: #e6f4ea;
+  color: #137333;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* ─── Transfer Route Button ────────────────────────────────── */
+.sched-transfer-btn {
+  font-size: 12px;
+  color: #1a73e8;
+  background: none;
+  border: 1px solid #1a73e8;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.sched-transfer-btn:hover {
+  background: #e8f0fe;
+}
+
+/* ─── Transfer Route Modal ─────────────────────────────────── */
+.transfer-route-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.transfer-route-content {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 420px;
+  width: 90%;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+  max-height: 80vh;
+  overflow-y: auto;
+}
+.transfer-crew-option {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid #dadce0;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.transfer-crew-option:hover {
+  border-color: #1a73e8;
+  background: #f8f9ff;
+}
+.transfer-crew-option.selected {
+  border-color: #1a73e8;
+  background: #e8f0fe;
+  box-shadow: 0 0 0 1px #1a73e8;
+}
+.transfer-crew-option.over-capacity {
+  border-color: #f5c6cb;
+  background: #fef7f7;
+}
+

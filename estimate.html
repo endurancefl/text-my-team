@@ -1272,6 +1272,19 @@
             </div>
             <div id="sched-detail-content"></div>
           </div>
+
+          <!-- TRANSFER ROUTE MODAL -->
+          <div id="transfer-route-modal" class="transfer-route-modal" style="display:none;">
+            <div class="transfer-route-content">
+              <h4 id="transfer-route-title" style="margin:0 0 4px 0;font-size:16px;">Transfer Route</h4>
+              <p id="transfer-route-desc" style="margin:0 0 16px 0;font-size:13px;color:#666;"></p>
+              <div id="transfer-route-crews"></div>
+              <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;">
+                <button class="btn btn-secondary" onclick="closeTransferRouteModal()">Cancel</button>
+                <button class="btn btn-primary" id="transfer-route-confirm" onclick="confirmTransferRoute()" disabled>Transfer</button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- CONTRACTS VIEW (renamed from Schedule) -->
@@ -13036,6 +13049,9 @@ async function generateScheduleFromContract() {
   setContractsView('calendar');
 
   showToast(`${tickets.length} tickets generated. Review and click Finalize Schedule when ready.`, 'success', 5000);
+
+  // Analyze capacity and show warnings if overloaded
+  analyzePreviewCapacity();
 }
 
 async function finalizeSchedule() {
@@ -13052,11 +13068,11 @@ async function finalizeSchedule() {
   const crew = scheduleContract.assignedCrew || '';
   const contractId = scheduleContract.contractId;
 
-  // Build ticket payload (strip preview- IDs)
+  // Build ticket payload (strip preview- IDs, preserve per-ticket crew changes)
   const ticketPayload = tickets.map(t => ({
     contractId: contractId,
     propertyAddress: t.propertyAddress || scheduleContract.propertyAddress || '',
-    assignedCrew: crew,
+    assignedCrew: t.assignedCrew || crew,
     eventDate: t.eventDate,
     services: t.services,
     totalEstHours: t.totalEstHours,
@@ -13100,6 +13116,10 @@ async function finalizeSchedule() {
     schedulePreviewMode = false;
     schedulePreviewEstimate = null;
 
+    // Remove capacity warning banner if present
+    var capBanner = document.getElementById('capacity-warning-banner');
+    if (capBanner) capBanner.remove();
+
     // Reload contract detail to get real ticket IDs
     showToast(`${tickets.length} tickets saved and schedule is now live.`, 'success', 5000);
     await openContractDetail(contractId, scheduleContract.propertyAddress || '');
@@ -13115,6 +13135,10 @@ function cancelSchedulePreview() {
   schedulePreviewEstimate = null;
   scheduleTickets = [];
 
+  // Remove capacity warning banner if present
+  var banner = document.getElementById('capacity-warning-banner');
+  if (banner) banner.remove();
+
   // Return to contract summary
   document.getElementById('contracts-tickets-subview').style.display = 'none';
   document.getElementById('contracts-summary-panel').style.display = 'block';
@@ -13123,6 +13147,104 @@ function cancelSchedulePreview() {
   renderContractSummary();
 
   showToast('Schedule preview discarded.', 'info');
+}
+
+// ─── Preview Capacity Analysis ──────────────────────────────
+
+function analyzePreviewCapacity() {
+  if (!schedulePreviewMode || scheduleTickets.length === 0) return;
+
+  // Ensure crew sizes are loaded
+  if (Object.keys(schedCrewSizes).length === 0) {
+    loadCrewSizes().then(function() { analyzePreviewCapacity(); });
+    return;
+  }
+
+  var crew = scheduleContract.assignedCrew || '';
+  if (!crew) return;
+
+  var crewSize = schedCrewSizes[crew] || 1;
+  var capacity = crewSize * 8;
+
+  // Build capacity map with preview tickets overlaid
+  var capMap = buildCrewCapacityMap(scheduleTickets);
+
+  var conflicts = [];
+  // Check each date where the assigned crew appears
+  Object.keys(capMap).forEach(function(dateStr) {
+    var crewData = capMap[dateStr][crew];
+    if (!crewData) return;
+    if (crewData.manHours <= capacity) return;
+
+    var overBy = crewData.manHours - capacity;
+
+    // Find same-division crews with available capacity
+    var prefix = crew.split(' ').slice(0, 1).join(' ');
+    var suggestions = [];
+    Object.keys(schedCrewSizes).forEach(function(otherCrew) {
+      if (otherCrew === crew) return;
+      if (!otherCrew.startsWith(prefix)) return;
+      var otherSize = schedCrewSizes[otherCrew] || 1;
+      var otherCap = otherSize * 8;
+      var otherLoad = (capMap[dateStr] && capMap[dateStr][otherCrew]) ? capMap[dateStr][otherCrew].manHours : 0;
+      var available = otherCap - otherLoad;
+      if (available > 0) {
+        suggestions.push({ crew: otherCrew, available: available });
+      }
+    });
+
+    conflicts.push({
+      date: dateStr,
+      totalHours: crewData.manHours,
+      overBy: overBy,
+      suggestions: suggestions
+    });
+  });
+
+  if (conflicts.length > 0) {
+    showCapacityWarningBanner(crew, conflicts);
+  }
+}
+
+function showCapacityWarningBanner(crew, conflicts) {
+  // Remove existing banner
+  var existing = document.getElementById('capacity-warning-banner');
+  if (existing) existing.remove();
+
+  var html = '<div class="capacity-warning-banner" id="capacity-warning-banner">';
+  html += '<div class="capacity-warning-header">';
+  html += '<span style="display:flex;align-items:center;gap:6px;">';
+  html += '<span style="font-size:16px;">&#9888;</span> ';
+  html += '<strong>' + conflicts.length + ' day(s) over capacity for ' + crew + '</strong>';
+  html += '</span>';
+  html += '<button onclick="document.getElementById(\'capacity-warning-banner\').remove()" style="background:none;border:none;font-size:16px;cursor:pointer;color:#b45309;">&times;</button>';
+  html += '</div>';
+  html += '<div class="capacity-warning-body">';
+
+  conflicts.sort(function(a, b) { return a.date.localeCompare(b.date); });
+
+  conflicts.forEach(function(c) {
+    var dateObj = new Date(c.date + 'T00:00:00');
+    var dateLabel = dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+
+    html += '<div class="capacity-conflict-row">';
+    html += '<span style="min-width:100px;font-size:13px;font-weight:500;">' + dateLabel + '</span>';
+    html += '<span style="font-size:13px;">' + c.totalHours.toFixed(1) + ' hrs <span style="color:#c5221f;font-weight:600;">(' + c.overBy.toFixed(1) + ' over)</span></span>';
+    if (c.suggestions.length > 0) {
+      c.suggestions.forEach(function(s) {
+        html += '<span class="crew-suggestion">' + s.crew + ' (' + s.available.toFixed(1) + 'h free)</span>';
+      });
+    }
+    html += '</div>';
+  });
+
+  html += '</div></div>';
+
+  // Insert after the schedule header area
+  var ticketsSubview = document.getElementById('contracts-tickets-subview');
+  if (ticketsSubview) {
+    ticketsSubview.insertAdjacentHTML('afterbegin', html);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -13672,13 +13794,52 @@ async function loadAllTicketsForMonth() {
         if (!allTicketsByDate[d]) allTicketsByDate[d] = [];
         allTicketsByDate[d].push({
           totalEstHours: parseFloat(t.totalEstHours) || 0,
-          travelHours: parseFloat(t.travelHours) || 0
+          travelHours: parseFloat(t.travelHours) || 0,
+          assignedCrew: t.assignedCrew || ''
         });
       });
     }
   } catch (e) {
     console.error('Failed to load all tickets for month:', e);
   }
+}
+
+let transferRouteState = { sourceCrew: '', targetCrew: '', date: '', ticketIds: [] };
+
+/**
+ * Build per-crew capacity map from allTicketsByDate + optional additional tickets
+ * Returns { 'YYYY-MM-DD': { 'MNT Crew 1': { manHours, ticketCount }, ... } }
+ */
+function buildCrewCapacityMap(additionalTickets) {
+  var map = {};
+
+  // Existing tickets from allTicketsByDate
+  Object.keys(allTicketsByDate).forEach(function(dateStr) {
+    if (!map[dateStr]) map[dateStr] = {};
+    allTicketsByDate[dateStr].forEach(function(t) {
+      var crew = t.assignedCrew || '';
+      if (!crew) return;
+      if (!map[dateStr][crew]) map[dateStr][crew] = { manHours: 0, ticketCount: 0 };
+      map[dateStr][crew].manHours += (t.totalEstHours || 0) + (t.travelHours || 0);
+      map[dateStr][crew].ticketCount++;
+    });
+  });
+
+  // Overlay additional tickets (e.g. preview schedule)
+  if (additionalTickets && additionalTickets.length > 0) {
+    additionalTickets.forEach(function(t) {
+      var dateStr = normalizeDate(t.eventDate);
+      if (!dateStr) return;
+      var crew = t.assignedCrew || '';
+      if (!crew) return;
+      if (!map[dateStr]) map[dateStr] = {};
+      if (!map[dateStr][crew]) map[dateStr][crew] = { manHours: 0, ticketCount: 0 };
+      map[dateStr][crew].manHours += (parseFloat(t.totalEstHours) || 0) + (parseFloat(t.travelHours) || 0);
+      map[dateStr][crew].ticketCount++;
+    });
+  }
+
+  return map;
 }
 
 /**
@@ -17657,6 +17818,7 @@ function renderSchedDay() {
     html += '<span class="sched-day-crew-name">' + crew + '</span>';
     html += '<span class="sched-day-crew-stats">' + stops.length + ' stops &middot; ' + crewTotalStr + ' budgeted (' + totalManHours.toFixed(2) + ' mh)' + earnedStr + ' &middot; ' + completed + ' done</span>';
     if (skippableCount > 0) {
+      html += '<button class="sched-transfer-btn" onclick="event.stopPropagation(); showTransferRouteModal(\'' + escapedCrew + '\')">Transfer Route</button>';
       html += '<button class="sched-skip-day-btn" onclick="event.stopPropagation(); bulkSkipCrewDay(\'' + escapedCrew + '\')">Skip Day (' + skippableCount + ')</button>';
     }
     html += '</div>';
@@ -18052,7 +18214,20 @@ function showSchedTicketDetail(ticketId) {
 
   var html = '<div style="font-size:13px;color:#666;margin-bottom:16px;">';
   html += '<div style="margin-bottom:4px;">' + dateLabel + '</div>';
-  html += '<div>Crew: <strong>' + (ticket.assignedCrew || 'Unassigned') + '</strong></div>';
+  var ticketStatus = String(ticket.status || 'scheduled').toLowerCase();
+  if (ticketStatus !== 'completed' && ticketStatus !== 'skipped') {
+    var crewOptions = Object.keys(schedCrewSizes).sort();
+    html += '<div style="display:flex;align-items:center;gap:6px;">Crew: <select class="form-input" style="flex:1;padding:4px 8px;font-size:13px;" onchange="reassignTicketCrew(\'' + ticketId + '\', this.value)">';
+    crewOptions.forEach(function(c) {
+      html += '<option value="' + c + '"' + (c === (ticket.assignedCrew || '') ? ' selected' : '') + '>' + c + '</option>';
+    });
+    if (crewOptions.indexOf(ticket.assignedCrew || '') === -1) {
+      html += '<option value="' + (ticket.assignedCrew || '') + '" selected>' + (ticket.assignedCrew || 'Unassigned') + '</option>';
+    }
+    html += '</select></div>';
+  } else {
+    html += '<div>Crew: <strong>' + (ticket.assignedCrew || 'Unassigned') + '</strong></div>';
+  }
   html += '<div>Status: <span class="sched-stop-status ' + (ticket.status || 'scheduled') + '">' + (ticket.status || 'Scheduled') + '</span></div>';
   var detailManHours = parseFloat(ticket.totalEstHours) || 0;
   var detailCrewSize = getCrewSizeForCrew(ticket.assignedCrew);
@@ -18130,6 +18305,184 @@ function showSchedTicketDetail(ticketId) {
 
 function closeSchedDetail() {
   document.getElementById('sched-ticket-detail').style.display = 'none';
+}
+
+async function reassignTicketCrew(ticketId, newCrew) {
+  var ticket = schedTicketsCache.find(function(t) { return t.ticketId === ticketId; });
+  if (!ticket) return;
+  var oldCrew = ticket.assignedCrew;
+  if (oldCrew === newCrew) return;
+
+  // Optimistic update
+  ticket.assignedCrew = newCrew;
+  closeSchedDetail();
+  renderScheduleView();
+  showToast('Moved to ' + newCrew, 'success');
+
+  // Preview tickets don't need backend update
+  if (String(ticketId).startsWith('preview-')) return;
+
+  try {
+    var resp = await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ updateTicketCrew: true, ticketId: ticketId, newCrew: newCrew })
+    });
+    var data = await resp.json();
+    if (!data.success) {
+      ticket.assignedCrew = oldCrew;
+      renderScheduleView();
+      showToast('Failed to reassign: ' + (data.error || 'Unknown error'), 'error');
+    }
+  } catch (err) {
+    console.error('Crew reassignment failed:', err);
+    ticket.assignedCrew = oldCrew;
+    renderScheduleView();
+    showToast('Failed to reassign ticket. Check your connection.', 'error');
+  }
+}
+
+// ─── Transfer Route (Bulk Crew Reassignment) ────────────────────
+
+function showTransferRouteModal(sourceCrew) {
+  var dateStr = schedDate.toISOString().split('T')[0];
+  var dayTickets = schedTicketsCache.filter(function(t) {
+    return t.eventDate === dateStr && t.assignedCrew === sourceCrew;
+  });
+  var transferable = dayTickets.filter(function(t) {
+    var s = String(t.status || '').toLowerCase();
+    return s === 'scheduled' || s === 'partial';
+  });
+  if (transferable.length === 0) {
+    showToast('No transferable tickets for ' + sourceCrew + ' on this day.', 'info');
+    return;
+  }
+
+  var totalHours = transferable.reduce(function(sum, t) { return sum + (parseFloat(t.totalEstHours) || 0) + (parseFloat(t.travelHours) || 0); }, 0);
+  var ticketIds = transferable.map(function(t) { return t.ticketId; });
+
+  transferRouteState = { sourceCrew: sourceCrew, targetCrew: '', date: dateStr, ticketIds: ticketIds };
+
+  // Get crew prefix for same-division matching
+  var prefix = sourceCrew.split(' ').slice(0, 1).join(' ');
+  var allCrews = Object.keys(schedCrewSizes).sort();
+
+  // Build capacity info for each potential target crew on this date
+  var crewsHtml = '';
+  allCrews.forEach(function(crew) {
+    if (crew === sourceCrew) return;
+    // Only show same-division crews (matching prefix)
+    if (!crew.startsWith(prefix)) return;
+
+    var crewSize = schedCrewSizes[crew] || 1;
+    var capacity = crewSize * 8;
+
+    // Current load for this crew on this date
+    var currentLoad = 0;
+    var currentStops = 0;
+    schedTicketsCache.forEach(function(t) {
+      if (t.eventDate === dateStr && t.assignedCrew === crew) {
+        var s = String(t.status || '').toLowerCase();
+        if (s !== 'skipped') {
+          currentLoad += (parseFloat(t.totalEstHours) || 0) + (parseFloat(t.travelHours) || 0);
+          currentStops++;
+        }
+      }
+    });
+
+    var projected = currentLoad + totalHours;
+    var utilPct = Math.min(Math.round(projected / capacity * 100), 100);
+    var isOver = projected > capacity;
+
+    crewsHtml += '<div class="transfer-crew-option' + (isOver ? ' over-capacity' : '') + '" onclick="selectTransferTarget(\'' + crew.replace(/'/g, "\\'") + '\', this)">';
+    crewsHtml += '<div style="flex:1;">';
+    crewsHtml += '<div style="font-weight:600;font-size:14px;">' + crew + '</div>';
+    crewsHtml += '<div style="font-size:12px;color:#666;">' + currentStops + ' stops &middot; ' + currentLoad.toFixed(1) + 'h current';
+    if (isOver) {
+      crewsHtml += ' <span style="color:#c5221f;font-weight:600;">&middot; Over capacity</span>';
+    }
+    crewsHtml += '</div>';
+    crewsHtml += '<div style="margin-top:4px;height:6px;background:#e8eaed;border-radius:3px;overflow:hidden;">';
+    crewsHtml += '<div style="height:100%;width:' + utilPct + '%;background:' + (isOver ? '#c5221f' : projected / capacity > 0.85 ? '#f9ab00' : '#137333') + ';border-radius:3px;transition:width 0.3s;"></div>';
+    crewsHtml += '</div>';
+    crewsHtml += '<div style="font-size:11px;color:#888;margin-top:2px;">After: ' + projected.toFixed(1) + 'h / ' + capacity + 'h (' + utilPct + '%)</div>';
+    crewsHtml += '</div>';
+    crewsHtml += '</div>';
+  });
+
+  if (!crewsHtml) {
+    crewsHtml = '<div style="padding:16px;text-align:center;color:#888;">No same-division crews available.</div>';
+  }
+
+  var dateLabel = new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  document.getElementById('transfer-route-title').textContent = 'Transfer Route — ' + sourceCrew;
+  document.getElementById('transfer-route-desc').textContent = transferable.length + ' ticket(s) &middot; ' + totalHours.toFixed(1) + ' hours on ' + dateLabel;
+  document.getElementById('transfer-route-desc').innerHTML = transferable.length + ' ticket(s) &middot; ' + totalHours.toFixed(1) + ' hours on ' + dateLabel;
+  document.getElementById('transfer-route-crews').innerHTML = crewsHtml;
+  document.getElementById('transfer-route-confirm').disabled = true;
+  document.getElementById('transfer-route-modal').style.display = 'flex';
+}
+
+function selectTransferTarget(crew, el) {
+  transferRouteState.targetCrew = crew;
+  document.querySelectorAll('#transfer-route-crews .transfer-crew-option').forEach(function(c) {
+    c.classList.remove('selected');
+  });
+  el.classList.add('selected');
+  document.getElementById('transfer-route-confirm').disabled = false;
+}
+
+async function confirmTransferRoute() {
+  var state = transferRouteState;
+  if (!state.targetCrew || state.ticketIds.length === 0) return;
+
+  if (!confirm('Transfer ' + state.ticketIds.length + ' ticket(s) from ' + state.sourceCrew + ' to ' + state.targetCrew + '?')) return;
+
+  var oldCrew = state.sourceCrew;
+  var newCrew = state.targetCrew;
+  var ticketIds = state.ticketIds;
+
+  // Optimistic update
+  ticketIds.forEach(function(id) {
+    var t = schedTicketsCache.find(function(t) { return t.ticketId === id; });
+    if (t) t.assignedCrew = newCrew;
+  });
+
+  closeTransferRouteModal();
+  renderScheduleView();
+  showToast(ticketIds.length + ' ticket(s) transferred to ' + newCrew, 'success');
+
+  // Skip backend call for preview tickets
+  if (ticketIds.length > 0 && String(ticketIds[0]).startsWith('preview-')) return;
+
+  try {
+    var resp = await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ updateTicketCrew: true, ticketIds: ticketIds, newCrew: newCrew })
+    });
+    var data = await resp.json();
+    if (!data.success) {
+      // Revert
+      ticketIds.forEach(function(id) {
+        var t = schedTicketsCache.find(function(t) { return t.ticketId === id; });
+        if (t) t.assignedCrew = oldCrew;
+      });
+      renderScheduleView();
+      showToast('Failed to transfer route: ' + (data.error || 'Unknown'), 'error');
+    }
+  } catch (err) {
+    console.error('Route transfer failed:', err);
+    ticketIds.forEach(function(id) {
+      var t = schedTicketsCache.find(function(t) { return t.ticketId === id; });
+      if (t) t.assignedCrew = oldCrew;
+    });
+    renderScheduleView();
+    showToast('Failed to transfer route. Check your connection.', 'error');
+  }
+}
+
+function closeTransferRouteModal() {
+  document.getElementById('transfer-route-modal').style.display = 'none';
+  transferRouteState = { sourceCrew: '', targetCrew: '', date: '', ticketIds: [] };
 }
 
 async function rescheduleFromDetail(ticketId) {
