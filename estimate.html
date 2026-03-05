@@ -5352,6 +5352,7 @@ async function streamMarvinResponse(prompt, historySlice, context, refs) {
   const controller = new AbortController();
   marvinStreamController = controller;
 
+  console.log('[MARVIN] Streaming to:', MARVIN_STREAM_URL);
   const resp = await fetch(MARVIN_STREAM_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -5359,7 +5360,9 @@ async function streamMarvinResponse(prompt, historySlice, context, refs) {
     body: JSON.stringify({ prompt, history: historySlice, mode: 'chat', context })
   });
 
+  console.log('[MARVIN] Response status:', resp.status, 'ok:', resp.ok);
   if (!resp.ok) throw new Error('Stream request failed: ' + resp.status);
+  if (!resp.body) throw new Error('Response body is not a readable stream');
 
   const reader = resp.body.getReader();
   const decoder = new TextDecoder();
