@@ -14349,7 +14349,7 @@ function renderCalendar() {
     const allDayTickets = allTicketsByDate[dateStr] || [];
     let dayTotalHours = 0;
     allDayTickets.forEach(t => {
-      dayTotalHours += t.totalEstHours + t.travelHours;
+      dayTotalHours += t.totalEstHours;
     });
 
     // In preview mode, also add preview tickets (they aren't in allTicketsByDate yet)
@@ -14396,7 +14396,8 @@ function renderCalendar() {
         : ticket.services.length + ' Services';
 
       const previewClass = schedulePreviewMode ? ' preview-ticket' : '';
-      html += `<div class="calendar-ticket status-${ticket.status || 'scheduled'}${previewClass}"
+      const reschedClass = ticket.needsReschedule ? ' needs-reschedule' : '';
+      html += `<div class="calendar-ticket status-${ticket.status || 'scheduled'}${previewClass}${reschedClass}"
         draggable="true"
         ondragstart="handleTicketDragStart(event, '${ticket.ticketId}')"
         ondragend="handleTicketDragEnd(event)"
@@ -17849,7 +17850,8 @@ function renderSchedWeek() {
       var displayHours = actualHours !== null ? actualHours : estHours;
       dayTotalHours += displayHours;
 
-      html += '<div class="sched-week-ticket crew-' + colorIdx + ' ' + statusClass + '"';
+      var reschedCls2 = ticket.needsReschedule ? ' needs-reschedule' : '';
+      html += '<div class="sched-week-ticket crew-' + colorIdx + ' ' + statusClass + reschedCls2 + '"';
       html += ' draggable="true"';
       html += ' ondragstart="schedWeekDragStart(event, \'' + ticket.ticketId + '\')"';
       html += ' ondragend="schedWeekDragEnd(event)"';
@@ -17957,7 +17959,7 @@ function renderSchedMonth() {
 
     var dayTotalHours = 0;
     dayTickets.forEach(function(t) {
-      dayTotalHours += (parseFloat(t.totalEstHours) || 0) + (parseFloat(t.travelHours) || 0);
+      dayTotalHours += (parseFloat(t.totalEstHours) || 0);
     });
     var capacity = bidSettings.dailyCrewCapacity || 33;
     var isOverCap = dayTotalHours > capacity;
@@ -17978,7 +17980,9 @@ function renderSchedMonth() {
       var colorIdx = schedCrewColors[ticket.assignedCrew || ''] || 0;
       var address = (ticket.propertyAddress || '').split(',')[0];
       var crewShort = (ticket.assignedCrew || '').replace(' Crew ', ' ');
-      html += '<div class="sched-month-ticket crew-' + colorIdx + '"';
+      var statusCls = ' status-' + String(ticket.status || 'scheduled').toLowerCase();
+      var reschedCls = ticket.needsReschedule ? ' needs-reschedule' : '';
+      html += '<div class="sched-month-ticket crew-' + colorIdx + statusCls + reschedCls + '"';
       html += ' draggable="true"';
       html += ' onclick="event.stopPropagation(); showSchedTicketDetail(\'' + ticket.ticketId + '\')"';
       html += ' ondragstart="schedMonthDragStart(event, \'' + ticket.ticketId + '\')"';
