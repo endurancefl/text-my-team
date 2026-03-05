@@ -118,7 +118,6 @@ Resources:
             - "http://127.0.0.1:8000"
           AllowMethods:
             - "POST"
-            - "OPTIONS"
           AllowHeaders:
             - "Content-Type"
           MaxAge: 3600
