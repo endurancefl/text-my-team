@@ -1,5 +1,4 @@
-reportlab>=4.0
+docraptor
 Pillow>=10.0
-weasyprint>=62.0
 jinja2>=3.1
 anthropic>=0.51.0

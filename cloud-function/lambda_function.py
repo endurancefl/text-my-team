@@ -1,17 +1,11 @@
-"""AWS Lambda handler for PDF generation.
+"""AWS Lambda handler for PDF generation and MARVIN AI chat.
 
 Receives requests via API Gateway, parses the request,
-generates PDFs, and returns base64-encoded PDF.
+generates PDFs via DocRaptor, and returns base64-encoded PDF.
 
 Supports two input modes:
   - multipart/form-data: photos embedded in request body
   - application/json with S3 keys: photos fetched from S3
-
-Supports dual rendering engines during migration:
-  - "reportlab" (default fallback) -- original main.py engine
-  - "weasyprint" -- new HTML/CSS template engine (pdf_generator.py)
-
-Set "renderer": "weasyprint" in the metadata JSON to use the new engine.
 """
 import base64
 import io
@@ -26,31 +20,18 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import boto3
 from pathlib import Path
 
-# ReportLab engine (original)
-from main import (
+from docraptor_service import (
     ALLOWED_ORIGINS,
     allowed_origin_from_header,
     cors_headers,
     parse_photo_buffers,
-    generate_standard_report as rl_generate_standard_report,
-    generate_before_after_report as rl_generate_before_after_report,
-    generate_contract_pdf as rl_generate_contract_pdf,
+    generate_standard_report,
+    generate_before_after_report,
+    generate_contract_pdf,
+    generate_invoice_pdf,
 )
 
-# WeasyPrint engine (new)
-try:
-    from pdf_generator import (
-        generate_standard_report as wp_generate_standard_report,
-        generate_before_after_report as wp_generate_before_after_report,
-        generate_contract_pdf as wp_generate_contract_pdf,
-        generate_invoice_pdf as wp_generate_invoice_pdf,
-    )
-    WEASYPRINT_AVAILABLE = True
-except (ImportError, OSError):
-    WEASYPRINT_AVAILABLE = False
-
-# Default renderer -- flip to "weasyprint" once all types are validated
-DEFAULT_RENDERER = "weasyprint"
+DOCRAPTOR_TEST_MODE = os.environ.get("DOCRAPTOR_TEST_MODE", "false").lower() == "true"
 
 # Load MARVIN knowledge file (bundled in Docker image, read once at cold start)
 _MARVIN_KNOWLEDGE = ""
@@ -268,19 +249,12 @@ def _handle_json_request(raw_body, allowed):
         metadata = data
     report_type = metadata.get("type", "standard")
 
-    # Select rendering engine
-    renderer = metadata.get("renderer", DEFAULT_RENDERER)
-    if renderer == "weasyprint" and not WEASYPRINT_AVAILABLE:
-        renderer = "reportlab"
-    use_wp = renderer == "weasyprint"
-
     s3 = _get_s3_client()
     bucket = PHOTO_BUCKET
+    test = DOCRAPTOR_TEST_MODE
 
     if report_type == "invoice":
-        if not WEASYPRINT_AVAILABLE:
-            return _error_response("WeasyPrint not available for invoice PDF", 500, allowed)
-        pdf_bytes, filename = wp_generate_invoice_pdf(metadata)
+        pdf_bytes, filename = generate_invoice_pdf(metadata, test=test)
 
     elif report_type == "contract":
         service_map_buffer = None
@@ -290,8 +264,7 @@ def _handle_json_request(raw_body, allowed):
             if buffers:
                 service_map_buffer = buffers[0]
 
-        gen = wp_generate_contract_pdf if use_wp else rl_generate_contract_pdf
-        pdf_bytes, filename = gen(metadata, service_map_buffer)
+        pdf_bytes, filename = generate_contract_pdf(metadata, service_map_buffer, test=test)
 
     elif report_type == "before_after":
         before_keys = metadata.get("beforeS3Keys", [])
@@ -300,15 +273,13 @@ def _handle_json_request(raw_body, allowed):
         before_buffers = _fetch_s3_photos(s3, bucket, before_keys)
         after_buffers = _fetch_s3_photos(s3, bucket, after_keys)
 
-        gen = wp_generate_before_after_report if use_wp else rl_generate_before_after_report
-        pdf_bytes, filename = gen(metadata, before_buffers, after_buffers)
+        pdf_bytes, filename = generate_before_after_report(metadata, before_buffers, after_buffers, test=test)
 
     else:
         s3_keys = metadata.get("s3Keys", [])
         photo_buffers = _fetch_s3_photos(s3, bucket, s3_keys)
 
-        gen = wp_generate_standard_report if use_wp else rl_generate_standard_report
-        pdf_bytes, filename = gen(metadata, photo_buffers)
+        pdf_bytes, filename = generate_standard_report(metadata, photo_buffers, test=test)
 
     return _pdf_response(pdf_bytes, filename, allowed)
 
@@ -329,17 +300,10 @@ def _handle_multipart_request(raw_body, content_type, allowed):
 
     metadata = json.loads(metadata_raw)
     report_type = metadata.get("type", "standard")
-
-    # Select rendering engine
-    renderer = metadata.get("renderer", DEFAULT_RENDERER)
-    if renderer == "weasyprint" and not WEASYPRINT_AVAILABLE:
-        renderer = "reportlab"
-    use_wp = renderer == "weasyprint"
+    test = DOCRAPTOR_TEST_MODE
 
     if report_type == "invoice":
-        if not WEASYPRINT_AVAILABLE:
-            return _error_response("WeasyPrint not available for invoice PDF", 500, allowed)
-        pdf_bytes, filename = wp_generate_invoice_pdf(metadata)
+        pdf_bytes, filename = generate_invoice_pdf(metadata, test=test)
 
     elif report_type == "contract":
         service_map_files = parts.get("files", {}).get("service_map", [])
@@ -349,8 +313,7 @@ def _handle_multipart_request(raw_body, content_type, allowed):
             if buffers:
                 service_map_buffer = buffers[0]
 
-        gen = wp_generate_contract_pdf if use_wp else rl_generate_contract_pdf
-        pdf_bytes, filename = gen(metadata, service_map_buffer)
+        pdf_bytes, filename = generate_contract_pdf(metadata, service_map_buffer, test=test)
 
     elif report_type == "before_after":
         before_files = parts.get("files", {}).get("before_photos", [])
@@ -359,15 +322,13 @@ def _handle_multipart_request(raw_body, content_type, allowed):
         before_buffers = parse_photo_buffers(before_files)
         after_buffers = parse_photo_buffers(after_files)
 
-        gen = wp_generate_before_after_report if use_wp else rl_generate_before_after_report
-        pdf_bytes, filename = gen(metadata, before_buffers, after_buffers)
+        pdf_bytes, filename = generate_before_after_report(metadata, before_buffers, after_buffers, test=test)
 
     else:
         photo_files = parts.get("files", {}).get("photos", [])
         photo_buffers = parse_photo_buffers(photo_files)
 
-        gen = wp_generate_standard_report if use_wp else rl_generate_standard_report
-        pdf_bytes, filename = gen(metadata, photo_buffers)
+        pdf_bytes, filename = generate_standard_report(metadata, photo_buffers, test=test)
 
     return _pdf_response(pdf_bytes, filename, allowed)
 

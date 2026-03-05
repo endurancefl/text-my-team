@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: PDF generation for Site Reports, Before & After Reports, and Contracts (WeasyPrint container)
+Description: PDF generation via DocRaptor + MARVIN AI streaming
 
 Globals:
   Function:
@@ -52,6 +52,8 @@ Resources:
         Variables:
           PHOTO_BUCKET: !Ref PhotoUploadBucket
           ANTHROPIC_API_KEY: '{{resolve:secretsmanager:marvin-api-key:SecretString:key}}'
+          DOCRAPTOR_API_KEY: '{{resolve:secretsmanager:docraptor-api-key:SecretString:key}}'
+          DOCRAPTOR_TEST_MODE: 'true'
       Events:
         GeneratePdf:
           Type: HttpApi

@@ -3,8 +3,8 @@
 {% block title %}{{ contract_id }} — Residential Contract{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ css_url('common.css') }}">
-<link rel="stylesheet" href="{{ css_url('contract.css') }}">
+<style>{{ css_content('common.css') }}</style>
+<style>{{ css_content('contract.css') }}</style>
 {% endblock %}
 
 {% block running_header_content %}

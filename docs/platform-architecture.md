@@ -68,14 +68,14 @@ text-my-team/
 ├── backend/
 │   └── combined-apps-script.js    # Google Apps Script backend (~5,200 lines)
 ├── cloud-function/                # AWS Lambda PDF generation
-│   ├── pdf_generator.py           # PDF library (WeasyPrint + ReportLab)
+│   ├── docraptor_service.py        # DocRaptor PDF service (~480 lines) — all PDF generation, CORS, photo utils
 │   ├── lambda_function.py         # AWS Lambda handler (~943 lines)
 │   ├── marvin-knowledge.md        # MARVIN AI knowledge base (~592 lines, loaded at cold start)
 │   ├── marvin-stream/             # Separate zip-based Lambda for MARVIN streaming
 │   │   ├── handler.py             # SSE streaming handler (native Lambda Function URL response streaming)
 │   │   ├── requirements.txt       # anthropic>=0.51.0 (standalone, no Docker)
 │   │   └── marvin-knowledge.md    # MARVIN knowledge base (copy, bundled in zip)
-│   ├── Dockerfile                 # WeasyPrint container image (PDF generation only)
+│   ├── Dockerfile                 # DocRaptor container image (lightweight, no C libraries)
 │   ├── requirements.txt
 │   ├── templates/                 # Jinja2 HTML/CSS templates for PDFs
 │   │   ├── base.html
@@ -158,8 +158,8 @@ text-my-team/
 - Spanish translation support in request messages
 - **Report Issue** — crew-submitted internal tickets with property search, photo capture
 - **Quick Photos** — batch photo upload to Google Drive organized by property
-- **Site Report Wizard** — multi-step flow: property selection → mode choice → photo capture with categories/notes → thumbnail strip → **service offer attachment** (recommend services with photos and catalog pricing) → PDF generation via AWS Lambda (ReportLab) → auto-upload to Google Drive → customer receives report with embedded approval buttons for offered services. **localStorage draft persistence** — in-progress reports auto-save to localStorage on every state change (property, photos, annotations, notes, categories, step). On wizard open, if a draft with photos exists, user is prompted to resume or start fresh. Drafts expire after 24 hours and clear on successful generation or explicit discard. **Photo optimization for Lambda** — photos sent to Lambda are resized to 1000px max dimension at 0.55 JPEG quality (~80-150KB each, stays under Lambda's 6MB synchronous payload limit after base64 encoding). Full-resolution photos (original size, 0.8 quality) are uploaded separately to Google Drive for archival.
-- **Before & After Reports** — pulls photos from previous site reports, pairs with new "after" photos, generates comparison PDF. **Photo orientation matching (Layers 1 & 2 built)** — real-time orientation hint banner in detail modal with green/red color indicator via `window.resize` + `orientationchange` events, shows landscape/portrait guidance based on before photo's `naturalWidth`/`naturalHeight`; mismatch warning dialog via `iosConfirm()` when after photo orientation doesn't match before photo. Layer 3 (ReportLab) unnecessary — existing fill-and-crop scaling handles mixed orientations
+- **Site Report Wizard** — multi-step flow: property selection → mode choice → photo capture with categories/notes → thumbnail strip → **service offer attachment** (recommend services with photos and catalog pricing) → PDF generation via AWS Lambda (DocRaptor) → auto-upload to Google Drive → customer receives report with embedded approval buttons for offered services. **localStorage draft persistence** — in-progress reports auto-save to localStorage on every state change (property, photos, annotations, notes, categories, step). On wizard open, if a draft with photos exists, user is prompted to resume or start fresh. Drafts expire after 24 hours and clear on successful generation or explicit discard. **Photo optimization for Lambda** — photos sent to Lambda are resized to 1000px max dimension at 0.55 JPEG quality (~80-150KB each, stays under Lambda's 6MB synchronous payload limit after base64 encoding). Full-resolution photos (original size, 0.8 quality) are uploaded separately to Google Drive for archival.
+- **Before & After Reports** — pulls photos from previous site reports, pairs with new "after" photos, generates comparison PDF. **Photo orientation matching (Layers 1 & 2 built)** — real-time orientation hint banner in detail modal with green/red color indicator via `window.resize` + `orientationchange` events, shows landscape/portrait guidance based on before photo's `naturalWidth`/`naturalHeight`; mismatch warning dialog via `iosConfirm()` when after photo orientation doesn't match before photo. Layer 3 (PDF renderer) unnecessary — existing fill-and-crop scaling handles mixed orientations
 - iOS design system: SF Pro typography, exact system colors, dark mode, frosted glass tab bar with `backdrop-filter`, iOS spring animations, 44px touch targets, `prefers-reduced-motion` support
 - Bottom tab bar: Schedule (home) | Requests | Report Issue | Reports
 
@@ -278,7 +278,7 @@ text-my-team/
   - **Terms & Conditions**: Quill editor in a dedicated modal (opened from Contract Settings card) — stores HTML in `currentEstimate.contract.termsAndConditionsHtml` (null = server defaults). Pre-populated with 12 default clauses containing placeholder tokens `{duration}`, `{startDate}`, `{endDate}`, `{paymentTerms}`, `{priceIncrease}` that resolve at PDF generation time. "Reset to Defaults" button restores original text.
   - **Toolbar**: Headers (H1-H3), bold/italic/underline, text color (dark, red, gray), ordered/bullet lists, indent/outdent, clear formatting
   - **CDN**: Quill v2 via jsdelivr (~43KB gzipped), MIT license, no build step
-- **Contract PDF Generation**: Generates professional contract PDFs via AWS Lambda/WeasyPrint pipeline. Two templates based on `propertyType`:
+- **Contract PDF Generation**: Generates professional contract PDFs via AWS Lambda/DocRaptor (PrinceXML) pipeline. Two templates based on `propertyType`:
   - **Residential (3 pages)**: Quote page (services table, totals, recipient info), Description of Services (rich text HTML per-service from Quill editors, falls back to hardcoded descriptions if no per-service rich text), Terms & Conditions (custom rich text HTML with resolved tokens, falls back to 12 structured clauses) + signature section
   - **Commercial (5-6 pages)**: Cover page (logo, property info, optional service map image), Three-tier services tables (Fixed/Billed Separately/Recommended with category groupings), Payment schedule (12-month breakdown with penny rounding), Description of services (rich text HTML per-service, falls back to tier-grouped paragraphs), Terms & Conditions (custom rich text or structured fallback), Signature page
   - T&C clauses 11-12 (Price Increase, Tropical Event Policy) highlighted in red (in default structured fallback)
@@ -287,7 +287,7 @@ text-my-team/
   - After upload, the Google Drive PDF URL and file ID are saved to the contract record via `updateContract`
   - Once a PDF URL is stored, header shows "View PDF" button (opens Drive link in new tab) + small "Regenerate" button
   - When opening a saved finalized estimate, the contract's `pdfUrl` is loaded from `allContracts` (or fetched) so the View PDF button persists across sessions
-  - **Signed PDF generation**: When `signedName` and `signedAt` are included in metadata, the signature is rendered in Dancing Script cursive font above the customer signature line. Both ReportLab and WeasyPrint engines support signature rendering. Output filename appended with `-signed` suffix.
+  - **Signed PDF generation**: When `signedName` and `signedAt` are included in metadata, the signature is rendered in Dancing Script cursive font above the customer signature line. DocRaptor (PrinceXML) renders the signature via the same Jinja2 templates. Output filename appended with `-signed` suffix.
 - **Typed E-Signature Flow (ESIGN Act / UETA compliant)**: Full contract signing workflow without DocuSign or login:
   1. Estimator finalizes estimate → generates contract PDF (no company signature yet) → clicks "Send Contract" button
   2. Backend regenerates PDF via Lambda with company e-signature ("Jack McMahon" in Dancing Script cursive), uploads to Drive (overwrites `PDF URL`/`PDF File ID`), computes SHA-256 hash (stored in `pdfHash`), records `companySigner`/`companySignedAt`/`companySignedIP`, generates UUID token, sends HTML email with company-signed PDF attachment + "Review & Sign" link. Frontend captures company signer's IP via api.ipify.org before POST.
@@ -295,7 +295,7 @@ text-my-team/
   4. Page shows contract summary (property, services, totals, dates), embedded Google Drive PDF viewer with download fallback, and typed signature input with live Dancing Script cursive preview
   5. Customer types name, checks consent checkbox ("I agree that my typed name above constitutes my electronic signature and that I have reviewed and accept the terms of this contract."), clicks "Sign & Accept"
   6. Backend records `signedName`, `signedAt` (server-side ISO timestamp), `signedIP`, `signedUserAgent`, `consentText` (verbatim), computes `pdfHash` (SHA-256 of contract PDF from Drive), sets `signingStatus = 'signed'`
-  7. Backend auto-generates signed PDF via Lambda (WeasyPrint), uploads to Drive, writes `signedPdfUrl`/`signedPdfFileId`, emails signed PDF to customer — all within `recordSignature()` via `generateAndEmailSignedPdf()` helper (non-fatal: signature is always recorded even if PDF/email fails)
+  7. Backend auto-generates signed PDF via Lambda (DocRaptor), uploads to Drive, writes `signedPdfUrl`/`signedPdfFileId`, emails signed PDF to customer — all within `recordSignature()` via `generateAndEmailSignedPdf()` helper (non-fatal: signature is always recorded even if PDF/email fails)
   8. sign.html success screen shows "A copy of your signed contract has been emailed to you." if `result.emailSent` is true
   9. estimate.html shows green "Signed" badge + "View Signed PDF" button (signed PDF URL already populated from backend)
   10. "Generate Signed PDF" button is a fallback — if `signedPdfUrl` already exists, it opens the URL directly instead of regenerating
@@ -306,7 +306,7 @@ text-my-team/
   - **Header buttons in estimate.html**: When no PDF → no send button; PDF exists but unsent → "Send Contract"; sent/viewed → amber "Awaiting Signature" badge; signed → green "Signed" badge; signed but no signedPdfUrl → "Generate Signed PDF" button; signedPdfUrl exists → "View Signed PDF" button; **revised** → amber "Needs Re-signing" badge + "Send Contract" button (allows re-sending). `sendContractForSigning()` checks contact picker dropdown first, then `currentContact`, then stored `contactId`
   - **Contracts sheet columns** (auto-created by `ensureSigningColumns()`): `signingToken` (UUID for stateless auth), `signingStatus` (`unsent | sent | viewed | signed | revised`), `signedName` (typed name), `signedAt` (ISO timestamp, server-side), `signedIP` (client IP), `signedUserAgent` (browser user agent), `signedPdfUrl` (Drive URL), `signedPdfFileId` (Drive file ID), `consentText` (exact consent acknowledgment text), `pdfHash` (SHA-256 hash computed at send time, format: `SHA-256:<hex>`, verified at sign time), `companySigner` (company signer name, e.g. "Jack McMahon"), `companySignedAt` (ISO timestamp when contract was sent), `companySignedIP` (IP address of estimator who sent the contract)
   - **Contracts sheet columns** (auto-created by `terminateContract()`): `terminatedDate` (yyyy-MM-dd), `terminationReason` (freetext)
-  - **Signed PDF timestamp format**: Both `signedAt` and `companySignedAt` timestamps are formatted as "Feb 26, 2026 at 9:35 PM Eastern" on PDFs (WeasyPrint path), converted from UTC via `_format_signed_at()` helper in `pdf_generator.py`. PDF templates accept `company_signer` and `company_signed_at` context fields for company-side rendering, and `signed_name`/`signed_at` for customer-side rendering
+  - **Signed PDF timestamp format**: Both `signedAt` and `companySignedAt` timestamps are formatted as "Feb 26, 2026 at 9:35 PM Eastern" on PDFs (DocRaptor path), converted from UTC via `_format_signed_at()` helper in `docraptor_service.py`. PDF templates accept `company_signer` and `company_signed_at` context fields for company-side rendering, and `signed_name`/`signed_at` for customer-side rendering
   - **sign.html** (~700 lines): Standalone page following `payment-success.html` pattern — single file, inline CSS/JS, no frameworks. Google Fonts CDN for Dancing Script 700 cursive preview. Google Drive iframe PDF viewer with download fallback. IP capture via api.ipify.org. Sends `consentText` with signature recording. **PDF hash integrity check**: if `data.hashMismatch` is true, shows error "This contract document has been modified since it was sent. Please contact Endurance Services at (407) 579-4403 for assistance." and blocks signing. Mobile responsive. States: loading → error | already-signed | signing → success. Success screen conditionally shows "A copy of your signed contract has been emailed to you." when `result.emailSent` is true (`white-space: pre-line` on `#success-details`). **Post-signing auto-pay setup**: Success screen includes optional auto-pay section with two tile buttons — "Pay by Bank (ACH)" at base monthly rate, "Pay by Card" at base + 2.9% convenience fee. Trust line below tiles: lock icon + "Payments are securely processed by Stripe. Endurance Services does not store your payment information." (Stripe wordmark in #635bff purple). Clicking either POSTs to `setupAutoPay` with `paymentMethodType` (`us_bank_account` or `card`), `autoPayMethod` (`ach` or `card`), and `skipEmail: true` (direct redirect, no email), then redirects to Stripe Checkout. "Skip for now" link hides the section. Monthly amounts calculated from `contractData.monthlyPayment`
   - **Apps Script permissions**: `MailApp.sendEmail` scope (`https://www.googleapis.com/auth/script.send_mail`) must be added to `appsscript.json` oauthScopes and authorized for email sending to work
 - **Estimate Revision & Re-Finalize Workflow**: Three-status lifecycle (Draft → Finalized → Revision → Finalized). When a finalized estimate is reopened and edited, status transitions to "Revision" (amber badge) instead of resetting to Draft. Re-finalizing updates the existing contract row and regenerates only future scheduled tickets — completed, skipped, and today's tickets are never touched. `revisionCount` tracks how many times a contract has been revised. The "Revise Estimate" button enters revision mode explicitly; "Update Contract" opens the finalize modal with revision-aware text ("Update Contract & Regenerate Tickets"). First-time finalization is unchanged. **Signed contract guard**: If the contract has `signingStatus === 'signed'`, entering revision mode shows a warning that the signature will be voided. On re-finalization, the backend resets signing fields (`signingStatus` → `'revised'`, clears `signedName`/`signedAt`/`signedPdfUrl`/`signedPdfFileId`/`pdfHash`) via `revisionReset: true` flag. The customer must re-sign after revision.
@@ -358,7 +358,7 @@ text-my-team/
 
 ### Backend & Infrastructure
 - **Backend** — Single consolidated Google Apps Script (Code.gs) serving Estimating, Crew, Invoicing, and Signing endpoints from one "Estimating" spreadsheet
-- **PDF Generation** — AWS Lambda + API Gateway (Python/WeasyPrint container image, ReportLab fallback). Rich text HTML from Quill.js editors rendered natively by WeasyPrint via `.rich-text-content` CSS class. Template variable resolution via `_resolve_template_vars()` for T&C placeholders.
+- **PDF Generation** — AWS Lambda + API Gateway (Python/DocRaptor container image). Jinja2 templates rendered locally, HTML sent to DocRaptor API (PrinceXML) for PDF conversion. Rich text HTML from Quill.js editors rendered natively via `.rich-text-content` CSS class. Template variable resolution via `_resolve_template_vars()` for T&C placeholders. Previously used WeasyPrint (local rendering) with ReportLab fallback.
 - **Hosting** — GitHub Pages (endurancefl.github.io). `.nojekyll` file + `_config.yml` (excludes `cloud-function/` and `backend/` dirs) prevent Jekyll from processing Jinja2 template syntax (`{% if %}`, `{{ }}`) in `cloud-function/templates/` which caused build failures
 - **Auth** — Crew leaders: phone number against Crew Members sheet (Role = "Leader"). Customers: 4-digit PIN against Properties sheet.
 - **Data storage** — Google Sheets as database, Google Drive for files (estimates JSON, photos, site reports, invoice PDFs), localStorage for auto-save
@@ -473,7 +473,7 @@ text-my-team/
 | `checkStripePayment` | Invoicing | Polls Stripe payment session, auto-records payment if paid. Returns `{ paid, status }` |
 | `sendContractForSigning` | Signing | Regenerates contract PDF via Lambda with company e-signature (companySigner: "Jack McMahon", companySignedAt: ISO timestamp), uploads to Drive (overwrites PDF URL/File ID), computes SHA-256 hash (stored in `pdfHash`), records company signer audit trail (companySigner, companySignedAt, companySignedIP from frontend), generates UUID token, sends HTML email with company-signed PDF attachment + signing link. Sets `signingStatus = 'sent'`. Requires `MailApp.sendEmail` scope |
 | `recordSignature` | Signing | Validates token, prevents double-signing, records `signedName`, `signedAt` (server-side), `signedIP`, `signedUserAgent`, `consentText`. Computes PDF SHA-256 hash from Drive file via `PDF File ID` column (bug fix: was using wrong column name `pdfFileId`), stores in `pdfHash`. Sets `signingStatus = 'signed'`. Then calls `generateAndEmailSignedPdf()` (non-fatal) to auto-generate dual-signed PDF + email. Returns `{ success, signedPdfGenerated, emailSent }` |
-| `generateAndEmailSignedPdf` | Signing | Helper called by `recordSignature()`. Reads bid JSON for services/T&C/propertyType, builds Lambda metadata payload, POSTs to Lambda (WeasyPrint), uploads signed PDF to Drive (`getPropertyFolder(addr, 'Contracts')`), writes `signedPdfUrl`/`signedPdfFileId` to Contracts sheet, emails customer styled HTML with signed PDF attached. Non-fatal — signature is always recorded even if this fails |
+| `generateAndEmailSignedPdf` | Signing | Helper called by `recordSignature()`. Reads bid JSON for services/T&C/propertyType, builds Lambda metadata payload, POSTs to Lambda (DocRaptor), uploads signed PDF to Drive (`getPropertyFolder(addr, 'Contracts')`), writes `signedPdfUrl`/`signedPdfFileId` to Contracts sheet, emails customer styled HTML with signed PDF attached. Non-fatal — signature is always recorded even if this fails |
 
 ### What Works Well
 - The UX patterns and workflows are production-quality — crew uses them daily
@@ -500,7 +500,7 @@ text-my-team/
 | Crew App (crew.html) | Production-quality, used daily | High |
 | Customer Portal (index.html) | Fully built, bilingual | Medium |
 | Estimating Engine (estimate.html) | Fully built — takeoffs, calculations, 3-tier billing, work tickets, templates, catalogs | High |
-| Contract PDF Generation | Built — residential + commercial templates, WeasyPrint on Lambda | Medium |
+| Contract PDF Generation | Built — residential + commercial templates, DocRaptor (PrinceXML) on Lambda | Medium |
 | Invoicing (estimate.html) | Built — Stripe Checkout, batch generation, auto-pay setup, payment tracking | Medium |
 | Properties / CRM / Contacts | Built as lite versions in estimate.html | Medium |
 | Schedule View | Built — day/week/month modes, drag-drop | Medium |
@@ -522,7 +522,7 @@ text-my-team/
 | 3 additional divisions (IRR/CON/ENH) | Medium | Catalogs, items, services need creation |
 | HubSpot CRM integration | Medium | Planned but not started |
 | QuickBooks integration | Medium | Planned but not started |
-| E-Signature (built-in typed signature) | Medium | **Built** — dual e-signature via sign.html (~700 lines), company signature pre-rendered at send time with PDF hash integrity verification at sign time, ESIGN Act/UETA compliant (consent text, SHA-256 hash, IP, user agent, company signer audit trail), Dancing Script cursive, signed PDF generation (WeasyPrint). DocuSign integration not started |
+| E-Signature (built-in typed signature) | Medium | **Built** — dual e-signature via sign.html (~700 lines), company signature pre-rendered at send time with PDF hash integrity verification at sign time, ESIGN Act/UETA compliant (consent text, SHA-256 hash, IP, user agent, company signer audit trail), Dancing Script cursive, signed PDF generation (DocRaptor). DocuSign integration not started |
 | Email/SMS (SendGrid + Twilio) | Medium | Not started |
 | Overhead tracking / true P&L | Medium | Schema designed, not built |
 | Google Calendar sync | Low | Optional, not started |
@@ -628,22 +628,21 @@ Both apps live in the same monorepo, share the component library (`packages/ui`)
 - Pick based on your cloud provider choice
 
 ### PDF Generation
-**Current: AWS Lambda + API Gateway + S3 (Python/WeasyPrint + ReportLab dual engine) — Container image deployment**
+**Current: AWS Lambda + API Gateway + S3 (Python/DocRaptor) — Container image deployment**
 - Endpoint: `https://ibjyxrp542.execute-api.us-east-1.amazonaws.com/prod/generate_site_report`
 - Upload URLs endpoint: `https://ibjyxrp542.execute-api.us-east-1.amazonaws.com/prod/upload-urls`
 - MARVIN AI endpoint (fallback): `https://ibjyxrp542.execute-api.us-east-1.amazonaws.com/prod/marvin`
 - MARVIN streaming endpoint: Lambda Function URL (set `MARVIN_STREAM_URL` in estimate.html after deploy)
-- **Architecture**: Two input paths, both produce PDFs via `pdf_generator.py` (WeasyPrint) or `main.py` (ReportLab):
+- **Architecture**: Two input paths, both produce PDFs via `docraptor_service.py` (DocRaptor/PrinceXML):
   - **S3 path (primary)**: crew.html → POST `/upload-urls` → Lambda returns pre-signed S3 PUT URLs → crew.html PUTs photos directly to S3 (10 concurrent, upload-as-you-go) → POST `/generate_site_report` with JSON body containing `s3Keys` → Lambda fetches photos from S3 via boto3 → generates PDF
   - **Multipart path (legacy fallback)**: crew.html → POST `/generate_site_report` with `multipart/form-data` containing photo blobs → Lambda parses multipart → generates PDF
 - **S3 Photo Upload Bucket**: Created via SAM template (`PhotoUploadBucket`). Auto-expires uploads after 24 hours (lifecycle policy on `uploads/` prefix). Public access blocked. CORS configured for GitHub Pages + localhost origins. Lambda has `S3CrudPolicy` for read/write access. Bucket name passed via `PHOTO_BUCKET` environment variable.
 - **Upload-as-you-go**: Each photo is uploaded to S3 immediately after capture/annotation in the background. By the time the user hits Generate, most photos are already in S3. If annotations change after upload, the photo is re-uploaded with composited annotations.
 - **Pre-signed URL batching**: Client requests 100 pre-signed PUT URLs upfront (`POST /upload-urls` with `{ count: 100 }`). Unused URLs simply expire after 15 minutes. For Before & After: `{ reportType: "before_after", beforeCount: N, afterCount: N }` returns separate `beforeUrls`/`afterUrls`/`beforeKeys`/`afterKeys`.
 - **S3 key structure**: `uploads/{uuid}/{photo|before|after}_{i}.jpg` — isolated per report session, auto-cleaned by lifecycle policy.
-- **Rendering engines**: Two engines coexist during migration. The `renderer` field in metadata JSON selects the engine (`"weasyprint"` default, `"reportlab"` fallback). `DEFAULT_RENDERER` in `lambda_function.py` controls the global default.
-- **WeasyPrint engine** (`pdf_generator.py`): Jinja2 HTML/CSS templates rendered to PDF via WeasyPrint. Photos embedded as base64 data URIs. Templates live in `cloud-function/templates/`. CSS edits are previewable in a browser via `test_local.py --html`. Custom Jinja2 filters: `format_date` (ISO date → "April 1, 2026"), `_format_signed_at` (ISO timestamp → "Feb 26, 2026 at 9:35 PM Eastern"). `logo_uri` auto-injected into all templates via `_render_pdf()`.
-- **ReportLab engine** (`main.py`): Original coordinate-based PDF generation (~2,193 lines). Available as fallback — set `DEFAULT_RENDERER = "reportlab"` in `lambda_function.py` to switch back.
-- `lambda_function.py` — Lambda handler: routes by path (`/upload-urls` → pre-signed URL generation, `/marvin` → MARVIN AI chat, `/generate_site_report` → PDF generation). PDF path detects content type: `application/json` → S3 flow (looks for `s3Keys`/`beforeS3Keys`/`afterS3Keys`), `multipart/form-data` → legacy multipart flow. Routes by `metadata.type`: `invoice` → `generate_invoice_pdf()` (WeasyPrint only), `contract` → `generate_contract_pdf()`, `before_after` → `generate_before_after_report()`, `standard` → `generate_standard_report()`
+- **Rendering engine**: DocRaptor (PrinceXML) — single engine, no fallback switching. Jinja2 HTML/CSS templates rendered locally into complete HTML documents, then sent to DocRaptor's API for PDF conversion. Photos embedded as base64 data URIs. Templates live in `cloud-function/templates/`. CSS inlined into templates via `{{ css_content('file.css') }}` Jinja2 function (DocRaptor cannot access local `file://` URLs). Dancing Script font embedded as base64 `@font-face` data URI (replaces `file:///var/task/` path). Custom Jinja2 filters: `format_date` (ISO date → "April 1, 2026"), `_format_signed_at` (ISO timestamp → "Feb 26, 2026 at 9:35 PM Eastern"). `logo_uri` auto-injected into all templates via `_render_pdf()`. `DOCRAPTOR_TEST_MODE` environment variable controls test vs production document generation.
+- **Previous engines (removed)**: WeasyPrint (`pdf_generator.py`, deleted) rendered Jinja2 templates to PDF locally using system C libraries. ReportLab (`main.py`, ~2,193 lines, deleted) was the original coordinate-based PDF engine. Both were replaced by DocRaptor to eliminate Docker build time issues, cross-architecture problems, and heavy system dependencies.
+- `lambda_function.py` — Lambda handler: routes by path (`/upload-urls` → pre-signed URL generation, `/marvin` → MARVIN AI chat, `/generate_site_report` → PDF generation). PDF path detects content type: `application/json` → S3 flow (looks for `s3Keys`/`beforeS3Keys`/`afterS3Keys`), `multipart/form-data` → legacy multipart flow. Imports all PDF generation functions from `docraptor_service`. Routes by `metadata.type`: `invoice` → `generate_invoice_pdf()`, `contract` → `generate_contract_pdf()`, `before_after` → `generate_before_after_report()`, `standard` → `generate_standard_report()`. Removed renderer switching logic (`WEASYPRINT_AVAILABLE`, `DEFAULT_RENDERER`). Added `DOCRAPTOR_TEST_MODE` env var support.
 - **MARVIN AI endpoint**: Two Lambda functions serve MARVIN — separate packaging, separate runtimes:
   - **Streaming (primary)**: `MarvinStreamFunction` — a **separate zip-based Lambda** (`Runtime: python3.12`) with a Function URL (`InvokeMode: RESPONSE_STREAM`). Self-contained in `cloud-function/marvin-stream/` directory (`handler.py`, `requirements.txt`, `marvin-knowledge.md`). Uses **native Lambda Function URL response streaming** — no Docker, no Web Adapter. Entry point: `handler.handler`. Streams SSE events (`thinking`, `text`, `tool_start`, `tool_result`, `done`, `error`) in real-time. No API Gateway timeout constraints. Frontend connects via `MARVIN_STREAM_URL` constant in estimate.html using `fetch()` + `ReadableStream`.
   - **Fallback (sync)**: `PdfGeneratorFunction` (Docker/Image) — existing API Gateway `/marvin` route. Same `_handle_marvin()` handler in `lambda_function.py`. Used when `MARVIN_STREAM_URL` is empty. Zero cost when unused.
@@ -671,11 +670,11 @@ Both apps live in the same monorepo, share the component library (`packages/ui`)
 - **Lambda config**: Two functions in the `endurance-pdf-generator` stack:
   - `PdfGeneratorFunction` — **Docker/Image** (ECR). Python 3.12, 2048MB memory, 300s timeout. Handles API Gateway routes: `/generate_site_report`, `/upload-urls`, `/marvin` (sync fallback). Requires Docker Desktop for builds.
   - `MarvinStreamFunction` — **zip/python3.12** (no Docker). 2048MB memory, 300s timeout. Lambda Function URL with `RESPONSE_STREAM` invoke mode. Self-contained in `cloud-function/marvin-stream/`. Entry point: `handler.handler`. No Docker dependency — SAM builds the zip from the `marvin-stream/` directory.
-- **Deployment**: `PdfGeneratorFunction` uses **Docker container image on ECR**. SAM builds the Dockerfile locally (requires Docker Desktop running), pushes to ECR, and updates the Lambda. Base image: `public.ecr.aws/lambda/python:3.12` (Amazon Linux 2023). System packages installed via `dnf`: pango 1.54, cairo 1.18, gdk-pixbuf2, harfbuzz 7.0, fontconfig, freetype. `MarvinStreamFunction` is zip-packaged — no Docker required. Redeployment: `cd cloud-function/deploy && ./deploy-docker.sh` (builds both functions, pushes Docker image to ECR, updates stack).
+- **Deployment**: `PdfGeneratorFunction` uses **Docker container image on ECR**. SAM builds the Dockerfile locally (requires Docker Desktop running), pushes to ECR, and updates the Lambda. Base image: `public.ecr.aws/lambda/python:3.12` (Amazon Linux 2023). No system C libraries needed — DocRaptor handles PDF rendering remotely. Docker image is dramatically smaller and faster to build than the previous WeasyPrint image (which required pango, cairo, gdk-pixbuf2, harfbuzz, fontconfig, freetype). Still Docker-based because the MARVIN fallback (`/marvin`) route shares this Lambda. `MarvinStreamFunction` is zip-packaged — no Docker required. Redeployment: `cd cloud-function/deploy && ./deploy-docker.sh` (builds both functions, pushes Docker image to ECR, updates stack).
 - **ECR repository**: `598386792755.dkr.ecr.us-east-1.amazonaws.com/endurancepdfgeneratorab3806a9/pdfgeneratorfunctionb84ef44frepo`
 - **Function name**: `endurance-pdf-generator-PdfGeneratorFunction-p2cuwitYNO8d`
 - **AWS CLI location** (macOS/Homebrew): `/opt/homebrew/Cellar/awscli/2.33.28/libexec/bin/aws`
-- **WeasyPrint is ACTIVE**: Container image includes system C libraries (pango, cairo, gdk-pixbuf2, harfbuzz) required by WeasyPrint. `WEASYPRINT_AVAILABLE = True` on cold start. `DEFAULT_RENDERER = "weasyprint"` routes all PDF types through the HTML/CSS template engine. To fall back to ReportLab: change `DEFAULT_RENDERER = "reportlab"` in `lambda_function.py` and redeploy — both engines are bundled in the container.
+- **DocRaptor is ACTIVE**: Lambda renders Jinja2 HTML/CSS templates locally, then sends the complete HTML to DocRaptor's API (PrinceXML) for PDF generation. No local PDF rendering — no system C libraries needed. `DOCRAPTOR_API_KEY` and `DOCRAPTOR_TEST_MODE` environment variables configured in `template.yaml`. Cost: ~$15-29/month based on document count. Eliminates Docker build time issues and cross-architecture problems that plagued WeasyPrint.
 - **Template structure**:
   ```
   cloud-function/templates/
@@ -694,17 +693,17 @@ Both apps live in the same monorepo, share the component library (`packages/ui`)
   ```
 - **Color palette** (CSS variables in `base.html`): `--green: #3A5F4B`, `--green-light: #E8F0EC`, `--dark: #1A2E24`, `--gray-header: #666666`, `--light-gray: #CCCCCC`, `--contract-light-gray: #F5F5F5`, `--contract-red: #C62828`, `--before-red: #DC2626`, `--after-green: #16A34A`
 - Handles Site Report, Before & After, and Contract PDF types (distinguished by `metadata.type` field)
-- **Advanced WeasyPrint features** (all 5 PDF types):
+- **Advanced PDF features** (all 5 PDF types, rendered by DocRaptor/PrinceXML):
   - **PDF Bookmarks**: `bookmark-level: 1; bookmark-label: 'Section Name'` on heading elements. Contracts: section bookmarks (Cover, Services, Payment, Description, T&C, Signature). Reports: per-category bookmarks. Enables PDF sidebar navigation.
   - **Running Headers**: `position: running(running-header)` in `common.css`, populated via `{% block running_header_content %}` in each template. Shows "Endurance Services | {address}" on pages 2+ of contracts and reports. Suppressed on first page via `@page :first`.
   - **Named Pages**: `@page cover` (no running header, tighter top margin) and `@page content` (running header in `@top-left`). Contracts use `.cover-page { page: cover; }` for page 1.
   - **Orphans/Widows**: Global `orphans: 3; widows: 3;` on body prevents isolated lines at page breaks. Contract clauses use `page-break-inside: avoid` to keep clauses together.
-  - **Date Formatting**: Jinja2 `format_date` filter (`_format_date()` in `pdf_generator.py`) converts ISO dates (`2026-04-01`) to readable format (`April 1, 2026`). Used in all contract dates and invoice dates.
+  - **Date Formatting**: Jinja2 `format_date` filter (`_format_date()` in `docraptor_service.py`) converts ISO dates (`2026-04-01`) to readable format (`April 1, 2026`). Used in all contract dates and invoice dates.
   - **Green Branding**: Consistent brand green (`--green: #3A5F4B`) across all PDF types — category headers, table headers, info box headers, title rules, service description blocks, total amount borders, AFTER labels, invoice details box border.
   - **Logo on Residential**: `logo_uri` now injected into all templates via `_render_pdf()`. Residential contract page 1 shows logo instead of text company name.
-- **Site Report layout**: 2-column CSS grid. Photos grouped by category with green category headers, notes below each photo with green left-border accent, softer photo borders (light-gray, rounded corners), page numbering via `@page` counters, logo on page 1. `object-fit: cover` replaces ReportLab's manual crop algorithm. PDF bookmarks per category for sidebar navigation.
+- **Site Report layout**: 2-column CSS grid. Photos grouped by category with green category headers, notes below each photo with green left-border accent, softer photo borders (light-gray, rounded corners), page numbering via `@page` counters, logo on page 1. `object-fit: cover` for photo scaling. PDF bookmarks per category for sidebar navigation.
 - **Before & After layout**: Side-by-side comparison — BEFORE (red banner) left, AFTER (brand green banner, `--green`) right. CSS grid pairs with `page-break-inside: avoid`. Softer borders (light-gray, rounded corners). New page per category. PDF bookmarks per category.
-- **Contract PDF layout**: Two templates based on `propertyType`. Residential: 3-page (quote with logo + green table headers, service descriptions with green left-border blocks, T&C with green title + formatted dates + signatures). Commercial: 5-6 page (cover, three-tier services tables with green header bars, payment schedule, service descriptions, T&C with formatted dates, signatures). Both include 12 standard terms clauses with template variables. Clause 12 (Named Tropical Event Policy) uses numbered sub-items instead of plain text. `_get_terms_clauses()` returns `(title, text)` tuples where text is a string or a list of sub-item strings. Both engines and all templates handle both formats. Optional `service_map` photo for commercial cover page. **E-signature rendering**: When `signedName`/`signedAt` present in metadata, customer signature column shows typed name in Dancing Script cursive font above the signature line, with "Signed: {date}" replacing the generic date. Conditional rendering via Jinja2 `{% if signed_name %}` in templates and direct font rendering in ReportLab. Both engines register/embed Dancing Script Bold TTF (`assets/fonts/DancingScript-Bold.ttf`). Functions: `generate_contract_pdf()`, `_generate_residential_contract()`, `_generate_commercial_contract()`
+- **Contract PDF layout**: Two templates based on `propertyType`. Residential: 3-page (quote with logo + green table headers, service descriptions with green left-border blocks, T&C with green title + formatted dates + signatures). Commercial: 5-6 page (cover, three-tier services tables with green header bars, payment schedule, service descriptions, T&C with formatted dates, signatures). Both include 12 standard terms clauses with template variables. Clause 12 (Named Tropical Event Policy) uses numbered sub-items instead of plain text. `_get_terms_clauses()` returns `(title, text)` tuples where text is a string or a list of sub-item strings. Templates handle both formats. Optional `service_map` photo for commercial cover page. **E-signature rendering**: When `signedName`/`signedAt` present in metadata, customer signature column shows typed name in Dancing Script cursive font above the signature line, with "Signed: {date}" replacing the generic date. Conditional rendering via Jinja2 `{% if signed_name %}` in templates. Dancing Script Bold font embedded as base64 data URI in `@font-face` rule (DocRaptor cannot access local font files). Functions: `generate_contract_pdf()`, `_generate_residential_contract()`, `_generate_commercial_contract()`
 - **Request format**: S3 path (primary): `application/json` with `s3Keys` array (or `beforeS3Keys`/`afterS3Keys`). Multipart path (legacy): `multipart/form-data` with JSON `metadata` field + photo blobs (`photos`, `before_photos`, `after_photos`)
 - Photos composited client-side (annotations burned onto canvas) before upload to S3. Site Report: max 1600px, 80% JPEG quality, uploaded as-you-go. Before & After: max 1600px, 80% JPEG quality, uploaded at generate time. S3 removes the 6MB Lambda payload limit — photos upload individually to S3.
 - **Large PDF fallback**: If the generated PDF exceeds ~7MB (API Gateway has a 10MB response limit, base64 adds ~33% overhead), Lambda writes the PDF to S3 (`pdfs/{uuid}/{filename}`) and returns a JSON response `{ downloadUrl, filename }` with a 1-hour pre-signed GET URL. The frontend detects the JSON content-type, fetches the PDF from S3, and proceeds normally. Both `uploads/` and `pdfs/` prefixes auto-expire after 24 hours via S3 lifecycle rules.
@@ -712,7 +711,7 @@ Both apps live in the same monorepo, share the component library (`packages/ui`)
 - Individual photos and report JSON also uploaded to Drive for future reference (Before & After pulls prior photos from these)
 - CORS configured at API Gateway level + Lambda response headers for GitHub Pages origins
 - Demo mode: `crew.html` intercepts `execute-api` URLs (and legacy `cloudfunctions.net`) to return mock PDF blobs
-- **Local dev workflow**: `python test_local.py standard --html` opens HTML in browser for rapid CSS iteration. `python test_local.py standard` generates WeasyPrint PDF. `--reportlab` flag uses old engine for comparison.
+- **Local dev workflow**: `python test_local.py standard --html` opens HTML in browser for rapid CSS iteration. `python test_local.py standard` generates PDF via DocRaptor API.
 
 **Built: Before & After photo orientation matching (Layers 1 & 2):**
 
@@ -720,9 +719,9 @@ Both apps live in the same monorepo, share the component library (`packages/ui`)
 
 2. **Layer 2 — Mismatch warning dialog** (crew.html, ✅ built): In `baProcessAfterPhoto()`, after the after image loads and dimensions are known (`w > h` vs `photo.beforeIsLandscape`), if orientations mismatch, shows `iosConfirm()` dialog: "This photo is [portrait/landscape] but the original was [landscape/portrait]. The report looks best with matching orientations." Buttons: "Use Anyway" (saves the photo) / Cancel (discards the photo). Save logic wrapped in `saveAfterPhoto()` inner function called by both paths.
 
-3. **Layer 3 — ReportLab layout normalization** (not needed): The PDF renderer already handles mixed orientations with fill-and-crop scaling inside fixed bounding boxes. Client-side guidance is sufficient.
+3. **Layer 3 — PDF layout normalization** (not needed): The PDF renderer (DocRaptor/PrinceXML) already handles mixed orientations with fill-and-crop scaling inside fixed bounding boxes. Client-side guidance is sufficient.
 
-- WeasyPrint HTML/CSS templates now replace the need for Puppeteer/Playwright — CSS print layout gives full control over page breaks, headers, footers, and photo grids while remaining previewable in any browser
+- DocRaptor (PrinceXML) renders the same Jinja2 HTML/CSS templates as the previous WeasyPrint engine — CSS print layout gives full control over page breaks, headers, footers, and photo grids while remaining previewable in any browser
 
 ### Hosting (Frontend)
 **Cloud-native static hosting (S3 + CloudFront / Azure Static Web Apps / Firebase Hosting / Vercel)**
@@ -770,7 +769,7 @@ Both apps live in the same monorepo, share the component library (`packages/ui`)
 
 ### E-Signature
 **Built-in typed signature (default, BUILT) + optional DocuSign (future)**
-- **Current (built)**: Dual e-signature via `sign.html` — company signature (Jack McMahon) pre-rendered in Dancing Script cursive at send time, customer types name with live cursive preview. No cost, no external dependency. ESIGN Act / UETA compliant: records intent to sign, consent text, identity (name/IP/user agent), server-side timestamp, document integrity (SHA-256 hash computed at send time, verified at sign time), association (UUID token), company signer audit trail (companySigner, companySignedAt, companySignedIP), and retains all records in Sheets + Drive. Signed PDF regenerated with both cursive signatures on signature page via WeasyPrint (ReportLab fallback available).
+- **Current (built)**: Dual e-signature via `sign.html` — company signature (Jack McMahon) pre-rendered in Dancing Script cursive at send time, customer types name with live cursive preview. No cost, no external dependency. ESIGN Act / UETA compliant: records intent to sign, consent text, identity (name/IP/user agent), server-side timestamp, document integrity (SHA-256 hash computed at send time, verified at sign time), association (UUID token), company signer audit trail (companySigner, companySignedAt, companySignedIP), and retains all records in Sheets + Drive. Signed PDF regenerated with both cursive signatures on signature page via DocRaptor (PrinceXML).
 - **Future**: tenants who want DocuSign connect their own account via OAuth. One toggle to enable.
 - Both paths produce the same outcome: a signed PDF and a contract activation trigger.
 
@@ -1832,7 +1831,7 @@ The platform doesn't care which path was taken — the outcome is the same: a si
 ### Phase 4: Invoicing & Payments (Weeks 15-18)
 **Goal: Get paid**
 
-> **Key decisions made:** (1) Invoice types are simple — fixed monthly maintenance contracts and project work (deposit + final payment), NOT per-ticket earned revenue billing. (2) Credit card fees are baked into the contract price so the customer never sees a surcharge. (3) Stripe Payments (core) handles payment processing — NOT Stripe Invoicing — because the platform generates its own invoice PDFs via Lambda/ReportLab. (4) QuickBooks handles accounting — invoices push to QBO, direct expenses push to QBO, QBO produces the P&L. (5) No sensitive payment data (card numbers, bank accounts) ever touches the platform — Stripe Checkout hosted page only.
+> **Key decisions made:** (1) Invoice types are simple — fixed monthly maintenance contracts and project work (deposit + final payment), NOT per-ticket earned revenue billing. (2) Credit card fees are baked into the contract price so the customer never sees a surcharge. (3) Stripe Payments (core) handles payment processing — NOT Stripe Invoicing — because the platform generates its own invoice PDFs via Lambda/DocRaptor. (4) QuickBooks handles accounting — invoices push to QBO, direct expenses push to QBO, QBO produces the P&L. (5) No sensitive payment data (card numbers, bank accounts) ever touches the platform — Stripe Checkout hosted page only.
 
 #### Invoice Types
 
@@ -1849,7 +1848,7 @@ The platform doesn't care which path was taken — the outcome is the same: a si
 #### Invoice Generation & Delivery
 - [x] "Generate Invoices" batch action in estimate.html — scans contracts, creates invoice records, generates PDFs, sends emails with Stripe Pay Now links
 - [ ] Bulk monthly invoice generation — one click to generate invoices for all active maintenance contracts
-- [ ] Invoice PDF generation via AWS Lambda (WeasyPrint) — same pipeline as site reports, new invoice template
+- [ ] Invoice PDF generation via AWS Lambda (DocRaptor) — same pipeline as site reports, new invoice template
 - [ ] Invoice PDF includes: company logo, customer info, invoice number, date, due date, line items, total, and a **"Pay Now" link**
 - [ ] Email delivery via Apps Script `GmailApp.sendEmail()` with PDF attachment
 - [ ] Automated payment reminders for overdue invoices
@@ -1874,7 +1873,7 @@ The platform doesn't care which path was taken — the outcome is the same: a si
 
 #### Stripe Integration (Core Payments Product)
 
-> **Why Stripe Payments, not Stripe Invoicing:** Stripe Invoicing charges $0.50/invoice on top of processing fees and generates its own PDFs/emails. Since the platform already has PDF generation (Lambda/ReportLab) and email delivery (Apps Script), using the core Payments product avoids the per-invoice fee and gives full control over invoice design and delivery.
+> **Why Stripe Payments, not Stripe Invoicing:** Stripe Invoicing charges $0.50/invoice on top of processing fees and generates its own PDFs/emails. Since the platform already has PDF generation (Lambda/DocRaptor) and email delivery (Apps Script), using the core Payments product avoids the per-invoice fee and gives full control over invoice design and delivery.
 
 - [ ] Stripe account setup (set `STRIPE_SECRET_KEY` in Script Properties)
 - [x] Stripe Checkout Sessions via API — `createStripeCheckoutSession()` in Apps Script, payment mode for one-time + setup mode for auto-pay
@@ -1911,7 +1910,7 @@ The platform doesn't care which path was taken — the outcome is the same: a si
 - [x] Individual invoice detail with line items table, totals, payment history
 - [x] Batch invoice generation — scans active contracts, dedup by period, creates drafts, auto-charges auto-pay
 - [x] Invoice lifecycle actions: Finalize, Send (email + PDF + Stripe Pay Now link), Record Payment, Check Payment Status, Void
-- [x] Invoice PDF generation via HtmlService (Apps Script fallback) and WeasyPrint (Lambda)
+- [x] Invoice PDF generation via HtmlService (Apps Script fallback) and DocRaptor (Lambda)
 - [ ] Aging report: 0-30, 31-60, 61-90, 90+ days outstanding
 
 #### QuickBooks Integration (Accounting & Financials)
@@ -2523,7 +2522,7 @@ messages=[
 
 Once approved, the report can be delivered as:
 - **Email** — HTML formatted body with photos embedded or attached
-- **PDF** — Generated via the existing ReportLab Lambda function, styled as a branded customer report
+- **PDF** — Generated via the existing DocRaptor Lambda function, styled as a branded customer report
 - **Both** — PDF attached to the email, with a plain text summary in the email body
 
 The customer-facing email should come from the account manager's name/email so it feels personal, not automated.
@@ -2586,7 +2585,7 @@ Before the full React/PostgreSQL migration, the ticket generation and schedule f
 10. ✅ Actual vs. estimated comparison display in Clock-Out modal
 11. ✅ **Day summary screen**: direct hours, indirect hours, total, direct %, crew members
 12. ✅ Job completion flow (notes, service checklist, partial/complete decision)
-13. ✅ **Before & After photo orientation matching** — Layer 1: real-time orientation hint banner in detail modal (`#ba-orientation-hint`) with green/red color via `window.resize` + `orientationchange`, detects before photo orientation via `naturalWidth`/`naturalHeight`. Layer 2: mismatch warning dialog in `baProcessAfterPhoto()` via `iosConfirm()` when after photo orientation doesn't match before. Layer 3 (ReportLab) not needed — existing fill-and-crop handles mixed orientations
+13. ✅ **Before & After photo orientation matching** — Layer 1: real-time orientation hint banner in detail modal (`#ba-orientation-hint`) with green/red color via `window.resize` + `orientationchange`, detects before photo orientation via `naturalWidth`/`naturalHeight`. Layer 2: mismatch warning dialog in `baProcessAfterPhoto()` via `iosConfirm()` when after photo orientation doesn't match before. Layer 3 (PDF renderer) not needed — existing fill-and-crop handles mixed orientations
 
 ### Phase D: Route Management (estimate.html / management view) — ✅ Built
 1. ✅ **Schedule view** — day/week/month display modes with property stop cards, drag-drop stop reordering (`schedDrop()` + `saveRouteOrder()`), crew filter dropdown. Day view with earned value and margin per stop, week calendar grid with drag-to-reschedule, month calendar with ticket dots. Functions: `loadScheduleView()`, `renderSchedDay()`, `renderSchedWeek()`, `renderSchedMonth()`, `showSchedTicketDetail()`, `rescheduleFromDetail()`, `skipFromDetail()`
