@@ -527,19 +527,12 @@ class MarvinHandler(BaseHTTPRequestHandler):
         self.wfile.write(b"OK")
 
     def do_OPTIONS(self):
-        origin = self.headers.get("Origin", "")
-        allowed = _cors_origin(origin)
+        # Lambda Function URL handles CORS preflight automatically
         self.send_response(204)
-        if allowed:
-            self.send_header("Access-Control-Allow-Origin", allowed)
-            self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
-            self.send_header("Access-Control-Allow-Headers", "Content-Type")
-            self.send_header("Access-Control-Max-Age", "3600")
         self.end_headers()
 
     def do_POST(self):
-        origin = self.headers.get("Origin", "")
-        allowed = _cors_origin(origin)
+        # CORS headers are added by Lambda Function URL config — don't duplicate
         content_len = int(self.headers.get("Content-Length", 0))
         body = json.loads(self.rfile.read(content_len)) if content_len else {}
 
@@ -547,8 +540,6 @@ class MarvinHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "text/event-stream")
         self.send_header("Cache-Control", "no-cache")
         self.send_header("Connection", "close")
-        if allowed:
-            self.send_header("Access-Control-Allow-Origin", allowed)
         self.end_headers()
 
         try:
