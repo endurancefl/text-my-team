@@ -71,8 +71,11 @@ text-my-team/
 │   ├── pdf_generator.py           # PDF library (WeasyPrint + ReportLab)
 │   ├── lambda_function.py         # AWS Lambda handler (~943 lines)
 │   ├── marvin-knowledge.md        # MARVIN AI knowledge base (~592 lines, loaded at cold start)
-│   ├── marvin_stream.py           # SSE streaming server for MARVIN (Lambda Web Adapter)
-│   ├── Dockerfile                 # WeasyPrint container image (+ Lambda Web Adapter for streaming)
+│   ├── marvin-stream/             # Separate zip-based Lambda for MARVIN streaming
+│   │   ├── handler.py             # SSE streaming handler (native Lambda Function URL response streaming)
+│   │   ├── requirements.txt       # anthropic>=0.51.0 (standalone, no Docker)
+│   │   └── marvin-knowledge.md    # MARVIN knowledge base (copy, bundled in zip)
+│   ├── Dockerfile                 # WeasyPrint container image (PDF generation only)
 │   ├── requirements.txt
 │   ├── templates/                 # Jinja2 HTML/CSS templates for PDFs
 │   │   ├── base.html
@@ -85,7 +88,7 @@ text-my-team/
 │   │   ├── logo.png
 │   │   └── fonts/DancingScript-Bold.ttf  # Cursive font for e-signature rendering
 │   └── deploy/
-│       ├── template.yaml          # SAM template (Lambda + API Gateway)
+│       ├── template.yaml          # SAM template (PdfGeneratorFunction Docker + MarvinStreamFunction zip)
 │       └── deploy.sh
 ├── docs/
 │   └── platform-architecture.md   # This document
@@ -641,18 +644,18 @@ Both apps live in the same monorepo, share the component library (`packages/ui`)
 - **WeasyPrint engine** (`pdf_generator.py`): Jinja2 HTML/CSS templates rendered to PDF via WeasyPrint. Photos embedded as base64 data URIs. Templates live in `cloud-function/templates/`. CSS edits are previewable in a browser via `test_local.py --html`. Custom Jinja2 filters: `format_date` (ISO date → "April 1, 2026"), `_format_signed_at` (ISO timestamp → "Feb 26, 2026 at 9:35 PM Eastern"). `logo_uri` auto-injected into all templates via `_render_pdf()`.
 - **ReportLab engine** (`main.py`): Original coordinate-based PDF generation (~2,193 lines). Available as fallback — set `DEFAULT_RENDERER = "reportlab"` in `lambda_function.py` to switch back.
 - `lambda_function.py` — Lambda handler: routes by path (`/upload-urls` → pre-signed URL generation, `/marvin` → MARVIN AI chat, `/generate_site_report` → PDF generation). PDF path detects content type: `application/json` → S3 flow (looks for `s3Keys`/`beforeS3Keys`/`afterS3Keys`), `multipart/form-data` → legacy multipart flow. Routes by `metadata.type`: `invoice` → `generate_invoice_pdf()` (WeasyPrint only), `contract` → `generate_contract_pdf()`, `before_after` → `generate_before_after_report()`, `standard` → `generate_standard_report()`
-- **MARVIN AI endpoint**: Two Lambda functions serve MARVIN, sharing the same Docker image:
-  - **Streaming (primary)**: `MarvinStreamFunction` — Lambda Function URL with `RESPONSE_STREAM` invoke mode. Runs `marvin_stream.py` via Lambda Web Adapter (public.ecr.aws/awsguru/aws-lambda-web-adapter:0.8.4). Streams SSE events (`text`, `thinking`, `tool_start`, `tool_result`, `done`, `error`) in real-time. No API Gateway timeout constraints. Frontend connects via `MARVIN_STREAM_URL` constant in estimate.html using `fetch()` + `ReadableStream`.
-  - **Fallback (sync)**: `PdfGeneratorFunction` — existing API Gateway `/marvin` route. Same `_handle_marvin()` handler. Used when `MARVIN_STREAM_URL` is empty. Zero cost when unused.
+- **MARVIN AI endpoint**: Two Lambda functions serve MARVIN — separate packaging, separate runtimes:
+  - **Streaming (primary)**: `MarvinStreamFunction` — a **separate zip-based Lambda** (`Runtime: python3.12`) with a Function URL (`InvokeMode: RESPONSE_STREAM`). Self-contained in `cloud-function/marvin-stream/` directory (`handler.py`, `requirements.txt`, `marvin-knowledge.md`). Uses **native Lambda Function URL response streaming** — no Docker, no Web Adapter. Entry point: `handler.handler`. Streams SSE events (`thinking`, `text`, `tool_start`, `tool_result`, `done`, `error`) in real-time. No API Gateway timeout constraints. Frontend connects via `MARVIN_STREAM_URL` constant in estimate.html using `fetch()` + `ReadableStream`.
+  - **Fallback (sync)**: `PdfGeneratorFunction` (Docker/Image) — existing API Gateway `/marvin` route. Same `_handle_marvin()` handler in `lambda_function.py`. Used when `MARVIN_STREAM_URL` is empty. Zero cost when unused.
   - **Model**: `claude-opus-4-5-20251101` (Opus 4.5). Pricing: ~$5/M input, ~$25/M output tokens. With prompt caching, repeated system prompts cost ~$0.63/M (cache read).
-  - **Extended thinking**: Enabled with 4096 budget tokens. Thinking blocks are filtered from text extraction (sync) or sent as `event: thinking` (streaming) — frontend shows subtle "Reasoning..." indicator.
-  - **Prompt caching**: System prompt uses `cache_control: {"type": "ephemeral"}` content block format. Caches the knowledge base + personality + action schemas across requests within the same Lambda instance.
+  - **Extended thinking**: Enabled with `budget_tokens: 4096`. Thinking blocks sent as `event: thinking` (streaming) — frontend shows subtle "Reasoning..." indicator. Filtered from text extraction in sync fallback.
+  - **Prompt caching**: System prompt uses `cache_control: {"type": "ephemeral"}` content block format. Caches the knowledge base + personality + action schemas across requests within the same Lambda instance. Reduces repeated system prompt cost significantly with Opus 4.5 pricing.
   - **Max tokens**: 8192 (up from 4096).
   - **Tool loop cap**: 5 tool_use rounds (up from 2, since streaming has no 30s timeout).
   - **SSE Protocol**: `event: thinking` (reasoning indicator), `event: text` (delta), `event: tool_start` (tool names/IDs), `event: tool_result` (tool names), `event: done` (final message + action), `event: error` (error string).
-  - API key stored in AWS Secrets Manager (`marvin-api-key`) and resolved at deploy time via `{{resolve:secretsmanager:...}}` in SAM template. `anthropic>=0.51.0` in `requirements.txt`.
+  - API key stored in AWS Secrets Manager (`marvin-api-key`) and resolved at deploy time via `{{resolve:secretsmanager:...}}` in SAM template. `anthropic>=0.51.0` in streaming function's `requirements.txt`.
   - **Chat mode** (all requests): Conversational assistant with **web search** (Anthropic `web_search_20250305` server-side tool) and **7 custom data tools** for live backend fetching. Accepts `{ "prompt": "...", "history": [], "context": {...} }`. Context includes current view, property info, services, contract settings, available views. Returns structured JSON: `{ "type": "text|action", "message": "...", "action": { "type": "setField|createSection|navigate", "data": {...} } }`. System prompt: general-purpose assistant with field IDs, view IDs, section types. Web search config: `max_uses: 5`, `user_location: Orlando, FL`. Claude decides when to search or use tools — no routing logic. Continuation loop handles `pause_turn` (web search) and `tool_use` (custom tools) stop reasons with up to 5 total iterations and max 5 tool_use rounds. Tools executed in parallel via `ThreadPoolExecutor`. Multi-block response content parsed by extracting all `text` blocks. Helper functions: `_build_chat_system_prompt(context)`, `_parse_chat_response(text)`, `_fetch_backend(params)`, `_execute_tool(tool_name, tool_input)`, `_execute_tools_parallel(tool_uses)`.
-  - **Frontend streaming**: `streamMarvinResponse()` in estimate.html — uses `fetch()` with `AbortController` for stop button support. `parseSSEBuffer()` handles split chunks. `updateMarvinSendButton()` toggles send/stop icon. All three send functions (`sendMarvinMessage`, `sendMarvinBriefingMessage`, `sendMarvinIdentifyMessage`) use streaming when `MARVIN_STREAM_URL` is set, with sync fallback.
+  - **Frontend streaming**: `streamMarvinResponse()` in estimate.html — uses `fetch()` + `ReadableStream` with `parseSSEBuffer()` to handle split SSE chunks. Stop button via `AbortController` — `updateMarvinSendButton()` toggles send/stop icon. All three send functions (`sendMarvinMessage`, `sendMarvinBriefingMessage`, `sendMarvinIdentifyMessage`) use streaming when `MARVIN_STREAM_URL` is set, with sync fallback.
   - **Custom data tools** (7 tools, defined in `_MARVIN_CUSTOM_TOOLS`): Allow Claude to fetch live data from Google Sheets backend when the browser context doesn't contain the needed data. Each tool maps to a backend GET endpoint:
     | Tool | Backend Action | Parameters | Use Case |
     |------|---------------|------------|----------|
@@ -665,8 +668,10 @@ Both apps live in the same monorepo, share the component library (`packages/ui`)
     | `get_reminders` | `getReminders` | none | Reminder queries |
     Backend calls use `urllib.request` with 25s timeout. Results truncated (100 tickets, 200 invoices/properties max). System prompt instructs Claude to prefer context data (faster) and only use tools when data is missing or a different filter is needed. Max 5 tool_use rounds (streaming removes the 30s API Gateway timeout constraint).
   - **Knowledge file** (`cloud-function/marvin-knowledge.md`, ~441 lines): Local markdown file loaded once at Lambda cold start into the `_MARVIN_KNOWLEDGE` global variable. Injected into the chat system prompt as the "Platform & Industry Knowledge" section. Contains: platform overview, all views and their field IDs, full item catalog with production rates, service catalog, calculation formulas, billing tiers, takeoff sections, bid settings, contract system, crew operations, customer portal, backend schemas, and industry benchmarks. Replaces the ~60 lines of hardcoded knowledge that was previously inline in the Lambda. Must be updated whenever the codebase changes (same discipline as `platform-architecture.md`). Redeploy Lambda after changes.
-- Lambda config: Python 3.12, **2048MB memory**, **300s timeout**. Two functions in stack: `PdfGeneratorFunction` (API Gateway, PDF + upload-urls + /marvin fallback) and `MarvinStreamFunction` (Function URL, SSE streaming)
-- **Deployment**: **Docker container image on ECR**. SAM builds the Dockerfile locally (requires Docker Desktop running), pushes to ECR, and updates the Lambda. Base image: `public.ecr.aws/lambda/python:3.12` (Amazon Linux 2023). System packages installed via `dnf`: pango 1.54, cairo 1.18, gdk-pixbuf2, harfbuzz 7.0, fontconfig, freetype. Redeployment: `cd cloud-function/deploy && ./deploy-docker.sh` (builds image, pushes to ECR, updates Lambda).
+- **Lambda config**: Two functions in the `endurance-pdf-generator` stack:
+  - `PdfGeneratorFunction` — **Docker/Image** (ECR). Python 3.12, 2048MB memory, 300s timeout. Handles API Gateway routes: `/generate_site_report`, `/upload-urls`, `/marvin` (sync fallback). Requires Docker Desktop for builds.
+  - `MarvinStreamFunction` — **zip/python3.12** (no Docker). 2048MB memory, 300s timeout. Lambda Function URL with `RESPONSE_STREAM` invoke mode. Self-contained in `cloud-function/marvin-stream/`. Entry point: `handler.handler`. No Docker dependency — SAM builds the zip from the `marvin-stream/` directory.
+- **Deployment**: `PdfGeneratorFunction` uses **Docker container image on ECR**. SAM builds the Dockerfile locally (requires Docker Desktop running), pushes to ECR, and updates the Lambda. Base image: `public.ecr.aws/lambda/python:3.12` (Amazon Linux 2023). System packages installed via `dnf`: pango 1.54, cairo 1.18, gdk-pixbuf2, harfbuzz 7.0, fontconfig, freetype. `MarvinStreamFunction` is zip-packaged — no Docker required. Redeployment: `cd cloud-function/deploy && ./deploy-docker.sh` (builds both functions, pushes Docker image to ECR, updates stack).
 - **ECR repository**: `598386792755.dkr.ecr.us-east-1.amazonaws.com/endurancepdfgeneratorab3806a9/pdfgeneratorfunctionb84ef44frepo`
 - **Function name**: `endurance-pdf-generator-PdfGeneratorFunction-p2cuwitYNO8d`
 - **AWS CLI location** (macOS/Homebrew): `/opt/homebrew/Cellar/awscli/2.33.28/libexec/bin/aws`

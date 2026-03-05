@@ -97,22 +97,16 @@ Resources:
   MarvinStreamFunction:
     Type: AWS::Serverless::Function
     Properties:
-      PackageType: Image
-      ImageConfig:
-        Command: ["python", "marvin_stream.py"]
+      Runtime: python3.12
+      Handler: handler.handler
+      CodeUri: ../marvin-stream/
       Architectures:
         - x86_64
       MemorySize: 2048
       Timeout: 300
-      Policies:
-        - S3CrudPolicy:
-            BucketName: !Ref PhotoUploadBucket
       Environment:
         Variables:
-          PHOTO_BUCKET: !Ref PhotoUploadBucket
           ANTHROPIC_API_KEY: '{{resolve:secretsmanager:marvin-api-key:SecretString:key}}'
-          AWS_LWA_INVOKE_MODE: RESPONSE_STREAM
-          PORT: '8080'
       FunctionUrlConfig:
         AuthType: NONE
         InvokeMode: RESPONSE_STREAM
@@ -128,10 +122,6 @@ Resources:
           AllowHeaders:
             - "Content-Type"
           MaxAge: 3600
-    Metadata:
-      DockerTag: latest
-      DockerContext: ../
-      Dockerfile: Dockerfile
 
   PdfApi:
     Type: AWS::Serverless::HttpApi
