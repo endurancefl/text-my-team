@@ -565,13 +565,73 @@ Shows calculated totals for the current estimate:
 ### Named Tropical Event Policy
 Storm cleanup billed at $65/hour Time and Materials, in addition to monthly contract price.
 
-### Divisions (MNT is fully built, others planned)
+### Divisions
 | Code | Name | Description |
 |------|------|-------------|
-| MNT | Maintenance | Recurring landscape maintenance — mowing, edging, pruning, etc. |
-| IRR | Irrigation | Irrigation system maintenance and repair |
-| CON | Construction | Hardscape, drainage, sod installations |
-| ENH | Enhancement | Large mulch jobs, seasonal color installs, planting projects, renovations |
+| MNT | Maintenance | Recurring landscape maintenance — mowing, edging, pruning, etc. (fully built) |
+| ENH | Enhancement | Large mulch jobs, seasonal color installs, planting projects, renovations (fully built) |
+| IRR | Irrigation | Irrigation system maintenance and repair (planned) |
+| CON | Construction | Hardscape, drainage, sod installations (planned) |
+
+### ENH Division — Enhancement Estimates
+
+ENH estimates are project-based work tickets (not recurring contracts). When `division === 'ENH'`:
+- Job type is auto-set to `work_ticket` with `scheduleType: 'single_visit'`
+- All services use `billingTier: 'fixed'` and `visits: 1`
+- Three schedule types available: **Single Visit**, **Multi-Day**, **Milestone** (non-consecutive dates with per-phase line item assignment)
+
+#### ENH Item Catalog (Labor)
+
+| Category | Items |
+|----------|-------|
+| Mulch | Mulch Installation (yards/hr), Mulch Bed Edging/Re-cutting (LF/hr), Bed Cleanup/Debris Removal (SF/hr) |
+| Color & Annuals | Annual Color Install 4" pot, Annual Color Install 1 gal, Annual Color Removal/Swap, Perennial Install |
+| Planting | Shrub Install (1/3/5/7/15 gal), Ornamental Grass Install, Ground Cover Install, Tree Install (15/25 gal), Tree Staking |
+| Renovation | Sod Installation, Soil Amendment/Till, Landscape Fabric Install, Rock/Stone Mulch Install, Plant Removal (Shrub/Tree), Grade & Shape Bed |
+
+#### ENH Service Catalog
+
+| Service | Default Items |
+|---------|--------------|
+| Mulch Installation | Mulch Installation, Bed Edging, Bed Cleanup |
+| Seasonal Color Install | Annual Color Install (4" and 1 gal), Color Removal/Swap |
+| Planting / Bed Install | Shrub Install (all sizes), Ground Cover, Perennial Install |
+| Landscape Renovation | Plant Removal, Grade & Shape, Soil Amendment, Sod, Landscape Fabric |
+
+#### ENH Materials & Subcontractors
+
+ENH services have **per-line material rows** and **per-line subcontractor rows** — distinct from MNT's aggregate material cost model:
+
+**Material rows**: `{ description, quantity, unit, unitCost, markup (default 20%), billedPrice }` — optionally linked to Plant Catalog entries via `plantCatalogId`
+
+**Subcontractor rows**: `{ description, cost, markup (default 15%), billedPrice }` — these are line items *within* a labor service, different from MNT's whole-service `isSubcontractor: true` model
+
+**ENH Bid Total** = Labor Billed + Materials Billed (sum of all material row billedPrices) + Subcontractor Billed (sum of all sub row billedPrices)
+
+#### ENH Takeoff Sections
+
+| Section | Inputs | Auto-calculation |
+|---------|--------|-----------------|
+| Mulch | Bed area (SF), depth (inches), edging (LF) | `cubicYards = (SF × depth) / 324` |
+| Color | 4" pots count, 1 gal count, removals count | Direct quantity mapping |
+| Planting | Count per plant size (1/3/5/7/15 gal, grass, ground cover SF, perennial, tree 15/25 gal, staking) | Direct quantity mapping |
+| Renovation | Sod SF, bed area SF, shrub removals, tree removals | Direct quantity mapping |
+
+#### Plant Catalog
+
+Standalone database of plants used across ENH estimates:
+- Fields: commonName, botanicalName, category, sizes (JSON with size/supplierCost/defaultMarkup/supplier/sku), photoFileId, notes
+- Photos stored in Google Drive (file IDs, not base64)
+- When a plant is linked to a material row, auto-fills description, unitCost, and markup from catalog
+- CSV import stub available (full pipeline planned for follow-up)
+
+#### Milestone Scheduling (ENH only)
+
+When `scheduleType === 'milestone'`, ENH estimates can define non-consecutive phases:
+- Each phase has: label, date, and assigned line items (labor, material, sub rows)
+- Each phase generates its own ticket
+- Earned value splits proportionally across phases by assigned budgeted hours
+- Use for projects like "Day 1: Demo & Grading, Day 3: Planting, Day 5: Mulch"
 
 ---
 

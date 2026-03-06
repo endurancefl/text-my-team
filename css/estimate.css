@@ -3862,6 +3862,176 @@ select option:checked {
   color: var(--text-primary);
 }
 
+/* ─── ENH Material & Subcontractor Rows ─── */
+.row-enh-section-header td {
+  padding: 6px 8px !important;
+  border-bottom: 1px solid var(--border-light) !important;
+  background: #f8f9fa;
+}
+.enh-section-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+}
+.enh-section-count {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+.row-enh-material td,
+.row-enh-sub td {
+  padding: 3px 6px !important;
+  font-size: 12px;
+  background: #fafbfc;
+  border-bottom: 1px solid var(--border-lighter, #f0f0f0) !important;
+}
+.enh-material-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-left: 24px;
+}
+.plant-link-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  background: #E8F5E9;
+  color: #2E7D32;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.row-enh-subtotal td {
+  padding: 4px 8px !important;
+  font-size: 11px;
+  background: #f8f9fa;
+  border-bottom: 1px solid var(--border-light) !important;
+}
+.row-enh-add td {
+  padding: 4px 8px !important;
+  background: #fafbfc;
+  border-bottom: 1px solid var(--border-light) !important;
+}
+.division-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.division-badge.div-enh {
+  background: #E8F5E9;
+  color: #2E7D32;
+}
+.division-badge.div-mnt {
+  background: #E3F2FD;
+  color: #1565C0;
+}
+
+/* ─── Plant Catalog ─── */
+.plant-catalog-container {
+  padding: 0;
+}
+.plant-catalog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.plant-catalog-search {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+  min-width: 200px;
+}
+.plant-catalog-actions {
+  display: flex;
+  gap: 8px;
+}
+.plant-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-light, #f0f0f0);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.plant-card:hover {
+  background: #f8f9fa;
+}
+.plant-thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.plant-thumb-placeholder {
+  width: 56px;
+  height: 56px;
+  border-radius: 6px;
+  background: #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.plant-card-info {
+  flex: 1;
+  min-width: 0;
+}
+.plant-card-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+.plant-card-botanical {
+  font-size: 12px;
+  font-style: italic;
+  color: var(--text-secondary);
+}
+.plant-card-category {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.plant-card-sizes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.plant-size-chip {
+  display: inline-block;
+  padding: 2px 6px;
+  background: #E8F5E9;
+  color: #2E7D32;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 500;
+}
+.plant-size-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
 /* Add Service Button */
 .add-service-row {
   padding: 12px 16px;
@@ -6526,6 +6696,14 @@ select option:checked {
 }
 .wt-schedule-btn:hover:not(.active) {
   background: var(--bg-table-row-hover);
+}
+
+/* Milestone Phase Cards */
+.milestone-phase-card {
+  transition: box-shadow 0.15s ease;
+}
+.milestone-phase-card:hover {
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
 }
 
 /* Deposit Display */

@@ -17,12 +17,12 @@ The platform supports four divisions, each representing a distinct revenue strea
 | MNT | Maintenance | Recurring lawn care, mowing, edging, blowing, hedges, weed control, irrigation inspections, mulch | **Built** (estimate.html prototype) |
 | IRR | Irrigation | Irrigation system install, repair, retrofit, drip conversion, backflow testing | Planned |
 | CON | Construction | Hardscape, retaining walls, drainage, grading, sod installation, tree planting | Planned |
-| ENH | Enhancement | Landscape enhancements beyond maintenance — large mulch jobs, seasonal color installs, planting projects, landscape renovations | Planned |
+| ENH | Enhancement | Landscape enhancements beyond maintenance — large mulch jobs, seasonal color installs, planting projects, landscape renovations | **Built** (estimate.html prototype) |
 
 **Shared architecture, division-specific content:** All four divisions use the same estimating engine (items × production rates ÷ difficulty → hours → markups → price). The differences are in what items exist, what services are offered, and how takeoffs feed data. A single estimate can only belong to one division, but a property can have contracts across multiple divisions.
 
 **What's the same across all divisions:**
-- Item Catalog structure (item, unit, easy/medium/hard production rates, category)
+- Item Catalog structure (item, unit, easy/medium/hard production rates, category, type, division)
 - Service Catalog structure (services with line items, visits, billing tiers)
 - Bid calculation engine (quantities ÷ rates → hours → labor cost × markup → bid price)
 - Three-tier billing (Fixed, Billed Separately, Recommended)
@@ -164,8 +164,8 @@ text-my-team/
 - iOS design system: SF Pro typography, exact system colors, dark mode, frosted glass tab bar with `backdrop-filter`, iOS spring animations, 44px touch targets, `prefers-reduced-motion` support
 - Bottom tab bar: Schedule (home) | Requests | Report Issue | Reports
 
-**estimate.html + estimate.css — Bidding & Estimating Tool (~18,148 lines HTML/JS + ~7,065 lines CSS)**
-- **Division: Maintenance (MNT) fully built** — Irrigation, Construction, and Enhancement divisions planned, will reuse the same engine with division-specific catalogs and takeoffs
+**estimate.html + estimate.css — Bidding & Estimating Tool (~19,500+ lines HTML/JS + ~7,100+ lines CSS)**
+- **Divisions: Maintenance (MNT) and Enhancement (ENH) fully built** — Irrigation and Construction divisions planned, will reuse the same engine with division-specific catalogs and takeoffs
 - **Job Type Selection** ✅ **BUILT**: When creating a new estimate, the user first picks a job type via the Job Type Picker modal:
   - **Recurring Service** — Ongoing contract with scheduled visits throughout the year (existing flow, unchanged)
   - **Work Ticket** — One-off billable job with single visit or multi-day schedule
@@ -187,8 +187,9 @@ text-my-team/
   |---------------|-------------|-------------------|
   | **Single Visit** | Small jobs done in one trip | One ticket with all services, one date |
   | **Multi-Day** | Simple labor spanning consecutive days | N consecutive business day tickets. Estimator picks start date + number of days (2-30). Hours split evenly by default, manually editable per-day allocation. |
+  | **Milestone** | Complex projects with distinct, non-consecutive phases (ENH only) | One ticket per phase. User defines phases with dates and assigns line items (labor, material, sub rows) to each phase. Earned value splits proportionally by assigned hours. |
 
-  **Milestone** schedule type (complex projects with distinct phases) is planned but not yet built.
+  Milestone schedule type is only available when `division === 'ENH'`. MNT work tickets show only Single Visit and Multi-Day.
 
   **Work Ticket Deposit System** ✅ **BUILT**: Optional deposit/final payment split:
   - Checkbox: "Collect deposit upfront?"
@@ -207,8 +208,12 @@ text-my-team/
   **Key Functions** ✅ **BUILT**:
   - `openJobTypePicker()` / `closeJobTypePicker()` / `selectJobType(type)` — Job type picker modal
   - `adaptBuilderForJobType()` — Adapts builder UI based on jobType
-  - `setScheduleType(type)` — Toggles between single_visit and multi_day
+  - `setScheduleType(type)` — Toggles between single_visit, multi_day, and milestone
   - `renderMultiDayAllocation()` — Per-day hour allocation table for multi-day
+  - `generateMilestoneTickets()` — Generates one ticket per milestone phase (ENH only)
+  - `addMilestonePhase()` / `removeMilestonePhase()` / `updateMilestonePhase()` — Phase CRUD
+  - `renderMilestonePhases()` — Renders phase cards with line item assignment UI
+  - `addMilestoneItem()` / `removeMilestoneItem()` — Assign/unassign line items to phases
   - `getBusinessDays(startDate, count)` — Returns consecutive weekday dates
   - `generateWorkTickets()` — Generates 1 or N tickets based on schedule type
   - `finalizeWorkTicket()` — Creates contract + tickets with work ticket metadata
@@ -217,12 +222,13 @@ text-my-team/
   **Data Model** — `currentEstimate.workTicket` sub-object:
   ```javascript
   workTicket: {
-    scheduleType: 'single_visit',  // 'single_visit' | 'multi_day'
+    scheduleType: 'single_visit',  // 'single_visit' | 'multi_day' | 'milestone'
     projectName: '',
     scheduledDate: '',             // Single visit date
     startDate: '',                 // Multi-day start
     numDays: 2,                    // Multi-day count (2-30)
     hoursPerDay: [],               // Manual per-day allocation
+    phases: [],                    // Milestone phases: [{phaseId, label, date, lineItemAssignments}]
     depositPercent: 25,            // Editable deposit % (default 25%)
     collectDeposit: false          // Whether to collect deposit
   }
@@ -237,6 +243,62 @@ text-my-team/
   **Crew App Integration**: Work ticket tickets appear as normal stop cards via `getCrewSchedule()` — no crew.html changes needed. Tickets carry `jobType`, `dayNumber`, `totalDays`, `projectName` metadata.
 
   **Sidebar Rename**: "Work Tickets" sidebar item renamed to "Reminders" to avoid confusion with the new Work Ticket job type.
+
+- **ENH (Enhancement) Division** ✅ **BUILT** (Mar 2026): Full Enhancement division implementation extending the MNT estimating engine with division-specific catalogs, takeoffs, material/subcontractor line items, plant catalog, and milestone scheduling.
+
+  **Division Registration:**
+  - `currentEstimate.division` stores codes (`'MNT'`, `'ENH'`); null/undefined/missing defaults to MNT (backward compatibility)
+  - Item catalog, service catalog, and service picker filter by `currentEstimate.division`
+  - ENH estimates auto-set `jobType: 'work_ticket'` and `scheduleType: 'single_visit'` — skip job type picker
+  - Division badge shown on estimate cards for non-MNT bids (`.division-badge.div-enh`, purple)
+
+  **ENH Item Catalog (24 labor items, `division: 'ENH'`):**
+  - **Mulch** (3): Mulch Installation, Bed Edging/Re-cutting, Bed Cleanup/Debris Removal
+  - **Color & Annuals** (4): Annual Color Install 4"/1 gal, Color Removal/Swap, Perennial Install
+  - **Planting** (10): Shrub Install 1/3/5/7/15 gal, Ornamental Grass, Ground Cover, Tree Install 15/25 gal, Tree Staking
+  - **Renovation** (7): Sod Installation, Soil Amendment/Till, Landscape Fabric, Rock/Stone Mulch, Plant Removal Shrub/Tree, Grade & Shape Bed
+
+  **ENH Service Catalog (4 services, `division: 'ENH'`, `singleTier: true`):**
+  - Mulch Installation (SVC-ENH-001), Seasonal Color Install (SVC-ENH-002), Planting/Bed Install (SVC-ENH-003), Landscape Renovation (SVC-ENH-004)
+
+  **ENH Material Line Items** — per-line material rows within services (distinct from MNT aggregate `calcServiceMaterialCost()`):
+  - Schema: `{ materialRowId, description, quantity, unit, unitCost, markup (default 20%), billedPrice, plantCatalogId? }`
+  - Functions: `addENHMaterial()`, `removeENHMaterial()`, `calcENHMaterialsBilled()`, `calcENHMaterialsCost()`
+  - Renders as sub-section below labor line items in service table
+
+  **ENH Subcontractor Line Items** — per-line sub rows within services (distinct from `isSubcontractor: true` whole-service model):
+  - Schema: `{ subRowId, description, cost, markup (default 15%), billedPrice }`
+  - Functions: `addENHSubcontractor()`, `removeENHSubcontractor()`, `calcENHSubsBilled()`, `calcENHSubsCost()`
+  - Renders as sub-section below materials in service table
+
+  **ENH Takeoff Sections** (`ENH_DEFAULT_SECTIONS` array, selected via `getActiveSections()` when `division === 'ENH'`):
+  - **enhMulch**: Bed area SF + depth → auto-convert `cubicYards = (SF × depth) / 324`, edging LF
+  - **enhColor**: 4" pots, 1 gal pots, removals count
+  - **enhPlanting**: 11 inputs (shrub sizes 1-15 gal, ornamental grass, ground cover SF, perennial, tree 15/25 gal, staking)
+  - **enhRenovation**: Sod SF, bed area SF, shrub removals, tree removals
+
+  **Plant Catalog** — standalone plant database, new sidebar nav item:
+  - Backend: "Plant Catalog" sheet with columns: `plantId | commonName | botanicalName | category | sizes (JSON) | photoFileId | notes | createdAt | updatedAt`
+  - Photos stored in Google Drive via `uploadPlantPhoto` endpoint (file IDs, not base64)
+  - Frontend: Full CRUD, search/filter, photo upload, CSV import stub, inline size editing
+  - Functions: `loadAndRenderPlantCatalog()`, `renderPlantCatalog()`, `filterPlantCatalog()`, `showPlantForm()`, `savePlantEntry()`, `deletePlant()`, `showPlantImportModal()`, `parsePlantImportCSV()`, `confirmPlantImport()`
+  - Backend endpoints: `getPlantCatalog` (GET), `savePlantEntry` (POST), `deletePlantEntry` (POST), `uploadPlantPhoto` (POST)
+
+  **ENH Bid Calculation** — extends `calculateBidTotals()` with guarded `division === 'ENH'` branch:
+  - ENH total = labor billed + ENH materials billed + ENH subcontractors billed
+  - ENH materials use 20% markup (vs MNT's 100% aggregate markup)
+  - ENH subs use 15% markup per line (vs MNT's 10% whole-service markup)
+
+  **PDF Output** — `generateContractPdf()` extended:
+  - Services payload includes `materials[]` and `subcontractors[]` arrays for ENH services
+  - Metadata includes `division` field for template branching in Lambda
+
+  **MARVIN Context** — `buildMarvinContext()` extended for ENH:
+  - Includes `division`, `jobType`, material rows, subcontractor rows per service
+  - Includes `workTicket.phases` for milestone schedules
+  - Includes linked plant catalog entries referenced in material rows
+
+  **CSS classes**: `.row-enh-section-header`, `.row-enh-material`, `.row-enh-sub`, `.row-enh-subtotal`, `.row-enh-add`, `.enh-section-label`, `.enh-material-name`, `.plant-link-badge`, `.milestone-phase-card`, `.plant-catalog-container`, `.plant-card`, `.plant-thumb`, `.plant-size-chip`
 
 - Two-panel Google Workspace + Vignelli design system layout (sidebar + main content). **Design system overhaul (Feb 2026)**: Complete CSS redesign following Massimo Vignelli structural principles + Google Workspace density. Design spec: `docs/design-spec-platform.md`. **Key design tokens**: `--rule-heavy: 2px solid #202124` (Vignelli heavy rule under headers/between sections), `--font-display: Google Sans` (page titles only, 22px), `--font-body: Roboto` (everything else), 14px body text, 13px table cells, 32px buttons/inputs, 28px bid builder rows, 48px header. **Sidebar**: 256px, Gmail-style pill nav items (`border-radius: 0 16px 16px 0`), grouped with 11px uppercase section labels (OPERATIONS, FINANCIALS, CONFIGURATION). **Color palette**: Google's exact blue (#1A73E8), semantic badge colors (green-light/red-light/yellow-light/blue-lighter backgrounds), Google's two-layer shadow system. **Spreadsheet-cell editing**: transparent inputs with blue-lighter hover hint, 2px solid blue border on focus (Google Sheets style). **CSS layout chain**: `.app-container` (flex row, 100vh) → `.sidebar` (fixed 256px) + `.main-content` (flex: 1, `display: flex; flex-direction: column`). `.main-header` (48px, `border-bottom: var(--rule-heavy)`, z-index: 2) sits at top. `.main-body` (`position: relative; flex: 1; overflow: hidden`) contains all `.view` panels as direct children. `.view.active` has `height: 100%; overflow-y: auto; padding: 16px` — each view fills main-body and scrolls independently. **Summary panel removed** (Feb 2026) — rate overrides (labor rate, labor markup, material markup, sub markup, travel %) integrated into the contract/project settings card as a collapsible `<details>` section, shared by both recurring and work ticket modes.
 - **Two-Tier Estimate Header** ✅ **BUILT** (Mar 2026): Replaced cluttered single-row header with a state-driven two-tier layout for the builder view:
@@ -268,7 +330,7 @@ text-my-team/
   - Weed Control: percentage liquid vs. hand weeding → separate line items
   - Seasonal Color: flowers ÷ flowers per flat → Spring/Fall items
   - Leaf Cleanup: canopy coverage × SF per bag → cleanup + hauling items
-- **Item Catalog**: 20+ items with production rates by difficulty (SF/Hour, LF/Hour), material pricing (purchase unit, cost per unit, coverage per unit, default depth)
+- **Item Catalog**: 20+ items with production rates by difficulty (SF/Hour, LF/Hour), material pricing (purchase unit, cost per unit, coverage per unit, default depth), type (Labor/Material), division (MNT/ENH/IRR/CON). Backend returns `rowIndex` for each item to support add/update/delete operations
 - **Service Catalog**: Pre-configured service templates with default visits, billing tiers, proposal names, descriptions (rich text via Quill.js editor), map colors, line item assignments, duration type (scalable or fixed)
 - **Template System**: Save/load estimate structures (services, tiers, visits, travel %, contract duration), excludes property-specific data
 - **Contract Settings**: Start/end dates, duration, payment months, price increase %, payment terms (Net 30, etc.), "Edit Terms & Conditions" button (opens Quill.js rich text editor modal). CC processing fee % and gross-up toggle removed — CC fee handling is now captured during the contract signing flow (auto-pay setup with card vs ACH payment methods).
@@ -377,12 +439,13 @@ text-my-team/
 | Endpoint | Source | Description |
 |----------|--------|-------------|
 | `getInitData` | Estimating | **Bulk init** — returns all estimating data in a single request (itemCatalog, bidSettings, bids, templates, serviceCatalog, contacts, properties, propertyContacts, subContractors, reminders, contracts). Contracts load before bids so the estimates list can filter out fully-contracted bids. Reduces 10+ network round-trips to 1. |
-| `getItemCatalog` | Estimating | Returns item catalog with production rates |
+| `getItemCatalog` | Estimating | Returns item catalog with production rates, type, division, and rowIndex (1-based sheet row for updates/deletes) |
 | `getBidSettings` | Estimating | Returns settings key-value pairs |
 | `getBids` | Estimating | Returns all bids |
 | `getTemplates` | Estimating | Returns all templates |
 | `getTemplate` | Estimating | Returns single template by ID |
-| `getServiceCatalog` | Estimating | Returns service catalog (includes `durationType` if "Duration Type" column exists) |
+| `getServiceCatalog` | Estimating | Returns service catalog (includes `durationType` and `division` if columns exist) |
+| `getPlantCatalog` | Estimating | Returns all plant catalog entries with parsed sizes JSON |
 | `getContracts` | Estimating | Returns all contracts (includes pdfUrl, pdfFileId) |
 | `getContacts` | Estimating | Returns all contacts from the Contacts sheet (auto-creates sheet if missing) |
 | `getCrews` | Crew | Returns crew names + crewSizes (active member counts per crew) |
@@ -410,7 +473,7 @@ text-my-team/
 
 `getInitData` bulk response also includes `reminders: getReminders()` so estimate.html gets all reminders on load.
 
-**POST endpoints (50):**
+**POST endpoints (52):**
 | Endpoint | Source | Description |
 |----------|--------|-------------|
 | `saveReminder` | Reminders | Creates a reminder in the Reminders sheet with auto-generated REM-0001 format ID. Fields: propertyAddress, propertyId, description, scheduledDate, isPermanent, createdBy, createdByPhone, assignedCrew, photoUrl |
@@ -442,7 +505,12 @@ text-my-team/
 | `saveBidSettings` | Estimating | Saves settings key-value pairs |
 | `saveTemplate` | Estimating | Creates or updates template |
 | `deleteTemplate` | Estimating | Deletes template by ID |
+| `addItem` | Estimating | Adds a new item to the Item Catalog sheet. Writes all fields (item, unit, easy/medium/hard, category, type, division, material fields). Division defaults to 'MNT' if not provided |
+| `updateItem` | Estimating | Updates an existing item in the Item Catalog sheet by rowIndex. Preserves existing values for fields not provided. Division defaults to existing value or 'MNT' |
 | `saveTakeoffSections` | Estimating | Upserts takeoff section configuration JSON for a division into TakeoffSections sheet (auto-creates sheet with division/configJSON/lastModified columns) |
+| `savePlantEntry` | Estimating | Upsert plant catalog entry by plantId (auto-creates Plant Catalog sheet if missing) |
+| `deletePlantEntry` | Estimating | Deletes plant catalog entry by plantId |
+| `uploadPlantPhoto` | Estimating | Uploads base64 image to Google Drive "Plant Photos" folder, returns fileId and thumbnailUrl |
 | `deleteBid` | Estimating | Deletes bid by ID |
 | `saveTimeEntry` | Crew | Creates time entry (day_clock, job, indirect, service). Accepts optional `estimatedHours` for service entries (auto-upgrades Estimated Hours column) |
 | `updateTimeEntry` | Crew | Updates existing time entry (fills in clockOut/duration/crewMembers/memberCount). Supports clearing clockOut (empty string) for undo operations. Finds by entryId or by crew+date+type fallback |
@@ -2615,8 +2683,8 @@ All sheets live in one spreadsheet with one Code.gs serving both estimate.html a
 **Existing Sheets:**
 | Sheet | Purpose |
 |-------|---------|
-| Item Catalog | Production rates by item, unit, difficulty (Easy/Medium/Hard) |
-| Service Catalog | Service definitions with line items, visits, billing tiers, duration type (scalable/fixed) |
+| Item Catalog | Production rates by item, unit, difficulty (Easy/Medium/Hard), type (Labor/Material), division (MNT/ENH/IRR/CON), material pricing fields |
+| Service Catalog | Service definitions with line items, visits, billing tiers, duration type (scalable/fixed), division (MNT/ENH/IRR/CON) |
 | Settings | Key-value pairs for bid defaults |
 | Bids | Saved estimates with financials (includes contractId, revisionCount, and status: Draft/Revision/Finalized) |
 | Templates | Reusable estimate structures |

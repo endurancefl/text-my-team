@@ -103,6 +103,10 @@ function doGet(e) {
       case 'getTakeoffSections':
         return jsonResponse(getTakeoffSections(e.parameter.division));
 
+      // ─── Plant Catalog ───
+      case 'getPlantCatalog':
+        return jsonResponse(getPlantCatalog());
+
       // ─── Invoicing ───
       case 'getInvoices':
         return jsonResponse(getInvoices(e));
@@ -171,8 +175,23 @@ function doPost(e) {
     if (data.deleteTemplate) {
       return jsonResponse(deleteTemplate(data.templateId));
     }
+    if (data.addItem) {
+      return jsonResponse(addCatalogItem(data));
+    }
+    if (data.updateItem) {
+      return jsonResponse(updateCatalogItem(data));
+    }
     if (data.saveTakeoffSections) {
       return jsonResponse(saveTakeoffSections(data));
+    }
+    if (data.savePlantEntry) {
+      return jsonResponse(savePlantEntry(data));
+    }
+    if (data.deletePlantEntry) {
+      return jsonResponse(deletePlantEntry(data.plantId));
+    }
+    if (data.uploadPlantPhoto) {
+      return jsonResponse(uploadPlantPhoto(data));
     }
     if (data.deleteBid) {
       return jsonResponse(deleteBid(data.bidId));
@@ -380,14 +399,16 @@ function getItemCatalog() {
     'Easy': 'easy',
     'Medium': 'medium',
     'Hard': 'hard',
-    'Category': 'category'
+    'Category': 'category',
+    'Type': 'type',
+    'Division': 'division'
   };
 
   for (var i = 1; i < data.length; i++) {
     var row = data[i];
     if (!row[0]) continue;
 
-    var item = {};
+    var item = { rowIndex: i + 1 }; // 1-based sheet row for updates/deletes
     headers.forEach(function(header, index) {
       var mappedKey = headerMap[header] || header;
       item[mappedKey] = row[index];
@@ -396,6 +417,230 @@ function getItemCatalog() {
   }
 
   return { success: true, items: items };
+}
+
+function addCatalogItem(data) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Item Catalog');
+  if (!sheet) return { success: false, error: 'Item Catalog sheet not found' };
+
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+
+  // Map frontend property names to sheet header names
+  var propertyToHeader = {
+    'item': 'Item',
+    'unit': 'Unit',
+    'easy': 'Easy',
+    'medium': 'Medium',
+    'hard': 'Hard',
+    'category': 'Category',
+    'type': 'Type',
+    'division': 'Division',
+    'purchaseUnit': 'Purchase Unit',
+    'costPerUnit': 'Cost Per Unit',
+    'coveragePerUnit': 'Coverage Per Unit',
+    'defaultDepth': 'Default Depth'
+  };
+
+  var headerToProperty = {};
+  Object.keys(propertyToHeader).forEach(function(prop) {
+    headerToProperty[propertyToHeader[prop]] = prop;
+  });
+
+  var rowData = headers.map(function(header) {
+    var prop = headerToProperty[header] || header;
+    if (prop === 'division') return data[prop] || 'MNT';
+    if (prop === 'addItem') return '';
+    return data[prop] !== undefined ? data[prop] : '';
+  });
+
+  sheet.appendRow(rowData);
+
+  return { success: true };
+}
+
+function updateCatalogItem(data) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Item Catalog');
+  if (!sheet) return { success: false, error: 'Item Catalog sheet not found' };
+
+  var rowIndex = parseInt(data.rowIndex);
+  if (!rowIndex || rowIndex < 2) return { success: false, error: 'Invalid row index' };
+
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+
+  // Map frontend property names to sheet header names
+  var propertyToHeader = {
+    'item': 'Item',
+    'unit': 'Unit',
+    'easy': 'Easy',
+    'medium': 'Medium',
+    'hard': 'Hard',
+    'category': 'Category',
+    'type': 'Type',
+    'division': 'Division',
+    'purchaseUnit': 'Purchase Unit',
+    'costPerUnit': 'Cost Per Unit',
+    'coveragePerUnit': 'Coverage Per Unit',
+    'defaultDepth': 'Default Depth'
+  };
+
+  var headerToProperty = {};
+  Object.keys(propertyToHeader).forEach(function(prop) {
+    headerToProperty[propertyToHeader[prop]] = prop;
+  });
+
+  var existingRow = sheet.getRange(rowIndex, 1, 1, headers.length).getValues()[0];
+
+  var rowData = headers.map(function(header, index) {
+    var prop = headerToProperty[header] || header;
+    if (prop === 'division') return data[prop] || existingRow[index] || 'MNT';
+    if (prop === 'updateItem') return '';
+    return data[prop] !== undefined ? data[prop] : existingRow[index];
+  });
+
+  sheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]);
+
+  return { success: true };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PLANT CATALOG
+// ═══════════════════════════════════════════════════════════════
+
+function getPlantCatalog() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Plant Catalog');
+  if (!sheet) return { success: true, plants: [] }; // No sheet yet = empty catalog
+
+  var data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return { success: true, plants: [] };
+
+  var headers = data[0];
+  var headerMap = {
+    'Plant ID': 'plantId',
+    'Common Name': 'commonName',
+    'Botanical Name': 'botanicalName',
+    'Category': 'category',
+    'Sizes': 'sizes',
+    'Photo File ID': 'photoFileId',
+    'Notes': 'notes',
+    'Created At': 'createdAt',
+    'Updated At': 'updatedAt'
+  };
+
+  var plants = [];
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    var plant = {};
+    headers.forEach(function(header, idx) {
+      var prop = headerMap[header];
+      if (prop) {
+        var val = row[idx];
+        if (prop === 'sizes') {
+          try { plant[prop] = typeof val === 'string' ? JSON.parse(val) : val; }
+          catch(e) { plant[prop] = []; }
+        } else {
+          plant[prop] = val;
+        }
+      }
+    });
+    if (plant.plantId) plants.push(plant);
+  }
+
+  return { success: true, plants: plants };
+}
+
+function savePlantEntry(data) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Plant Catalog');
+
+  // Create sheet if it doesn't exist
+  if (!sheet) {
+    sheet = ss.insertSheet('Plant Catalog');
+    sheet.appendRow(['Plant ID', 'Common Name', 'Botanical Name', 'Category', 'Sizes', 'Photo File ID', 'Notes', 'Created At', 'Updated At']);
+  }
+
+  var now = new Date().toISOString();
+  var plantId = data.plantId || 'PLT-' + Date.now();
+  var sizesJson = typeof data.sizes === 'string' ? data.sizes : JSON.stringify(data.sizes || []);
+
+  // Check for existing entry by plantId
+  var allData = sheet.getDataRange().getValues();
+  var headers = allData[0];
+  var plantIdCol = headers.indexOf('Plant ID');
+  var existingRow = -1;
+
+  for (var i = 1; i < allData.length; i++) {
+    if (allData[i][plantIdCol] === plantId) {
+      existingRow = i + 1; // 1-indexed sheet row
+      break;
+    }
+  }
+
+  var rowData = [
+    plantId,
+    data.commonName || '',
+    data.botanicalName || '',
+    data.category || '',
+    sizesJson,
+    data.photoFileId || '',
+    data.notes || '',
+    existingRow > 0 ? allData[existingRow - 1][headers.indexOf('Created At')] : now,
+    now
+  ];
+
+  if (existingRow > 0) {
+    sheet.getRange(existingRow, 1, 1, rowData.length).setValues([rowData]);
+  } else {
+    sheet.appendRow(rowData);
+  }
+
+  return { success: true, plantId: plantId };
+}
+
+function deletePlantEntry(plantId) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Plant Catalog');
+  if (!sheet) return { success: false, error: 'Plant Catalog sheet not found' };
+
+  var data = sheet.getDataRange().getValues();
+  var headers = data[0];
+  var plantIdCol = headers.indexOf('Plant ID');
+
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][plantIdCol] === plantId) {
+      sheet.deleteRow(i + 1);
+      return { success: true };
+    }
+  }
+
+  return { success: false, error: 'Plant not found' };
+}
+
+function uploadPlantPhoto(data) {
+  // Get or create the Plant Photos folder in the same Drive folder as the spreadsheet
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ssFile = DriveApp.getFileById(ss.getId());
+  var parentFolders = ssFile.getParents();
+  var parentFolder = parentFolders.hasNext() ? parentFolders.next() : DriveApp.getRootFolder();
+
+  var folderName = 'Plant Photos';
+  var folders = parentFolder.getFoldersByName(folderName);
+  var targetFolder = folders.hasNext() ? folders.next() : parentFolder.createFolder(folderName);
+
+  // Strip data URL prefix if present
+  var photoData = data.photo;
+  if (photoData && photoData.indexOf(',') !== -1) {
+    photoData = photoData.split(',')[1];
+  }
+
+  var filename = (data.commonName || 'Plant') + ' - ' + Date.now() + '.jpg';
+  var blob = Utilities.newBlob(Utilities.base64Decode(photoData), 'image/jpeg', filename);
+  var file = targetFolder.createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+  return {
+    success: true,
+    photoUrl: 'https://drive.google.com/uc?export=view&id=' + file.getId(),
+    fileId: file.getId()
+  };
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -424,7 +669,8 @@ function getServiceCatalog() {
     'Is Manual Entry': 'isManualEntry',
     'Sort Order': 'sortOrder',
     'Last Modified': 'lastModified',
-    'Duration Type': 'durationType'
+    'Duration Type': 'durationType',
+    'Division': 'division'
   };
 
   for (var i = 1; i < data.length; i++) {

@@ -98,6 +98,12 @@
           </svg>
           <span>Service Catalog</span>
         </div>
+        <div class="nav-item" data-view="plant-catalog">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+          </svg>
+          <span>Plant Catalog</span>
+        </div>
         <div class="nav-item" data-view="production">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
@@ -230,9 +236,10 @@
                   </div>
                   <div class="form-group" style="margin-bottom: 12px;">
                     <label class="form-label">Schedule Type</label>
-                    <div class="wt-schedule-type-picker">
+                    <div class="wt-schedule-type-picker" id="wt-schedule-type-picker">
                       <button class="wt-schedule-btn active" data-type="single_visit" onclick="setScheduleType('single_visit')">Single Visit</button>
                       <button class="wt-schedule-btn" data-type="multi_day" onclick="setScheduleType('multi_day')">Multi-Day</button>
+                      <button class="wt-schedule-btn" data-type="milestone" onclick="setScheduleType('milestone')" style="display:none;" id="wt-milestone-btn">Milestone</button>
                     </div>
                   </div>
                   <div id="wt-single-visit-fields">
@@ -253,6 +260,12 @@
                       </div>
                     </div>
                     <div id="wt-day-allocation" style="margin-bottom: 12px;"></div>
+                  </div>
+                  <div id="wt-milestone-fields" style="display: none;">
+                    <div style="font-size: 12px; font-weight: 600; color: #5f6368; margin-bottom: 8px;">Milestone Phases</div>
+                    <div style="font-size: 11px; color: #80868b; margin-bottom: 10px;">Define phases with non-consecutive dates. Assign line items to each phase.</div>
+                    <div id="wt-milestone-phases"></div>
+                    <button type="button" class="btn-text" style="font-size: 12px; color: #1A73E8; margin-top: 4px;" onclick="addMilestonePhase()">+ Add Phase</button>
                   </div>
                   <div class="form-group" style="margin-bottom: 12px; padding-top: 12px; border-top: 1px solid #eee;">
                     <div style="display: flex; align-items: center; gap: 8px;">
@@ -997,7 +1010,13 @@
           <div class="table-card">
             <div class="table-toolbar">
               <h3>Item Catalog</h3>
-              <button class="catalog-btn catalog-btn-add" id="add-catalog-item-btn">+ Add Item</button>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <select class="form-input" style="padding:4px 8px;font-size:13px;width:auto;" onchange="catalogDivisionFilter=this.value;renderCatalog()">
+                  <option value="MNT">MNT</option>
+                  <option value="ENH">ENH</option>
+                </select>
+                <button class="catalog-btn catalog-btn-add" id="add-catalog-item-btn">+ Add Item</button>
+              </div>
             </div>
             <div class="table-container">
               <table class="catalog-table">
@@ -1199,6 +1218,102 @@
         <!-- SERVICE CATALOG VIEW -->
         <div class="view" id="view-services">
           <div class="service-catalog-container" id="service-catalog-container"></div>
+        </div>
+
+        <!-- PLANT CATALOG VIEW -->
+        <div class="view" id="view-plant-catalog">
+          <div class="plant-catalog-container">
+            <div class="plant-catalog-header">
+              <div class="plant-catalog-search">
+                <input type="text" id="plant-search" class="form-input" placeholder="Search plants..." oninput="filterPlantCatalog()">
+                <select id="plant-category-filter" class="form-select" onchange="filterPlantCatalog()" style="width:auto;">
+                  <option value="">All Categories</option>
+                  <option value="Shrub">Shrub</option>
+                  <option value="Tree">Tree</option>
+                  <option value="Annual">Annual</option>
+                  <option value="Perennial">Perennial</option>
+                  <option value="Ornamental Grass">Ornamental Grass</option>
+                  <option value="Ground Cover">Ground Cover</option>
+                </select>
+              </div>
+              <div class="plant-catalog-actions">
+                <button class="btn btn-outline" onclick="showPlantImportModal()">Import CSV</button>
+                <button class="btn btn-primary" onclick="showPlantForm()">+ Add Plant</button>
+              </div>
+            </div>
+            <div id="plant-catalog-list"></div>
+          </div>
+
+          <!-- Plant Add/Edit Form Modal -->
+          <div id="plant-form-modal" class="modal-overlay" style="display:none;">
+            <div class="modal-content" style="max-width:520px;">
+              <div class="modal-header">
+                <h3 id="plant-form-title">Add Plant</h3>
+                <button class="modal-close" onclick="closePlantForm()">&times;</button>
+              </div>
+              <div class="modal-body" style="max-height:70vh;overflow-y:auto;">
+                <input type="hidden" id="plant-edit-id">
+                <div class="form-group">
+                  <label class="form-label">Common Name</label>
+                  <input type="text" id="plant-common-name" class="form-input" placeholder="e.g. Knockout Rose">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Botanical Name</label>
+                  <input type="text" id="plant-botanical-name" class="form-input" placeholder="e.g. Rosa 'Radrazz'">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Category</label>
+                  <select id="plant-category" class="form-select">
+                    <option value="Shrub">Shrub</option>
+                    <option value="Tree">Tree</option>
+                    <option value="Annual">Annual</option>
+                    <option value="Perennial">Perennial</option>
+                    <option value="Ornamental Grass">Ornamental Grass</option>
+                    <option value="Ground Cover">Ground Cover</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Photo</label>
+                  <div id="plant-photo-preview" style="margin-bottom:8px;"></div>
+                  <input type="file" id="plant-photo-input" accept="image/*" onchange="previewPlantPhoto(this)">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Notes</label>
+                  <textarea id="plant-notes" class="form-input" rows="2" placeholder="Optional notes"></textarea>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Sizes & Pricing</label>
+                  <div id="plant-sizes-list"></div>
+                  <button class="btn btn-outline" onclick="addPlantSizeRow()" style="margin-top:6px;font-size:12px;">+ Add Size</button>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closePlantForm()">Cancel</button>
+                <button class="btn btn-primary" onclick="savePlantEntry()">Save Plant</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Plant CSV Import Modal -->
+          <div id="plant-import-modal" class="modal-overlay" style="display:none;">
+            <div class="modal-content" style="max-width:600px;">
+              <div class="modal-header">
+                <h3>Import Plant Order</h3>
+                <button class="modal-close" onclick="closePlantImport()">&times;</button>
+              </div>
+              <div class="modal-body">
+                <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">
+                  Upload a CSV with columns: commonName, size, quantity, unitCost, supplier
+                </p>
+                <input type="file" id="plant-import-file" accept=".csv" onchange="parsePlantImportCSV(this)">
+                <div id="plant-import-preview" style="margin-top:12px;"></div>
+              </div>
+              <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closePlantImport()">Cancel</button>
+                <button class="btn btn-primary" id="plant-import-confirm-btn" onclick="confirmPlantImport()" disabled>Confirm Import</button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- PRODUCTION RATES VIEW -->
@@ -1979,7 +2094,7 @@
             <label class="form-label">Description (for proposal)</label>
             <div id="service-description-editor" style="height: 120px;"></div>
           </div>
-          <div class="service-details-row">
+          <div class="service-details-row" id="billing-tier-row">
             <div class="form-group">
               <label class="form-label">Billing Tier</label>
               <select class="form-select" id="service-billing-tier">
@@ -2681,7 +2796,35 @@ let itemCatalog = [
   { item: 'Pine Straw Application', type: 'Material', unit: 'SF/Hour', easy: 800, medium: 600, hard: 400, category: 'Pine Straw', purchaseUnit: 'Bale', costPerUnit: 8.00, coveragePerUnit: 50, defaultDepth: 3 },
   { item: 'Spring Seasonal Color', type: 'Material', unit: 'SF/Hour', easy: 200, medium: 150, hard: 100, category: 'Seasonal Color', purchaseUnit: 'Flat', costPerUnit: 25.00, coveragePerUnit: 12, defaultDepth: 0 },
   { item: 'Fall Seasonal Color', type: 'Material', unit: 'SF/Hour', easy: 200, medium: 150, hard: 100, category: 'Seasonal Color', purchaseUnit: 'Flat', costPerUnit: 25.00, coveragePerUnit: 12, defaultDepth: 0 },
-  { item: 'Pre-Emergent Granular', type: 'Material', unit: 'SF/Hour', easy: 2000, medium: 1500, hard: 1000, category: 'Pre-Emergent', purchaseUnit: 'Bag', costPerUnit: 35.00, coveragePerUnit: 5000, defaultDepth: 0 }
+  { item: 'Pre-Emergent Granular', type: 'Material', unit: 'SF/Hour', easy: 2000, medium: 1500, hard: 1000, category: 'Pre-Emergent', purchaseUnit: 'Bag', costPerUnit: 35.00, coveragePerUnit: 5000, defaultDepth: 0 },
+  // ─── ENH Division: Mulch ───
+  { item: 'Mulch Installation', type: 'Labor', unit: 'Yards/Hour', easy: 2.5, medium: 1.8, hard: 1.2, category: 'Mulch', division: 'ENH' },
+  { item: 'Mulch Bed Edging / Re-cutting', type: 'Labor', unit: 'LF/Hour', easy: 200, medium: 150, hard: 100, category: 'Mulch', division: 'ENH' },
+  { item: 'Bed Cleanup / Debris Removal', type: 'Labor', unit: 'SF/Hour', easy: 800, medium: 500, hard: 300, category: 'Mulch', division: 'ENH' },
+  // ─── ENH Division: Color & Annuals ───
+  { item: 'Annual Color Install — 4" pot', type: 'Labor', unit: 'Each/Hour', easy: 30, medium: 22, hard: 15, category: 'Color & Annuals', division: 'ENH' },
+  { item: 'Annual Color Install — 1 gal', type: 'Labor', unit: 'Each/Hour', easy: 20, medium: 15, hard: 10, category: 'Color & Annuals', division: 'ENH' },
+  { item: 'Annual Color Removal / Swap', type: 'Labor', unit: 'Each/Hour', easy: 40, medium: 30, hard: 20, category: 'Color & Annuals', division: 'ENH' },
+  { item: 'Perennial Install', type: 'Labor', unit: 'Each/Hour', easy: 12, medium: 8, hard: 5, category: 'Color & Annuals', division: 'ENH' },
+  // ─── ENH Division: Planting ───
+  { item: 'Shrub Install — 1 gal', type: 'Labor', unit: 'Each/Hour', easy: 12, medium: 8, hard: 5, category: 'Planting', division: 'ENH' },
+  { item: 'Shrub Install — 3 gal', type: 'Labor', unit: 'Each/Hour', easy: 8, medium: 6, hard: 4, category: 'Planting', division: 'ENH' },
+  { item: 'Shrub Install — 5 gal', type: 'Labor', unit: 'Each/Hour', easy: 5, medium: 4, hard: 2.5, category: 'Planting', division: 'ENH' },
+  { item: 'Shrub Install — 7 gal', type: 'Labor', unit: 'Each/Hour', easy: 4, medium: 3, hard: 2, category: 'Planting', division: 'ENH' },
+  { item: 'Shrub Install — 15 gal', type: 'Labor', unit: 'Each/Hour', easy: 2.5, medium: 2, hard: 1.2, category: 'Planting', division: 'ENH' },
+  { item: 'Ornamental Grass Install', type: 'Labor', unit: 'Each/Hour', easy: 10, medium: 7, hard: 4, category: 'Planting', division: 'ENH' },
+  { item: 'Ground Cover Install', type: 'Labor', unit: 'SF/Hour', easy: 100, medium: 70, hard: 40, category: 'Planting', division: 'ENH' },
+  { item: 'Tree Install — 15 gal', type: 'Labor', unit: 'Each/Hour', easy: 2, medium: 1.5, hard: 1, category: 'Planting', division: 'ENH' },
+  { item: 'Tree Install — 25 gal', type: 'Labor', unit: 'Each/Hour', easy: 1.5, medium: 1, hard: 0.5, category: 'Planting', division: 'ENH' },
+  { item: 'Tree Staking', type: 'Labor', unit: 'Each/Hour', easy: 4, medium: 3, hard: 2, category: 'Planting', division: 'ENH' },
+  // ─── ENH Division: Renovation ───
+  { item: 'Sod Installation', type: 'Labor', unit: 'SF/Hour', easy: 300, medium: 200, hard: 120, category: 'Renovation', division: 'ENH' },
+  { item: 'Soil Amendment / Till', type: 'Labor', unit: 'SF/Hour', easy: 400, medium: 250, hard: 150, category: 'Renovation', division: 'ENH' },
+  { item: 'Landscape Fabric Install', type: 'Labor', unit: 'SF/Hour', easy: 500, medium: 350, hard: 200, category: 'Renovation', division: 'ENH' },
+  { item: 'Rock / Stone Mulch Install', type: 'Labor', unit: 'SF/Hour', easy: 150, medium: 100, hard: 60, category: 'Renovation', division: 'ENH' },
+  { item: 'Plant Removal — Shrub', type: 'Labor', unit: 'Each/Hour', easy: 6, medium: 4, hard: 2, category: 'Renovation', division: 'ENH' },
+  { item: 'Plant Removal — Tree', type: 'Labor', unit: 'Each/Hour', easy: 2, medium: 1, hard: 0.5, category: 'Renovation', division: 'ENH' },
+  { item: 'Grade & Shape Bed', type: 'Labor', unit: 'SF/Hour', easy: 300, medium: 200, hard: 100, category: 'Renovation', division: 'ENH' }
 ];
 let bidSettings = {
   laborRate: 22.50,
@@ -2731,6 +2874,7 @@ let wtFilter = 'active';        // 'active', 'permanent', 'completed', 'all'
 
 // Current estimate state
 let currentEstimate = {
+  division: 'MNT',  // 'MNT' or 'ENH' — null/undefined treated as MNT everywhere
   propertyType: 'Residential',
   propertyAddress: '',
   propertyId: '',
@@ -3161,6 +3305,87 @@ const DEFAULT_SERVICE_CATALOG = [
     items: [],
     isManualEntry: true,
     sortOrder: 5
+  },
+  // ─── ENH Division Services ───
+  {
+    serviceId: 'SVC-ENH-001',
+    sectionName: 'Enhancement Services',
+    serviceName: 'Mulch Installation',
+    defaultVisits: 1,
+    defaultBillingTier: 'fixed',
+    defaultProposalName: 'Mulch Installation',
+    defaultDescription: 'Professional mulch installation including bed edging, debris removal, and mulch application to all designated landscape beds.',
+    defaultMapColor: 'orange',
+    division: 'ENH',
+    singleTier: true,
+    items: [
+      { itemName: 'Mulch Installation', measurementSource: 'ENH Mulch', sortOrder: 1 },
+      { itemName: 'Mulch Bed Edging / Re-cutting', measurementSource: 'ENH Mulch', sortOrder: 2 },
+      { itemName: 'Bed Cleanup / Debris Removal', measurementSource: 'ENH Mulch', sortOrder: 3 }
+    ],
+    sortOrder: 1
+  },
+  {
+    serviceId: 'SVC-ENH-002',
+    sectionName: 'Enhancement Services',
+    serviceName: 'Seasonal Color Install',
+    defaultVisits: 1,
+    defaultBillingTier: 'fixed',
+    defaultProposalName: 'Seasonal Color Installation',
+    defaultDescription: 'Removal of existing annuals and installation of fresh seasonal color plants for vibrant landscape displays.',
+    defaultMapColor: 'pink',
+    division: 'ENH',
+    singleTier: true,
+    items: [
+      { itemName: 'Annual Color Install — 4" pot', measurementSource: 'ENH Color', sortOrder: 1 },
+      { itemName: 'Annual Color Install — 1 gal', measurementSource: 'ENH Color', sortOrder: 2 },
+      { itemName: 'Annual Color Removal / Swap', measurementSource: 'ENH Color', sortOrder: 3 }
+    ],
+    sortOrder: 2
+  },
+  {
+    serviceId: 'SVC-ENH-003',
+    sectionName: 'Enhancement Services',
+    serviceName: 'Planting / Bed Install',
+    defaultVisits: 1,
+    defaultBillingTier: 'fixed',
+    defaultProposalName: 'Planting / Bed Installation',
+    defaultDescription: 'Professional installation of shrubs, trees, perennials, ornamental grasses, and ground cover per landscape plan.',
+    defaultMapColor: 'green',
+    division: 'ENH',
+    singleTier: true,
+    items: [
+      { itemName: 'Shrub Install — 1 gal', measurementSource: 'ENH Planting', sortOrder: 1 },
+      { itemName: 'Shrub Install — 3 gal', measurementSource: 'ENH Planting', sortOrder: 2 },
+      { itemName: 'Shrub Install — 5 gal', measurementSource: 'ENH Planting', sortOrder: 3 },
+      { itemName: 'Shrub Install — 7 gal', measurementSource: 'ENH Planting', sortOrder: 4 },
+      { itemName: 'Shrub Install — 15 gal', measurementSource: 'ENH Planting', sortOrder: 5 },
+      { itemName: 'Ornamental Grass Install', measurementSource: 'ENH Planting', sortOrder: 6 },
+      { itemName: 'Ground Cover Install', measurementSource: 'ENH Planting', sortOrder: 7 },
+      { itemName: 'Perennial Install', measurementSource: 'ENH Planting', sortOrder: 8 }
+    ],
+    sortOrder: 3
+  },
+  {
+    serviceId: 'SVC-ENH-004',
+    sectionName: 'Enhancement Services',
+    serviceName: 'Landscape Renovation',
+    defaultVisits: 1,
+    defaultBillingTier: 'fixed',
+    defaultProposalName: 'Landscape Renovation',
+    defaultDescription: 'Complete landscape renovation including plant removal, grading, soil preparation, sod installation, and landscape fabric.',
+    defaultMapColor: 'yellow',
+    division: 'ENH',
+    singleTier: true,
+    items: [
+      { itemName: 'Plant Removal — Shrub', measurementSource: 'ENH Renovation', sortOrder: 1 },
+      { itemName: 'Plant Removal — Tree', measurementSource: 'ENH Renovation', sortOrder: 2 },
+      { itemName: 'Grade & Shape Bed', measurementSource: 'ENH Renovation', sortOrder: 3 },
+      { itemName: 'Soil Amendment / Till', measurementSource: 'ENH Renovation', sortOrder: 4 },
+      { itemName: 'Sod Installation', measurementSource: 'ENH Renovation', sortOrder: 5 },
+      { itemName: 'Landscape Fabric Install', measurementSource: 'ENH Renovation', sortOrder: 6 }
+    ],
+    sortOrder: 4
   }
 ];
 
@@ -4387,8 +4612,135 @@ const MNT_DEFAULT_SECTIONS = [
   }
 ];
 
+// ─── ENH Division Takeoff Sections ───
+const ENH_DEFAULT_SECTIONS = [
+  {
+    id: 'enhMulch', label: 'Mulch', type: 'calc', unit: 'YD',
+    enabled: true, isDefault: true, order: 0,
+    readRows(t, f) {
+      const enh = t.enhMulch || {};
+      const bedSF = enh.bedAreaSF || 0;
+      const depth = enh.depthInches || 3;
+      const yards = bedSF > 0 ? Math.round((bedSF / 324 * (depth / 12) * 27) * 100) / 100 : 0; // SF → cubic yards
+      const edging = enh.edgingLF || 0;
+      return [
+        { label: 'Bed Area', value: bedSF, field: 'bedAreaSF', unit: 'SF' },
+        { label: 'Depth', value: depth, field: 'depthInches', unit: 'in' },
+        { label: 'Yards Needed', value: yards, readonly: true, unit: 'YD' },
+        { label: 'Edging', value: edging, field: 'edgingLF', unit: 'LF' }
+      ];
+    },
+    readTotal(t, f) {
+      const enh = t.enhMulch || {};
+      const bedSF = enh.bedAreaSF || 0;
+      const depth = enh.depthInches || 3;
+      return bedSF > 0 ? Math.round((bedSF / 324 * (depth / 12) * 27) * 100) / 100 : 0;
+    },
+    summaryText(t, f) {
+      const enh = t.enhMulch || {};
+      const bedSF = enh.bedAreaSF || 0;
+      const depth = enh.depthInches || 3;
+      const yards = bedSF > 0 ? Math.round((bedSF / 324 * (depth / 12) * 27) * 100) / 100 : 0;
+      const edging = enh.edgingLF || 0;
+      const parts = [];
+      if (yards > 0) parts.push(`${yards} YD`);
+      if (edging > 0) parts.push(`${formatNum(edging)} LF edging`);
+      return parts.join(' · ');
+    }
+  },
+  {
+    id: 'enhColor', label: 'Color', type: 'calc', unit: 'EA',
+    enabled: true, isDefault: true, order: 1,
+    readRows(t, f) {
+      const enh = t.enhColor || {};
+      return [
+        { label: '4" Pots', value: enh.pots4in || 0, field: 'pots4in', unit: 'EA' },
+        { label: '1 Gal Pots', value: enh.pots1gal || 0, field: 'pots1gal', unit: 'EA' },
+        { label: 'Removals', value: enh.removals || 0, field: 'removals', unit: 'EA' }
+      ];
+    },
+    readTotal(t, f) {
+      const enh = t.enhColor || {};
+      return (enh.pots4in || 0) + (enh.pots1gal || 0) + (enh.removals || 0);
+    },
+    summaryText(t, f) {
+      const enh = t.enhColor || {};
+      const parts = [];
+      if (enh.pots4in > 0) parts.push(`${enh.pots4in} × 4"`);
+      if (enh.pots1gal > 0) parts.push(`${enh.pots1gal} × 1gal`);
+      if (enh.removals > 0) parts.push(`${enh.removals} removals`);
+      return parts.join(' · ');
+    }
+  },
+  {
+    id: 'enhPlanting', label: 'Planting', type: 'calc', unit: 'EA',
+    enabled: true, isDefault: true, order: 2,
+    readRows(t, f) {
+      const enh = t.enhPlanting || {};
+      return [
+        { label: 'Shrub — 1 gal', value: enh.shrub1gal || 0, field: 'shrub1gal', unit: 'EA' },
+        { label: 'Shrub — 3 gal', value: enh.shrub3gal || 0, field: 'shrub3gal', unit: 'EA' },
+        { label: 'Shrub — 5 gal', value: enh.shrub5gal || 0, field: 'shrub5gal', unit: 'EA' },
+        { label: 'Shrub — 7 gal', value: enh.shrub7gal || 0, field: 'shrub7gal', unit: 'EA' },
+        { label: 'Shrub — 15 gal', value: enh.shrub15gal || 0, field: 'shrub15gal', unit: 'EA' },
+        { label: 'Ornamental Grass', value: enh.ornGrass || 0, field: 'ornGrass', unit: 'EA' },
+        { label: 'Ground Cover', value: enh.groundCover || 0, field: 'groundCover', unit: 'SF' },
+        { label: 'Perennial', value: enh.perennial || 0, field: 'perennial', unit: 'EA' },
+        { label: 'Tree — 15 gal', value: enh.tree15gal || 0, field: 'tree15gal', unit: 'EA' },
+        { label: 'Tree — 25 gal', value: enh.tree25gal || 0, field: 'tree25gal', unit: 'EA' },
+        { label: 'Tree Staking', value: enh.treeStaking || 0, field: 'treeStaking', unit: 'EA' }
+      ];
+    },
+    readTotal(t, f) {
+      const enh = t.enhPlanting || {};
+      return (enh.shrub1gal || 0) + (enh.shrub3gal || 0) + (enh.shrub5gal || 0) +
+             (enh.shrub7gal || 0) + (enh.shrub15gal || 0) + (enh.ornGrass || 0) +
+             (enh.groundCover || 0) + (enh.perennial || 0) + (enh.tree15gal || 0) +
+             (enh.tree25gal || 0) + (enh.treeStaking || 0);
+    },
+    summaryText(t, f) {
+      const enh = t.enhPlanting || {};
+      const total = (enh.shrub1gal || 0) + (enh.shrub3gal || 0) + (enh.shrub5gal || 0) +
+                    (enh.shrub7gal || 0) + (enh.shrub15gal || 0) + (enh.ornGrass || 0) +
+                    (enh.perennial || 0) + (enh.tree15gal || 0) + (enh.tree25gal || 0);
+      const parts = [];
+      if (total > 0) parts.push(`${total} plants`);
+      if (enh.groundCover > 0) parts.push(`${formatNum(enh.groundCover)} SF ground cover`);
+      if (enh.treeStaking > 0) parts.push(`${enh.treeStaking} staked`);
+      return parts.join(' · ');
+    }
+  },
+  {
+    id: 'enhRenovation', label: 'Renovation', type: 'calc', unit: 'SF',
+    enabled: true, isDefault: true, order: 3,
+    readRows(t, f) {
+      const enh = t.enhRenovation || {};
+      return [
+        { label: 'Sod Area', value: enh.sodSF || 0, field: 'sodSF', unit: 'SF' },
+        { label: 'Bed Area', value: enh.bedSF || 0, field: 'bedSF', unit: 'SF' },
+        { label: 'Shrub Removals', value: enh.shrubRemovals || 0, field: 'shrubRemovals', unit: 'EA' },
+        { label: 'Tree Removals', value: enh.treeRemovals || 0, field: 'treeRemovals', unit: 'EA' }
+      ];
+    },
+    readTotal(t, f) {
+      const enh = t.enhRenovation || {};
+      return (enh.sodSF || 0) + (enh.bedSF || 0);
+    },
+    summaryText(t, f) {
+      const enh = t.enhRenovation || {};
+      const parts = [];
+      if (enh.sodSF > 0) parts.push(`${formatNum(enh.sodSF)} SF sod`);
+      if (enh.bedSF > 0) parts.push(`${formatNum(enh.bedSF)} SF beds`);
+      const removals = (enh.shrubRemovals || 0) + (enh.treeRemovals || 0);
+      if (removals > 0) parts.push(`${removals} removals`);
+      return parts.join(' · ');
+    }
+  }
+];
+
 function getActiveSections() {
-  let sections = MNT_DEFAULT_SECTIONS.slice();
+  const isENH = (currentEstimate.division || 'MNT') === 'ENH';
+  let sections = isENH ? ENH_DEFAULT_SECTIONS.slice() : MNT_DEFAULT_SECTIONS.slice();
   if (!companyTakeoffSections) {
     // No backend config — apply default disabled sections
     sections = sections.filter(s => !DEFAULT_DISABLED_SECTIONS.includes(s.id));
@@ -4681,7 +5033,7 @@ function onTakeoffInput(input) {
   const f = currentEstimate.features || {};
 
   // Cap check for split sections
-  const secDef = MNT_DEFAULT_SECTIONS.find(s => s.id === section);
+  const secDef = MNT_DEFAULT_SECTIONS.find(s => s.id === section) || ENH_DEFAULT_SECTIONS.find(s => s.id === section);
   if (secDef && secDef.type === 'split' && secDef.parentMeasurement) {
     const parentTotal = secDef.parentMeasurement();
     if (parentTotal > 0 && field === 'pct') {
@@ -4775,6 +5127,31 @@ function onTakeoffInput(input) {
       if (field === 'overrideSF') t.mulchSub.overrideSF = rawVal;
       else if (field === 'coveragePerCY') t.mulchSub.coveragePerCY = rawVal;
       else if (field === 'costPerCY') t.mulchSub.costPerCY = rawVal;
+      break;
+    }
+    // ─── ENH Takeoff Sections ───
+    case 'enhMulch': {
+      if (!t.enhMulch) t.enhMulch = {};
+      if (field === 'bedAreaSF') t.enhMulch.bedAreaSF = rawVal;
+      else if (field === 'depthInches') t.enhMulch.depthInches = rawVal;
+      else if (field === 'edgingLF') t.enhMulch.edgingLF = rawVal;
+      break;
+    }
+    case 'enhColor': {
+      if (!t.enhColor) t.enhColor = {};
+      if (field === 'pots4in') t.enhColor.pots4in = rawVal;
+      else if (field === 'pots1gal') t.enhColor.pots1gal = rawVal;
+      else if (field === 'removals') t.enhColor.removals = rawVal;
+      break;
+    }
+    case 'enhPlanting': {
+      if (!t.enhPlanting) t.enhPlanting = {};
+      t.enhPlanting[field] = rawVal;
+      break;
+    }
+    case 'enhRenovation': {
+      if (!t.enhRenovation) t.enhRenovation = {};
+      t.enhRenovation[field] = rawVal;
       break;
     }
     default: {
@@ -5599,6 +5976,10 @@ function buildMarvinContext() {
     // Takeoff data
     ctx.takeoffs = currentEstimate.takeoffs;
 
+    // Division info
+    ctx.division = currentEstimate.division || 'MNT';
+    ctx.jobType = currentEstimate.jobType || 'recurring';
+
     // Services with full detail
     ctx.services = (currentEstimate.services || []).map(s => {
       if (typeof s === 'string') return { name: s };
@@ -5618,8 +5999,62 @@ function buildMarvinContext() {
           unit: li.unit || ''
         }));
       }
+      // ENH per-line material rows (distinct from MNT calcServiceMaterialCost aggregate)
+      if (s.materials && s.materials.length > 0) {
+        svc.materials = s.materials.map(m => ({
+          description: m.description || '',
+          quantity: m.quantity || 0,
+          unit: m.unit || '',
+          unitCost: m.unitCost || 0,
+          markup: m.markup || 0,
+          billedPrice: (m.quantity || 0) * (m.unitCost || 0) * (1 + (m.markup || 0.20)),
+          plantCatalogId: m.plantCatalogId || null
+        }));
+      }
+      // ENH per-line subcontractor rows (distinct from isSubcontractor:true whole-service model)
+      if (s.subcontractors && s.subcontractors.length > 0) {
+        svc.subcontractors = s.subcontractors.map(sub => ({
+          description: sub.description || '',
+          cost: sub.cost || 0,
+          markup: sub.markup || 0,
+          billedPrice: (sub.cost || 0) * (1 + (sub.markup || 0.15))
+        }));
+      }
       return svc;
     });
+
+    // ENH milestone phases (if applicable)
+    if (currentEstimate.jobType === 'work_ticket' && currentEstimate.workTicket) {
+      ctx.workTicket = {
+        scheduleType: currentEstimate.workTicket.scheduleType || 'single_visit',
+        projectName: currentEstimate.workTicket.projectName || ''
+      };
+      if (currentEstimate.workTicket.scheduleType === 'milestone' && currentEstimate.workTicket.phases) {
+        ctx.workTicket.phases = currentEstimate.workTicket.phases.map(p => ({
+          label: p.label || '',
+          date: p.date || '',
+          itemCount: (p.lineItemAssignments || []).length
+        }));
+      }
+    }
+
+    // Linked plant catalog entries for ENH estimates
+    if ((currentEstimate.division || 'MNT') === 'ENH' && typeof plantCatalog !== 'undefined' && plantCatalog.length > 0) {
+      // Only include plants that are referenced in material rows
+      const linkedPlantIds = new Set();
+      (currentEstimate.services || []).forEach(s => {
+        (s.materials || []).forEach(m => { if (m.plantCatalogId) linkedPlantIds.add(m.plantCatalogId); });
+      });
+      if (linkedPlantIds.size > 0) {
+        ctx.linkedPlants = plantCatalog.filter(p => linkedPlantIds.has(p.plantId)).map(p => ({
+          plantId: p.plantId,
+          commonName: p.commonName || '',
+          botanicalName: p.botanicalName || '',
+          category: p.category || '',
+          hasPhoto: !!p.photoFileId
+        }));
+      }
+    }
 
     // Contract settings
     ctx.contract = { ...currentEstimate.contract };
@@ -6388,7 +6823,8 @@ async function applyMarvinKBUpdate(data) {
 
 async function loadTakeoffSections() {
   try {
-    const resp = await fetch(GOOGLE_SHEETS_URL + '?action=getTakeoffSections&division=MNT');
+    const div = (currentEstimate && currentEstimate.division) || 'MNT';
+    const resp = await fetch(GOOGLE_SHEETS_URL + '?action=getTakeoffSections&division=' + encodeURIComponent(div));
     const data = await resp.json();
     if (data.success && data.configJSON) {
       companyTakeoffSections = typeof data.configJSON === 'string' ? JSON.parse(data.configJSON) : data.configJSON;
@@ -6400,13 +6836,14 @@ async function loadTakeoffSections() {
 
 async function saveTakeoffSectionsToBackend() {
   try {
+    const div = (currentEstimate && currentEstimate.division) || 'MNT';
     const cfg = typeof companyTakeoffSections === 'string' ? companyTakeoffSections : JSON.stringify(companyTakeoffSections);
     await fetch(GOOGLE_SHEETS_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         saveTakeoffSections: true,
-        division: 'MNT',
+        division: div,
         configJSON: cfg
       })
     });
@@ -6563,6 +7000,14 @@ function initializeTakeoffs() {
   if (ht.pctUnder4ft === undefined) ht.pctUnder4ft = 0;
   if (ht.pct4to6ft === undefined) ht.pct4to6ft = 0;
   if (ht.pctOver6ft === undefined) ht.pctOver6ft = 0;
+
+  // ─── ENH Takeoff Sections ───
+  if ((currentEstimate.division || 'MNT') === 'ENH') {
+    if (!currentEstimate.takeoffs.enhMulch) currentEstimate.takeoffs.enhMulch = { bedAreaSF: 0, depthInches: 3, edgingLF: 0 };
+    if (!currentEstimate.takeoffs.enhColor) currentEstimate.takeoffs.enhColor = { pots4in: 0, pots1gal: 0, removals: 0 };
+    if (!currentEstimate.takeoffs.enhPlanting) currentEstimate.takeoffs.enhPlanting = {};
+    if (!currentEstimate.takeoffs.enhRenovation) currentEstimate.takeoffs.enhRenovation = { sodSF: 0, bedSF: 0, shrubRemovals: 0, treeRemovals: 0 };
+  }
 }
 
 // Calculate lawn takeoff outputs for each equipment
@@ -6982,6 +7427,73 @@ function buildServicesFromTakeoffs() {
   // Inject hedge trimming outputs into Shrub Pruning Service
   injectItemsIntoService(hedgeTarget, hedgeTrimmingOutputs);
 
+  // ─── ENH Takeoff → Service Line Item Binding ───
+  if ((currentEstimate.division || 'MNT') === 'ENH') {
+    const enhT = currentEstimate.takeoffs || {};
+
+    // ENH Mulch takeoff → Mulch Installation service
+    if (enhT.enhMulch) {
+      const m = enhT.enhMulch;
+      const depth = m.depthInches || 3;
+      const yards = m.bedAreaSF > 0 ? Math.round((m.bedAreaSF / 324 * (depth / 12) * 27) * 100) / 100 : 0;
+      const enhMulchOutputs = filterToCatalog([
+        { itemName: 'Mulch Installation', sourceSection: 'enhMulch', quantities: { easy: yards, medium: 0, hard: 0 } },
+        { itemName: 'Mulch Bed Edging / Re-cutting', sourceSection: 'enhMulch', quantities: { easy: m.edgingLF || 0, medium: 0, hard: 0 } },
+        { itemName: 'Bed Cleanup / Debris Removal', sourceSection: 'enhMulch', quantities: { easy: m.bedAreaSF || 0, medium: 0, hard: 0 } }
+      ].filter(o => o.quantities.easy > 0));
+      injectItemsIntoService('Mulch Installation', enhMulchOutputs);
+    }
+
+    // ENH Color takeoff → Seasonal Color Install service
+    if (enhT.enhColor) {
+      const c = enhT.enhColor;
+      const enhColorOutputs = filterToCatalog([
+        { itemName: 'Annual Color Install — 4" pot', sourceSection: 'enhColor', quantities: { easy: c.pots4in || 0, medium: 0, hard: 0 } },
+        { itemName: 'Annual Color Install — 1 gal', sourceSection: 'enhColor', quantities: { easy: c.pots1gal || 0, medium: 0, hard: 0 } },
+        { itemName: 'Annual Color Removal / Swap', sourceSection: 'enhColor', quantities: { easy: c.removals || 0, medium: 0, hard: 0 } }
+      ].filter(o => o.quantities.easy > 0));
+      injectItemsIntoService('Seasonal Color Install', enhColorOutputs);
+    }
+
+    // ENH Planting takeoff → Planting / Bed Install service
+    if (enhT.enhPlanting) {
+      const p = enhT.enhPlanting;
+      const plantingMap = [
+        ['Shrub Install — 1 gal', p.shrub1gal],
+        ['Shrub Install — 3 gal', p.shrub3gal],
+        ['Shrub Install — 5 gal', p.shrub5gal],
+        ['Shrub Install — 7 gal', p.shrub7gal],
+        ['Shrub Install — 15 gal', p.shrub15gal],
+        ['Ornamental Grass Install', p.ornGrass],
+        ['Ground Cover Install', p.groundCover],
+        ['Perennial Install', p.perennial],
+        ['Tree Install — 15 gal', p.tree15gal],
+        ['Tree Install — 25 gal', p.tree25gal],
+        ['Tree Staking', p.treeStaking]
+      ];
+      const enhPlantOutputs = filterToCatalog(
+        plantingMap.filter(([, qty]) => (qty || 0) > 0).map(([name, qty]) => ({
+          itemName: name, sourceSection: 'enhPlanting', quantities: { easy: qty || 0, medium: 0, hard: 0 }
+        }))
+      );
+      injectItemsIntoService('Planting / Bed Install', enhPlantOutputs);
+    }
+
+    // ENH Renovation takeoff → Landscape Renovation service
+    if (enhT.enhRenovation) {
+      const r = enhT.enhRenovation;
+      const enhRenoOutputs = filterToCatalog([
+        { itemName: 'Sod Installation', sourceSection: 'enhRenovation', quantities: { easy: r.sodSF || 0, medium: 0, hard: 0 } },
+        { itemName: 'Soil Amendment / Till', sourceSection: 'enhRenovation', quantities: { easy: r.bedSF || 0, medium: 0, hard: 0 } },
+        { itemName: 'Grade & Shape Bed', sourceSection: 'enhRenovation', quantities: { easy: r.bedSF || 0, medium: 0, hard: 0 } },
+        { itemName: 'Landscape Fabric Install', sourceSection: 'enhRenovation', quantities: { easy: r.bedSF || 0, medium: 0, hard: 0 } },
+        { itemName: 'Plant Removal — Shrub', sourceSection: 'enhRenovation', quantities: { easy: r.shrubRemovals || 0, medium: 0, hard: 0 } },
+        { itemName: 'Plant Removal — Tree', sourceSection: 'enhRenovation', quantities: { easy: r.treeRemovals || 0, medium: 0, hard: 0 } }
+      ].filter(o => o.quantities.easy > 0));
+      injectItemsIntoService('Landscape Renovation', enhRenoOutputs);
+    }
+  }
+
   // Mulch Subcontractor — create/update sub service with calculated cost
   const mulchSubCalc = calculateMulchSubTakeoff();
   if (mulchSubCalc.totalCost > 0) {
@@ -7319,6 +7831,11 @@ function calculateBidTotals() {
   let totalSubCost = 0;
   let totalSubBilled = 0;
   let totalVisits = 0;
+  // ENH per-line material and subcontractor totals (billed and cost)
+  let enhMaterialsBilled = 0;
+  let enhMaterialsCost = 0;
+  let enhSubsBilled = 0;
+  let enhSubsCost = 0;
 
   currentEstimate.services.forEach(service => {
     if (service.isSubcontractor) {
@@ -7335,12 +7852,23 @@ function calculateBidTotals() {
       totalTravelHours += serviceTravelHours;
       totalVisits = Math.max(totalVisits, service.visits || 0);
 
-      // Add material costs from Material type items
-      totalMaterialCost += calcServiceMaterialCost(service);
+      // ENH per-line materials: when present, skip the old aggregate material cost
+      const hasENHMaterials = service.materials && service.materials.length > 0;
+      if (hasENHMaterials) {
+        enhMaterialsBilled += calcENHMaterialsBilled(service);
+        enhMaterialsCost += calcENHMaterialsCost(service);
+      } else {
+        // MNT-style: aggregate material costs from Material-type catalog items
+        totalMaterialCost += calcServiceMaterialCost(service);
+        if (service.materialCost) {
+          totalMaterialCost += service.materialCost;
+        }
+      }
 
-      // Also include any manual material cost override on the service
-      if (service.materialCost) {
-        totalMaterialCost += service.materialCost;
+      // ENH per-line subcontractors (distinct from isSubcontractor: true services)
+      if (service.subcontractors && service.subcontractors.length > 0) {
+        enhSubsBilled += calcENHSubsBilled(service);
+        enhSubsCost += calcENHSubsCost(service);
       }
     }
   });
@@ -7351,11 +7879,11 @@ function calculateBidTotals() {
   const laborCost = totalHours * rates.laborRate;
   const laborBilled = calcWithMarkup(laborCost, rates.laborMarkup);
 
-  const materialBilled = calcWithMarkup(totalMaterialCost, rates.materialMarkup);
-  const subBilled = totalSubBilled;
+  const materialBilled = calcWithMarkup(totalMaterialCost, rates.materialMarkup) + enhMaterialsBilled;
+  const subBilled = totalSubBilled + enhSubsBilled;
 
   const bidTotal = laborBilled + materialBilled + subBilled;
-  const internalCost = laborCost + totalMaterialCost + totalSubCost;
+  const internalCost = laborCost + totalMaterialCost + enhMaterialsCost + totalSubCost + enhSubsCost;
   const profit = bidTotal - internalCost;
   const margin = bidTotal > 0 ? (profit / bidTotal) * 100 : 0;
   const billedRate = totalHours > 0 ? bidTotal / totalHours : 0;
@@ -7408,11 +7936,13 @@ function calculateTierTotals() {
       const serviceLaborCost = serviceTotalHours * rates.laborRate;
       const laborBilled = calcWithMarkup(serviceLaborCost, rates.laborMarkup);
 
-      // Material costs
-      const serviceMaterialCost = calcServiceMaterialCost(service);
-      const materialBilled = calcWithMarkup(serviceMaterialCost, rates.materialMarkup);
+      // Material costs — ENH per-line materials vs MNT aggregate
+      const hasENHMats = service.materials && service.materials.length > 0;
+      const serviceMaterialCost = hasENHMats ? 0 : calcServiceMaterialCost(service);
+      const materialBilled = hasENHMats ? calcENHMaterialsBilled(service) : calcWithMarkup(serviceMaterialCost, rates.materialMarkup);
+      const enhSubsBilled = calcENHSubsBilled(service);
 
-      serviceBilled = laborBilled + materialBilled;
+      serviceBilled = laborBilled + materialBilled + enhSubsBilled;
     }
 
     // For recommended services, only include if accepted
@@ -10169,6 +10699,403 @@ async function createDefaultServiceCatalog() {
 }
 
 // ═══════════════════════════════════════════════════════════════
+//  PLANT CATALOG
+// ═══════════════════════════════════════════════════════════════
+
+let plantCatalog = [];
+let plantImportData = null;
+
+async function loadAndRenderPlantCatalog() {
+  try {
+    const resp = await fetch(GOOGLE_SHEETS_URL + '?action=getPlantCatalog');
+    const data = await resp.json();
+    if (data.success) {
+      plantCatalog = data.plants || [];
+    }
+  } catch (e) {
+    console.error('Failed to load plant catalog:', e);
+  }
+  renderPlantCatalog();
+}
+
+function renderPlantCatalog() {
+  const container = document.getElementById('plant-catalog-list');
+  if (!container) return;
+
+  const query = (document.getElementById('plant-search')?.value || '').toLowerCase();
+  const catFilter = document.getElementById('plant-category-filter')?.value || '';
+
+  const filtered = plantCatalog.filter(p => {
+    if (catFilter && p.category !== catFilter) return false;
+    if (query) {
+      const searchStr = ((p.commonName || '') + ' ' + (p.botanicalName || '') + ' ' + (p.category || '')).toLowerCase();
+      if (!searchStr.includes(query)) return false;
+    }
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div style="text-align:center;padding:40px;color:var(--text-secondary);">
+        ${plantCatalog.length === 0 ? 'No plants in catalog. Click "+ Add Plant" to get started.' : 'No plants match your search.'}
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = filtered.map(p => {
+    const sizes = (p.sizes || []);
+    const sizeChips = sizes.map(s =>
+      `<span class="plant-size-chip">${s.size} · $${(s.supplierCost || 0).toFixed(2)}</span>`
+    ).join('');
+    const photoThumb = p.photoFileId
+      ? `<img src="https://drive.google.com/uc?export=view&id=${p.photoFileId}" class="plant-thumb" alt="${p.commonName}">`
+      : '<div class="plant-thumb-placeholder">No Photo</div>';
+
+    return `
+      <div class="plant-card" onclick="showPlantForm('${p.plantId}')">
+        ${photoThumb}
+        <div class="plant-card-info">
+          <div class="plant-card-name">${p.commonName || 'Unnamed'}</div>
+          <div class="plant-card-botanical">${p.botanicalName || ''}</div>
+          <div class="plant-card-category">${p.category || ''}</div>
+          <div class="plant-card-sizes">${sizeChips || '<span style="color:var(--text-muted);font-size:11px;">No sizes</span>'}</div>
+        </div>
+        <button class="delete-item-btn" onclick="event.stopPropagation(); deletePlant('${p.plantId}')" title="Delete plant">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+    `;
+  }).join('');
+}
+
+function filterPlantCatalog() {
+  renderPlantCatalog();
+}
+
+function showPlantForm(plantId) {
+  const modal = document.getElementById('plant-form-modal');
+  modal.style.display = 'flex';
+
+  if (plantId) {
+    const plant = plantCatalog.find(p => p.plantId === plantId);
+    if (!plant) return;
+    document.getElementById('plant-form-title').textContent = 'Edit Plant';
+    document.getElementById('plant-edit-id').value = plantId;
+    document.getElementById('plant-common-name').value = plant.commonName || '';
+    document.getElementById('plant-botanical-name').value = plant.botanicalName || '';
+    document.getElementById('plant-category').value = plant.category || 'Shrub';
+    document.getElementById('plant-notes').value = plant.notes || '';
+
+    // Photo preview
+    const preview = document.getElementById('plant-photo-preview');
+    if (plant.photoFileId) {
+      preview.innerHTML = `<img src="https://drive.google.com/uc?export=view&id=${plant.photoFileId}" style="max-width:100px;max-height:100px;border-radius:6px;">`;
+    } else {
+      preview.innerHTML = '';
+    }
+
+    // Sizes
+    renderPlantSizeRows(plant.sizes || []);
+  } else {
+    document.getElementById('plant-form-title').textContent = 'Add Plant';
+    document.getElementById('plant-edit-id').value = '';
+    document.getElementById('plant-common-name').value = '';
+    document.getElementById('plant-botanical-name').value = '';
+    document.getElementById('plant-category').value = 'Shrub';
+    document.getElementById('plant-notes').value = '';
+    document.getElementById('plant-photo-preview').innerHTML = '';
+    document.getElementById('plant-photo-input').value = '';
+    renderPlantSizeRows([{ size: '3 gal', supplierCost: 0, defaultMarkup: 0.20, supplier: '', sku: '' }]);
+  }
+}
+
+function closePlantForm() {
+  document.getElementById('plant-form-modal').style.display = 'none';
+}
+
+function renderPlantSizeRows(sizes) {
+  const container = document.getElementById('plant-sizes-list');
+  container.innerHTML = sizes.map((s, i) => `
+    <div class="plant-size-row" data-idx="${i}">
+      <input type="text" class="form-input plant-size-val" value="${s.size || ''}" placeholder="Size (e.g. 3 gal)" style="width:80px;">
+      <input type="number" class="form-input plant-size-cost" value="${s.supplierCost || ''}" placeholder="Cost" step="0.01" min="0" style="width:70px;">
+      <input type="number" class="form-input plant-size-markup" value="${((s.defaultMarkup || 0.20) * 100).toFixed(0)}" placeholder="%" step="1" min="0" style="width:50px;" title="Markup %">
+      <input type="text" class="form-input plant-size-supplier" value="${s.supplier || ''}" placeholder="Supplier" style="width:100px;">
+      <input type="text" class="form-input plant-size-sku" value="${s.sku || ''}" placeholder="SKU" style="width:70px;">
+      <button class="delete-item-btn" onclick="this.closest('.plant-size-row').remove()" title="Remove size" style="margin-left:2px;">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+  `).join('');
+}
+
+function addPlantSizeRow() {
+  const container = document.getElementById('plant-sizes-list');
+  const idx = container.children.length;
+  const div = document.createElement('div');
+  div.className = 'plant-size-row';
+  div.dataset.idx = idx;
+  div.innerHTML = `
+    <input type="text" class="form-input plant-size-val" value="" placeholder="Size" style="width:80px;">
+    <input type="number" class="form-input plant-size-cost" value="" placeholder="Cost" step="0.01" min="0" style="width:70px;">
+    <input type="number" class="form-input plant-size-markup" value="20" placeholder="%" step="1" min="0" style="width:50px;" title="Markup %">
+    <input type="text" class="form-input plant-size-supplier" value="" placeholder="Supplier" style="width:100px;">
+    <input type="text" class="form-input plant-size-sku" value="" placeholder="SKU" style="width:70px;">
+    <button class="delete-item-btn" onclick="this.closest('.plant-size-row').remove()" title="Remove size" style="margin-left:2px;">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+      </svg>
+    </button>
+  `;
+  container.appendChild(div);
+}
+
+function previewPlantPhoto(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    document.getElementById('plant-photo-preview').innerHTML =
+      `<img src="${e.target.result}" style="max-width:100px;max-height:100px;border-radius:6px;">`;
+    // Store base64 for upload
+    document.getElementById('plant-photo-preview').dataset.base64 = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function savePlantEntry() {
+  const plantId = document.getElementById('plant-edit-id').value || null;
+  const commonName = document.getElementById('plant-common-name').value.trim();
+  if (!commonName) {
+    showToast('Common name is required.', 'error');
+    return;
+  }
+
+  // Collect sizes from form
+  const sizeRows = document.querySelectorAll('#plant-sizes-list .plant-size-row');
+  const sizes = [];
+  sizeRows.forEach(row => {
+    const size = row.querySelector('.plant-size-val')?.value.trim();
+    if (size) {
+      sizes.push({
+        size: size,
+        supplierCost: parseFloat(row.querySelector('.plant-size-cost')?.value) || 0,
+        defaultMarkup: (parseFloat(row.querySelector('.plant-size-markup')?.value) || 20) / 100,
+        supplier: row.querySelector('.plant-size-supplier')?.value.trim() || '',
+        sku: row.querySelector('.plant-size-sku')?.value.trim() || ''
+      });
+    }
+  });
+
+  // Upload photo if new one selected
+  let photoFileId = '';
+  const photoBase64 = document.getElementById('plant-photo-preview').dataset?.base64;
+  if (photoBase64) {
+    try {
+      showToast('Uploading photo...', 'info');
+      const photoResp = await fetch(GOOGLE_SHEETS_URL, {
+        method: 'POST',
+        body: JSON.stringify({ uploadPlantPhoto: true, photo: photoBase64, commonName: commonName })
+      });
+      const photoData = await photoResp.json();
+      if (photoData.success) {
+        photoFileId = photoData.fileId;
+      }
+    } catch (e) {
+      console.error('Photo upload failed:', e);
+    }
+  } else if (plantId) {
+    // Preserve existing photo
+    const existing = plantCatalog.find(p => p.plantId === plantId);
+    photoFileId = existing?.photoFileId || '';
+  }
+
+  const entry = {
+    savePlantEntry: true,
+    plantId: plantId,
+    commonName: commonName,
+    botanicalName: document.getElementById('plant-botanical-name').value.trim(),
+    category: document.getElementById('plant-category').value,
+    sizes: sizes,
+    photoFileId: photoFileId,
+    notes: document.getElementById('plant-notes').value.trim()
+  };
+
+  try {
+    showToast('Saving plant...', 'info');
+    const resp = await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify(entry)
+    });
+    const data = await resp.json();
+    if (data.success) {
+      showToast('Plant saved.', 'success');
+      closePlantForm();
+      await loadAndRenderPlantCatalog();
+    } else {
+      showToast('Save failed: ' + (data.error || 'Unknown error'), 'error');
+    }
+  } catch (e) {
+    showToast('Save failed: ' + e.message, 'error');
+  }
+}
+
+async function deletePlant(plantId) {
+  if (!confirm('Delete this plant from the catalog?')) return;
+  try {
+    const resp = await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ deletePlantEntry: true, plantId: plantId })
+    });
+    const data = await resp.json();
+    if (data.success) {
+      showToast('Plant deleted.', 'success');
+      plantCatalog = plantCatalog.filter(p => p.plantId !== plantId);
+      renderPlantCatalog();
+    }
+  } catch (e) {
+    showToast('Delete failed: ' + e.message, 'error');
+  }
+}
+
+// ─── Plant CSV Import ───
+function showPlantImportModal() {
+  document.getElementById('plant-import-modal').style.display = 'flex';
+  document.getElementById('plant-import-preview').innerHTML = '';
+  document.getElementById('plant-import-file').value = '';
+  document.getElementById('plant-import-confirm-btn').disabled = true;
+  plantImportData = null;
+}
+
+function closePlantImport() {
+  document.getElementById('plant-import-modal').style.display = 'none';
+  plantImportData = null;
+}
+
+function parsePlantImportCSV(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const text = e.target.result;
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+    if (lines.length < 2) {
+      document.getElementById('plant-import-preview').innerHTML = '<div style="color:red;">CSV must have a header row and at least one data row.</div>';
+      return;
+    }
+
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+    const rows = [];
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(',').map(c => c.trim());
+      const row = {};
+      headers.forEach((h, idx) => { row[h] = cols[idx] || ''; });
+      rows.push(row);
+    }
+
+    // Match against existing catalog
+    const matched = [];
+    const newEntries = [];
+    rows.forEach(row => {
+      const name = row.commonname || row['common name'] || '';
+      const size = row.size || '';
+      const existing = plantCatalog.find(p =>
+        (p.commonName || '').toLowerCase() === name.toLowerCase()
+      );
+      if (existing) {
+        matched.push({ ...row, existing: existing, status: 'match' });
+      } else {
+        newEntries.push({ ...row, status: 'new' });
+      }
+    });
+
+    plantImportData = { matched, newEntries, rows };
+
+    // Render preview
+    let html = `<div style="font-size:12px;margin-top:8px;">
+      <div style="color:#2E7D32;margin-bottom:4px;"><strong>${matched.length}</strong> matched existing plants</div>
+      <div style="color:#E65100;margin-bottom:8px;"><strong>${newEntries.length}</strong> new plants to create</div>
+      <table style="width:100%;font-size:11px;border-collapse:collapse;">
+        <tr style="background:#f5f5f5;"><th style="padding:4px;text-align:left;">Name</th><th>Size</th><th>Cost</th><th>Status</th></tr>`;
+
+    [...matched, ...newEntries].forEach(r => {
+      const name = r.commonname || r['common name'] || '';
+      const bgColor = r.status === 'match' ? '#E8F5E9' : '#FFF3E0';
+      html += `<tr style="background:${bgColor};">
+        <td style="padding:3px 4px;">${name}</td>
+        <td style="padding:3px 4px;">${r.size || ''}</td>
+        <td style="padding:3px 4px;">$${parseFloat(r.unitcost || r['unit cost'] || 0).toFixed(2)}</td>
+        <td style="padding:3px 4px;">${r.status === 'match' ? 'Update' : 'New'}</td>
+      </tr>`;
+    });
+    html += '</table></div>';
+
+    document.getElementById('plant-import-preview').innerHTML = html;
+    document.getElementById('plant-import-confirm-btn').disabled = false;
+  };
+  reader.readAsText(file);
+}
+
+async function confirmPlantImport() {
+  if (!plantImportData) return;
+  const allRows = [...plantImportData.matched, ...plantImportData.newEntries];
+  showToast(`Importing ${allRows.length} plants...`, 'info');
+
+  for (const row of allRows) {
+    const name = row.commonname || row['common name'] || '';
+    const size = row.size || '';
+    const cost = parseFloat(row.unitcost || row['unit cost'] || 0);
+    const supplier = row.supplier || '';
+    const qty = parseInt(row.quantity || 0);
+
+    let plantId = null;
+    let sizes = [];
+
+    if (row.existing) {
+      plantId = row.existing.plantId;
+      sizes = [...(row.existing.sizes || [])];
+      // Update or add size
+      const existingSizeIdx = sizes.findIndex(s => s.size.toLowerCase() === size.toLowerCase());
+      if (existingSizeIdx >= 0) {
+        sizes[existingSizeIdx].supplierCost = cost;
+        if (supplier) sizes[existingSizeIdx].supplier = supplier;
+      } else if (size) {
+        sizes.push({ size, supplierCost: cost, defaultMarkup: 0.20, supplier, sku: '' });
+      }
+    } else {
+      sizes = size ? [{ size, supplierCost: cost, defaultMarkup: 0.20, supplier, sku: '' }] : [];
+    }
+
+    try {
+      await fetch(GOOGLE_SHEETS_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+          savePlantEntry: true,
+          plantId: plantId,
+          commonName: name,
+          botanicalName: '',
+          category: 'Shrub',
+          sizes: sizes,
+          photoFileId: row.existing?.photoFileId || '',
+          notes: ''
+        })
+      });
+    } catch (e) {
+      console.error('Import row failed:', e);
+    }
+  }
+
+  showToast('Import complete.', 'success');
+  closePlantImport();
+  await loadAndRenderPlantCatalog();
+}
+
+// ═══════════════════════════════════════════════════════════════
 //  SERVICE CATALOG UI FUNCTIONS
 // ═══════════════════════════════════════════════════════════════
 
@@ -11007,6 +11934,7 @@ function showView(viewId) {
       'templates': 'Templates',
       'services': 'Service Catalog',
       'catalog': 'Item Catalog',
+      'plant-catalog': 'Plant Catalog',
       'production': 'Production Rates',
       'schedule': 'Schedule',
       'contracts': 'Contracts',
@@ -11086,6 +12014,11 @@ function showView(viewId) {
   // Render work tickets when work tickets view is shown
   if (viewId === 'worktickets') {
     renderWorkTickets();
+  }
+
+  // Load plant catalog when plant catalog view is shown
+  if (viewId === 'plant-catalog') {
+    loadAndRenderPlantCatalog();
   }
 
   // Populate contact picker when builder view is shown
@@ -11193,6 +12126,7 @@ function renderEstimatesList() {
         <div class="estimate-card-date">${bid.date}</div>
       </div>
       <div class="estimate-card-footer">
+        ${bid.division && bid.division !== 'MNT' ? `<span class="division-badge div-${(bid.division||'').toLowerCase()}">${bid.division}</span>` : ''}
         <div class="estimate-card-total">${formatCurrency(bid.bidTotal || 0)}</div>
         <span class="status-badge status-${(bid.status || 'draft').toLowerCase()}">${bid.status || 'Draft'}</span>
         <button class="template-action-btn delete" onclick="event.stopPropagation(); deleteSavedEstimate('${bid.bidId}')" title="Delete" style="margin-left: 8px;">
@@ -11267,7 +12201,7 @@ async function openSavedEstimate(bidId) {
 
         // Ensure workTicket sub-object exists for older saved estimates
         if (!currentEstimate.workTicket) {
-          currentEstimate.workTicket = { scheduleType: 'single_visit', projectName: '', scheduledDate: '', startDate: '', numDays: 2, hoursPerDay: [], depositPercent: 25, collectDeposit: false };
+          currentEstimate.workTicket = { scheduleType: 'single_visit', projectName: '', scheduledDate: '', startDate: '', numDays: 2, hoursPerDay: [], phases: [], depositPercent: 25, collectDeposit: false };
         }
         if (!currentEstimate.jobType) currentEstimate.jobType = 'recurring';
 
@@ -11341,7 +12275,7 @@ async function openSavedEstimate(bidId) {
 
       // Ensure workTicket sub-object exists for older saved estimates
       if (!currentEstimate.workTicket) {
-        currentEstimate.workTicket = { scheduleType: 'single_visit', projectName: '', scheduledDate: '', startDate: '', numDays: 2, hoursPerDay: [], depositPercent: 25, collectDeposit: false };
+        currentEstimate.workTicket = { scheduleType: 'single_visit', projectName: '', scheduledDate: '', startDate: '', numDays: 2, hoursPerDay: [], phases: [], depositPercent: 25, collectDeposit: false };
       }
       if (!currentEstimate.jobType) currentEstimate.jobType = 'recurring';
 
@@ -11389,13 +12323,21 @@ async function deleteSavedEstimate(bidId) {
   }
 }
 
+let catalogDivisionFilter = 'MNT'; // Division filter for item catalog view
+
 function renderCatalog() {
   const tbody = document.getElementById('catalog-body');
 
   // Sort by type (Labor first), then category, then item name
-  const categoryOrder = ['Mowing', 'Blowing', 'Pruning', 'Irrigation', 'General', 'Mulch', 'Pine Straw', 'Seasonal Color', 'Pre-Emergent', 'Fertilizer'];
+  const categoryOrder = ['Mowing', 'Blowing', 'Pruning', 'Irrigation', 'General', 'Leaf Cleanup', 'Mulch', 'Pine Straw', 'Seasonal Color', 'Pre-Emergent', 'Fertilizer',
+    'Color & Annuals', 'Planting', 'Renovation'];
   const sortedItems = itemCatalog
-    .map((item, index) => ({ ...item, originalIndex: index }))
+    .filter(item => (item.division || 'MNT') === catalogDivisionFilter)
+    .map((item, index) => {
+      // Find the original index in the full itemCatalog array for edit/delete
+      const origIdx = itemCatalog.indexOf(item);
+      return { ...item, originalIndex: origIdx >= 0 ? origIdx : index };
+    })
     .sort((a, b) => {
       // Labor items before Material items
       const typeA = (a.type || 'Labor') === 'Labor' ? 0 : 1;
@@ -11533,9 +12475,12 @@ function renderTableBody() {
     const serviceTotalHours = serviceAnnualHours * (1 + serviceTravelPercent / 100);
     const serviceLaborCost = serviceTotalHours * rates.laborRate;
     const serviceLaborBilled = calcWithMarkup(serviceLaborCost, rates.laborMarkup);
-    const serviceMaterialCost = calcServiceMaterialCost(service);
-    const serviceMaterialBilled = calcWithMarkup(serviceMaterialCost, rates.materialMarkup);
-    const serviceBilled = serviceLaborBilled + serviceMaterialBilled;
+    // Material costs: ENH per-line materials vs MNT aggregate
+    const hasENHMats = service.materials && service.materials.length > 0;
+    const serviceMaterialCost = hasENHMats ? 0 : calcServiceMaterialCost(service);
+    const serviceMaterialBilled = hasENHMats ? calcENHMaterialsBilled(service) : calcWithMarkup(serviceMaterialCost, rates.materialMarkup);
+    const serviceENHSubsBilled = calcENHSubsBilled(service);
+    const serviceBilled = serviceLaborBilled + serviceMaterialBilled + serviceENHSubsBilled;
     const isCollapsed = collapsedServices.has(sIdx);
 
     // Service group header row
@@ -11784,6 +12729,155 @@ function renderTableBody() {
         </td>
       </tr>
     `;
+
+    // ─── ENH Material + Subcontractor line items ───
+    // Only show for ENH division services (non-subcontractor)
+    const isENHService = (currentEstimate.division || 'MNT') === 'ENH' && !service.isSubcontractor;
+    if (isENHService) {
+      const materials = service.materials || [];
+      const subs = service.subcontractors || [];
+
+      // Materials header
+      html += `
+        <tr class="row-enh-section-header ${isCollapsed ? 'row-hidden' : ''}" data-service="${sIdx}">
+          <td colspan="12">
+            <div class="enh-section-label">
+              <strong>Materials</strong>
+              <span class="enh-section-count">${materials.length} item${materials.length !== 1 ? 's' : ''}</span>
+            </div>
+          </td>
+        </tr>
+      `;
+
+      // Material rows
+      materials.forEach((mat, mIdx) => {
+        const billedPrice = (mat.quantity || 0) * (mat.unitCost || 0) * (1 + (mat.markup || 0.20));
+        html += `
+          <tr class="row-enh-material ${isCollapsed ? 'row-hidden' : ''}" data-service="${sIdx}" data-mat="${mIdx}">
+            <td>
+              <div class="enh-material-name">
+                ${mat.plantCatalogId ? '<span class="plant-link-badge" title="Linked to Plant Catalog">P</span>' : ''}
+                <input type="text" class="table-input enh-mat-desc" value="${(mat.description || '').replace(/"/g, '&quot;')}"
+                  data-service="${sIdx}" data-mat="${mIdx}" placeholder="Description">
+              </div>
+            </td>
+            <td></td>
+            <td>
+              <input type="number" class="table-input enh-mat-qty" value="${mat.quantity || ''}"
+                data-service="${sIdx}" data-mat="${mIdx}" min="0" step="1" placeholder="Qty">
+            </td>
+            <td>
+              <input type="text" class="table-input enh-mat-unit" value="${mat.unit || 'each'}"
+                data-service="${sIdx}" data-mat="${mIdx}" placeholder="Unit" style="width:55px;">
+            </td>
+            <td>
+              <input type="number" class="table-input enh-mat-cost" value="${mat.unitCost || ''}"
+                data-service="${sIdx}" data-mat="${mIdx}" min="0" step="0.01" placeholder="Cost">
+            </td>
+            <td>
+              <input type="number" class="table-input enh-mat-markup" value="${((mat.markup || 0.20) * 100).toFixed(0)}"
+                data-service="${sIdx}" data-mat="${mIdx}" min="0" max="500" step="1" title="Markup %" style="width:50px;">
+            </td>
+            <td colspan="3"></td>
+            <td></td>
+            <td class="num">${formatCurrency(billedPrice)}</td>
+            <td>
+              <button class="delete-item-btn" onclick="removeENHMaterial(${sIdx}, ${mIdx})" title="Remove material">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            </td>
+          </tr>
+        `;
+      });
+
+      // Materials subtotal + add button
+      const materialSubtotal = materials.reduce((sum, m) => sum + (m.quantity || 0) * (m.unitCost || 0) * (1 + (m.markup || 0.20)), 0);
+      html += `
+        <tr class="row-enh-subtotal ${isCollapsed ? 'row-hidden' : ''}" data-service="${sIdx}">
+          <td colspan="10" style="text-align: right; font-size: 11px; color: var(--text-secondary);">Materials Subtotal</td>
+          <td class="num" style="font-weight: 600; font-size: 12px;">${formatCurrency(materialSubtotal)}</td>
+          <td></td>
+        </tr>
+        <tr class="row-enh-add ${isCollapsed ? 'row-hidden' : ''}" data-service="${sIdx}">
+          <td colspan="12">
+            <button class="add-item-btn" onclick="addENHMaterial(${sIdx})" style="font-size: 11px;">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+              </svg>
+              Add Material
+            </button>
+          </td>
+        </tr>
+      `;
+
+      // Subcontractors header
+      html += `
+        <tr class="row-enh-section-header ${isCollapsed ? 'row-hidden' : ''}" data-service="${sIdx}">
+          <td colspan="12">
+            <div class="enh-section-label">
+              <strong>Subcontractors</strong>
+              <span class="enh-section-count">${subs.length} item${subs.length !== 1 ? 's' : ''}</span>
+            </div>
+          </td>
+        </tr>
+      `;
+
+      // Subcontractor rows
+      subs.forEach((sub, subIdx) => {
+        const subBilled = (sub.cost || 0) * (1 + (sub.markup || 0.15));
+        html += `
+          <tr class="row-enh-sub ${isCollapsed ? 'row-hidden' : ''}" data-service="${sIdx}" data-sub="${subIdx}">
+            <td>
+              <div class="enh-material-name">
+                <input type="text" class="table-input enh-sub-desc" value="${(sub.description || '').replace(/"/g, '&quot;')}"
+                  data-service="${sIdx}" data-sub="${subIdx}" placeholder="Description">
+              </div>
+            </td>
+            <td colspan="3"></td>
+            <td>
+              <input type="number" class="table-input enh-sub-cost" value="${sub.cost || ''}"
+                data-service="${sIdx}" data-sub="${subIdx}" min="0" step="0.01" placeholder="Cost">
+            </td>
+            <td>
+              <input type="number" class="table-input enh-sub-markup" value="${((sub.markup || 0.15) * 100).toFixed(0)}"
+                data-service="${sIdx}" data-sub="${subIdx}" min="0" max="500" step="1" title="Markup %" style="width:50px;">
+            </td>
+            <td colspan="3"></td>
+            <td></td>
+            <td class="num">${formatCurrency(subBilled)}</td>
+            <td>
+              <button class="delete-item-btn" onclick="removeENHSubcontractor(${sIdx}, ${subIdx})" title="Remove subcontractor">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            </td>
+          </tr>
+        `;
+      });
+
+      // Subcontractor subtotal + add button
+      const subSubtotal = subs.reduce((sum, s) => sum + (s.cost || 0) * (1 + (s.markup || 0.15)), 0);
+      html += `
+        <tr class="row-enh-subtotal ${isCollapsed ? 'row-hidden' : ''}" data-service="${sIdx}">
+          <td colspan="10" style="text-align: right; font-size: 11px; color: var(--text-secondary);">Subcontractor Subtotal</td>
+          <td class="num" style="font-weight: 600; font-size: 12px;">${formatCurrency(subSubtotal)}</td>
+          <td></td>
+        </tr>
+        <tr class="row-enh-add ${isCollapsed ? 'row-hidden' : ''}" data-service="${sIdx}">
+          <td colspan="12">
+            <button class="add-item-btn" onclick="addENHSubcontractor(${sIdx})" style="font-size: 11px;">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+              </svg>
+              Add Subcontractor
+            </button>
+          </td>
+        </tr>
+      `;
+    }
   });
 
   tbody.innerHTML = html;
@@ -12588,6 +13682,17 @@ async function finalizeWorkTicket(finalizeBtn, linkedContact) {
       showToast('Please set a scheduled date in Project Settings.', 'error');
       return;
     }
+  } else if (wt.scheduleType === 'milestone') {
+    const phases = wt.phases || [];
+    if (phases.length === 0) {
+      showToast('Please add at least one milestone phase in Project Settings.', 'error');
+      return;
+    }
+    const phasesWithDates = phases.filter(p => p.date);
+    if (phasesWithDates.length === 0) {
+      showToast('Please set dates on your milestone phases.', 'error');
+      return;
+    }
   } else {
     if (!wt.startDate) {
       showToast('Please set a start date in Project Settings.', 'error');
@@ -12595,7 +13700,8 @@ async function finalizeWorkTicket(finalizeBtn, linkedContact) {
     }
   }
 
-  const tickets = generateWorkTickets();
+  // Use milestone generator for milestone type, standard generator otherwise
+  const tickets = wt.scheduleType === 'milestone' ? generateMilestoneTickets() : generateWorkTickets();
   if (tickets.length === 0) {
     showToast('No tickets could be generated. Check your dates.', 'error');
     return;
@@ -12609,6 +13715,9 @@ async function finalizeWorkTicket(finalizeBtn, linkedContact) {
   confirmMsg += `Project: ${wt.projectName || currentEstimate.propertyAddress}\n`;
   if (wt.scheduleType === 'single_visit') {
     confirmMsg += `Date: ${wt.scheduledDate}\n`;
+  } else if (wt.scheduleType === 'milestone') {
+    confirmMsg += `Phases: ${tickets.length} milestone${tickets.length > 1 ? 's' : ''}\n`;
+    tickets.forEach(t => { confirmMsg += `  ${t.phaseLabel || 'Phase'}: ${t.eventDate}\n`; });
   } else {
     confirmMsg += `Dates: ${tickets[0].eventDate} to ${tickets[tickets.length - 1].eventDate}\n`;
   }
@@ -12709,7 +13818,9 @@ async function finalizeWorkTicket(finalizeBtn, linkedContact) {
       jobType: 'work_ticket',
       dayNumber: t.dayNumber,
       totalDays: t.totalDays,
-      projectName: t.projectName || ''
+      projectName: t.projectName || '',
+      phaseLabel: t.phaseLabel || '',
+      phaseId: t.phaseId || ''
     }));
 
     const ticketResult = await fetch(GOOGLE_SHEETS_URL, {
@@ -13290,13 +14401,32 @@ async function generateContractPdf() {
         const serviceTotalHours = serviceAnnualHours * (1 + rates.travelPercent / 100);
         const serviceLaborCost = serviceTotalHours * rates.laborRate;
         const laborBilled = calcWithMarkup(serviceLaborCost, rates.laborMarkup);
-        const serviceMaterialCost = calcServiceMaterialCost(svc);
-        const materialBilled = calcWithMarkup(serviceMaterialCost, rates.materialMarkup);
-        annualTotal = laborBilled + materialBilled;
+        // ENH per-line materials vs MNT aggregate
+        const hasENHMats = svc.materials && svc.materials.length > 0;
+        const serviceMaterialCost = hasENHMats ? 0 : calcServiceMaterialCost(svc);
+        const materialBilled = hasENHMats ? calcENHMaterialsBilled(svc) : calcWithMarkup(serviceMaterialCost, rates.materialMarkup);
+        const enhSubsBilled = calcENHSubsBilled(svc);
+        annualTotal = laborBilled + materialBilled + enhSubsBilled;
       }
 
       const visits = svc.visits || 1;
       costPerOccurrence = annualTotal / visits;
+
+      // Build ENH material/sub line items for PDF
+      const svcMaterials = (svc.materials || []).map(m => ({
+        description: m.description || '',
+        quantity: m.quantity || 0,
+        unit: m.unit || 'each',
+        unitCost: m.unitCost || 0,
+        markup: m.markup || 0.20,
+        billedPrice: (m.quantity || 0) * (m.unitCost || 0) * (1 + (m.markup || 0.20))
+      }));
+      const svcSubs = (svc.subcontractors || []).map(s => ({
+        description: s.description || '',
+        cost: s.cost || 0,
+        markup: s.markup || 0.15,
+        billedPrice: (s.cost || 0) * (1 + (s.markup || 0.15))
+      }));
 
       return {
         name: svc.proposalName || svc.name || '',
@@ -13306,7 +14436,9 @@ async function generateContractPdf() {
         category: svc.category || '',
         costPerOccurrence: Math.round(costPerOccurrence * 100) / 100,
         annualTotal: Math.round(annualTotal * 100) / 100,
-        accepted: svc.accepted !== false
+        accepted: svc.accepted !== false,
+        materials: svcMaterials.length > 0 ? svcMaterials : undefined,
+        subcontractors: svcSubs.length > 0 ? svcSubs : undefined
       };
     });
 
@@ -13345,7 +14477,8 @@ async function generateContractPdf() {
       contractValue: Math.round(effectiveAnnual * 100) / 100,
       monthlyPayment: Math.round(monthlyPayment * 100) / 100,
       paymentSchedule: schedule,
-      termsAndConditionsHtml: currentEstimate.contract.termsAndConditionsHtml || null
+      termsAndConditionsHtml: currentEstimate.contract.termsAndConditionsHtml || null,
+      division: currentEstimate.division || 'MNT'
     };
 
     // Build FormData
@@ -13453,6 +14586,13 @@ async function openFinalizeModal() {
     if (wt.scheduleType === 'single_visit') {
       summaryHtml = `<div style="font-weight:600;margin-bottom:4px;">Single Visit</div>`;
       summaryHtml += `<div>Date: ${wt.scheduledDate ? formatDateShort(wt.scheduledDate) : '<em>Not set</em>'}</div>`;
+      summaryHtml += `<div>Total Hours: ${totals.totalHours.toFixed(1)}</div>`;
+    } else if (wt.scheduleType === 'milestone') {
+      const phases = (wt.phases || []).filter(p => p.date);
+      summaryHtml = `<div style="font-weight:600;margin-bottom:4px;">Milestone Project (${phases.length} phase${phases.length !== 1 ? 's' : ''})</div>`;
+      phases.forEach(p => {
+        summaryHtml += `<div style="font-size:12px;">${p.label}: ${formatDateShort(p.date)} — ${(p.lineItemAssignments || []).length} item${(p.lineItemAssignments || []).length !== 1 ? 's' : ''}</div>`;
+      });
       summaryHtml += `<div>Total Hours: ${totals.totalHours.toFixed(1)}</div>`;
     } else {
       const numDays = wt.numDays || 2;
@@ -14935,6 +16075,62 @@ function attachTableEventListeners() {
   document.querySelectorAll('.item-visits-input').forEach(input => {
     input.addEventListener('change', handleItemVisitsChange);
   });
+
+  // ─── ENH Material inputs ───
+  document.querySelectorAll('.enh-mat-desc').forEach(input => {
+    input.addEventListener('change', function(e) {
+      const sIdx = parseInt(e.target.dataset.service);
+      const mIdx = parseInt(e.target.dataset.mat);
+      const service = currentEstimate.services[sIdx];
+      if (service && service.materials && service.materials[mIdx]) {
+        service.materials[mIdx].description = e.target.value;
+        markEstimateDirty();
+      }
+    });
+  });
+  document.querySelectorAll('.enh-mat-qty, .enh-mat-cost, .enh-mat-markup, .enh-mat-unit').forEach(input => {
+    input.addEventListener('change', function(e) {
+      const sIdx = parseInt(e.target.dataset.service);
+      const mIdx = parseInt(e.target.dataset.mat);
+      const service = currentEstimate.services[sIdx];
+      if (!service || !service.materials || !service.materials[mIdx]) return;
+      const mat = service.materials[mIdx];
+      if (e.target.classList.contains('enh-mat-qty')) mat.quantity = parseFloat(e.target.value) || 0;
+      if (e.target.classList.contains('enh-mat-cost')) mat.unitCost = parseFloat(e.target.value) || 0;
+      if (e.target.classList.contains('enh-mat-markup')) mat.markup = (parseFloat(e.target.value) || 0) / 100;
+      if (e.target.classList.contains('enh-mat-unit')) mat.unit = e.target.value || 'each';
+      mat.billedPrice = (mat.quantity || 0) * (mat.unitCost || 0) * (1 + (mat.markup || 0.20));
+      renderTableBody();
+      markEstimateDirty();
+    });
+  });
+
+  // ─── ENH Subcontractor inputs ───
+  document.querySelectorAll('.enh-sub-desc').forEach(input => {
+    input.addEventListener('change', function(e) {
+      const sIdx = parseInt(e.target.dataset.service);
+      const subIdx = parseInt(e.target.dataset.sub);
+      const service = currentEstimate.services[sIdx];
+      if (service && service.subcontractors && service.subcontractors[subIdx]) {
+        service.subcontractors[subIdx].description = e.target.value;
+        markEstimateDirty();
+      }
+    });
+  });
+  document.querySelectorAll('.enh-sub-cost, .enh-sub-markup').forEach(input => {
+    input.addEventListener('change', function(e) {
+      const sIdx = parseInt(e.target.dataset.service);
+      const subIdx = parseInt(e.target.dataset.sub);
+      const service = currentEstimate.services[sIdx];
+      if (!service || !service.subcontractors || !service.subcontractors[subIdx]) return;
+      const sub = service.subcontractors[subIdx];
+      if (e.target.classList.contains('enh-sub-cost')) sub.cost = parseFloat(e.target.value) || 0;
+      if (e.target.classList.contains('enh-sub-markup')) sub.markup = (parseFloat(e.target.value) || 0) / 100;
+      sub.billedPrice = (sub.cost || 0) * (1 + (sub.markup || 0.15));
+      renderTableBody();
+      markEstimateDirty();
+    });
+  });
 }
 
 function handleQuantityChange(e) {
@@ -15149,9 +16345,15 @@ function deleteService(sIdx) {
 function renderAddItemOptions(service) {
   // Get items already in this service
   const existingItems = new Set(service.lineItems.map(li => li.itemName));
+  const estDiv = (currentEstimate && currentEstimate.division) || 'MNT';
 
-  // Filter out items already in the service
-  const availableItems = itemCatalog.filter(item => !existingItems.has(item.item));
+  // Filter out items already in the service, and filter by division
+  // null/undefined/'' division on catalog items = MNT (backward compat)
+  const availableItems = itemCatalog.filter(item => {
+    if (existingItems.has(item.item)) return false;
+    const itemDiv = item.division || 'MNT';
+    return itemDiv === estDiv;
+  });
 
   // Group by category
   const byCategory = {};
@@ -15162,9 +16364,10 @@ function renderAddItemOptions(service) {
     byCategory[item.category].push(item);
   });
 
-  // Build options HTML with optgroups
+  // Build options HTML with optgroups — ENH categories appended after MNT ones
   let html = '';
-  const categoryOrder = ['Mowing', 'Blowing', 'Pruning', 'Mulch', 'Irrigation', 'General'];
+  const categoryOrder = ['Mowing', 'Blowing', 'Pruning', 'Mulch', 'Irrigation', 'General',
+    'Color & Annuals', 'Planting', 'Renovation'];
 
   categoryOrder.forEach(category => {
     if (byCategory[category] && byCategory[category].length > 0) {
@@ -15249,6 +16452,89 @@ function removeItemFromService(sIdx, lIdx) {
   }
 }
 
+// ─── ENH Material & Subcontractor CRUD ───
+// These per-line material rows are distinct from the existing calcServiceMaterialCost()
+// system used by MNT. For ENH services, these additive material rows replace the
+// aggregate material cost calculation. When service.materials[] has entries,
+// calcServiceMaterialCost() is not called for that service.
+
+function addENHMaterial(sIdx) {
+  const service = currentEstimate.services[sIdx];
+  if (!service) return;
+  if (!service.materials) service.materials = [];
+  service.materials.push({
+    description: '',
+    quantity: 0,
+    unit: 'each',
+    unitCost: 0,
+    markup: 0.20,
+    billedPrice: 0,
+    plantCatalogId: null
+  });
+  renderTableBody();
+  markEstimateDirty();
+}
+
+function removeENHMaterial(sIdx, mIdx) {
+  const service = currentEstimate.services[sIdx];
+  if (!service || !service.materials) return;
+  service.materials.splice(mIdx, 1);
+  renderTableBody();
+  markEstimateDirty();
+}
+
+function addENHSubcontractor(sIdx) {
+  const service = currentEstimate.services[sIdx];
+  if (!service) return;
+  if (!service.subcontractors) service.subcontractors = [];
+  // This is distinct from isSubcontractor: true on a service — these are sub-rows
+  // inside a labor service, not a whole-service subcontractor model.
+  service.subcontractors.push({
+    description: '',
+    cost: 0,
+    markup: 0.15,
+    billedPrice: 0
+  });
+  renderTableBody();
+  markEstimateDirty();
+}
+
+function removeENHSubcontractor(sIdx, subIdx) {
+  const service = currentEstimate.services[sIdx];
+  if (!service || !service.subcontractors) return;
+  service.subcontractors.splice(subIdx, 1);
+  renderTableBody();
+  markEstimateDirty();
+}
+
+// Calculate total billed materials for an ENH service
+function calcENHMaterialsBilled(service) {
+  if (!service.materials || service.materials.length === 0) return 0;
+  return service.materials.reduce((sum, m) => {
+    return sum + (m.quantity || 0) * (m.unitCost || 0) * (1 + (m.markup || 0.20));
+  }, 0);
+}
+
+// Calculate total billed subcontractors for an ENH service
+function calcENHSubsBilled(service) {
+  if (!service.subcontractors || service.subcontractors.length === 0) return 0;
+  return service.subcontractors.reduce((sum, s) => {
+    return sum + (s.cost || 0) * (1 + (s.markup || 0.15));
+  }, 0);
+}
+
+// Calculate total cost for ENH materials (what we pay)
+function calcENHMaterialsCost(service) {
+  if (!service.materials || service.materials.length === 0) return 0;
+  return service.materials.reduce((sum, m) => sum + (m.quantity || 0) * (m.unitCost || 0), 0);
+}
+
+// Calculate total cost for ENH subcontractors (what we pay)
+function calcENHSubsCost(service) {
+  if (!service.subcontractors || service.subcontractors.length === 0) return 0;
+  return service.subcontractors.reduce((sum, s) => sum + (s.cost || 0), 0);
+}
+
 function getDefaultMeasurementSource(category) {
   // Map item categories to logical default measurement sources
   const categorySourceMap = {
@@ -15299,6 +16585,9 @@ function updateSummaryPanel() {
     // Refresh multi-day allocation if visible
     if (currentEstimate.workTicket.scheduleType === 'multi_day') {
       renderMultiDayAllocation();
+    }
+    if (currentEstimate.workTicket.scheduleType === 'milestone') {
+      renderMilestonePhases();
     }
   }
 }
@@ -15418,8 +16707,11 @@ function startBlankFromPicker() {
   estimateDirty = false;
   startedFromBlank = true; // Flag to skip mowing suggestion
 
-  // Apply pending job type from picker
-  if (window._pendingJobType) {
+  // Apply pending job type from picker (ENH always forces work_ticket)
+  if ((currentEstimate.division || 'MNT') === 'ENH') {
+    currentEstimate.jobType = 'work_ticket';
+    window._pendingJobType = null;
+  } else if (window._pendingJobType) {
     currentEstimate.jobType = window._pendingJobType;
     window._pendingJobType = null;
   }
@@ -15481,8 +16773,11 @@ async function selectTemplateAndStart() {
     await loadEstimateFromTemplate(selectedTemplateId);
   }
 
-  // Apply pending job type from picker
-  if (window._pendingJobType) {
+  // Apply pending job type from picker (ENH always forces work_ticket)
+  if ((currentEstimate.division || 'MNT') === 'ENH') {
+    currentEstimate.jobType = 'work_ticket';
+    window._pendingJobType = null;
+  } else if (window._pendingJobType) {
     currentEstimate.jobType = window._pendingJobType;
     window._pendingJobType = null;
   }
@@ -15534,7 +16829,13 @@ async function loadEstimateFromTemplate(templateId) {
   const duration = data.contractDuration || 12;
   const endDate = new Date(startDate.getFullYear(), startDate.getMonth() + duration, 0);
 
+  // Map template division names to codes (templates use full names like 'Enhancement')
+  const templateDivMap = { 'Enhancement': 'ENH', 'Maintenance': 'MNT', 'Installation': 'CON', 'Commercial': 'CON', 'Irrigation': 'IRR' };
+  const templateDiv = templateDivMap[template.division] || template.division || 'MNT';
+  const isENH = templateDiv === 'ENH';
+
   currentEstimate = {
+    division: templateDiv,
     propertyType: 'Residential',
     propertyAddress: '',
     lotSizeSF: 0,
@@ -15551,7 +16852,8 @@ async function loadEstimateFromTemplate(templateId) {
       paymentTerms: 'Net 30',
       termsAndConditionsHtml: null
     },
-    jobType: 'recurring',
+    // ENH auto-sets to work_ticket; MNT uses pending job type from picker
+    jobType: isENH ? 'work_ticket' : 'recurring',
     workTicket: {
       scheduleType: 'single_visit',
       projectName: '',
@@ -15559,6 +16861,7 @@ async function loadEstimateFromTemplate(templateId) {
       startDate: '',
       numDays: 2,
       hoursPerDay: [],
+      phases: [],
       depositPercent: 25,
       collectDeposit: false
     }
@@ -15685,7 +16988,11 @@ async function editTemplate(templateId) {
   templateDirty = false; // Reset dirty flag when loading template
   currentTemplateId = templateId;
 
+  const editDivMap = { 'Enhancement': 'ENH', 'Maintenance': 'MNT', 'Installation': 'CON', 'Commercial': 'CON', 'Irrigation': 'IRR' };
+  const editDiv = editDivMap[template.division] || template.division || 'MNT';
+
   currentEstimate = {
+    division: editDiv,
     propertyType: 'Residential',
     propertyAddress: '',
     lotSizeSF: 0,
@@ -15784,11 +17091,14 @@ async function saveTemplateFromBuilder() {
   // Get template name - if editing existing template, use that name
   let name, division;
 
+  // Map division codes to full names for template storage
+  const divFullName = { 'MNT': 'Maintenance', 'ENH': 'Enhancement', 'CON': 'Installation', 'IRR': 'Irrigation' };
+
   if (currentTemplateId) {
     const existing = savedTemplates.find(t => t.templateId === currentTemplateId);
     if (existing) {
       name = existing.name;
-      division = existing.division || 'Maintenance';
+      division = existing.division || divFullName[currentEstimate.division] || 'Maintenance';
     }
   }
 
@@ -15799,7 +17109,7 @@ async function saveTemplateFromBuilder() {
       return;
     }
     name = name.trim();
-    division = 'Maintenance';
+    division = divFullName[currentEstimate.division] || 'Maintenance';
   }
 
   const templateData = {
@@ -15912,11 +17222,15 @@ function switchServicePickerTab(tab) {
 function renderServicePickerCatalog() {
   const container = document.getElementById('service-picker-catalog-list');
 
-  // Group services by section
+  // Group services by section — filtered by current estimate's division
   const sections = {};
   const catalog = serviceCatalog.length > 0 ? serviceCatalog : DEFAULT_SERVICE_CATALOG;
+  const estDiv = (currentEstimate && currentEstimate.division) || 'MNT';
 
   catalog.forEach(service => {
+    // Division filter: null/undefined/'' division = MNT (backward compat)
+    const svcDiv = service.division || 'MNT';
+    if (svcDiv !== estDiv) return;
     const section = service.sectionName || 'Other';
     if (!sections[section]) {
       sections[section] = [];
@@ -16291,6 +17605,7 @@ function resetEstimate() {
   const endDate = new Date(startDate.getFullYear() + 1, startDate.getMonth(), 0);
 
   currentEstimate = {
+    division: 'MNT',
     propertyType: 'Residential',
     propertyAddress: '',
     contactId: '',
@@ -16325,6 +17640,7 @@ function resetEstimate() {
       startDate: '',
       numDays: 2,
       hoursPerDay: [],
+      phases: [],
       depositPercent: 25,
       collectDeposit: false
     }
@@ -16373,6 +17689,9 @@ function adaptBuilderForJobType() {
   const wtFields = document.getElementById('wt-project-fields');
   const cardTitle = contractCard ? contractCard.querySelector('.contract-card-header h3') : null;
 
+  // Hide billing tier selector for work tickets (ENH uses single tier)
+  const billingTierRow = document.getElementById('billing-tier-row');
+
   if (isWT) {
     // Change card title
     if (cardTitle) {
@@ -16382,6 +17701,7 @@ function adaptBuilderForJobType() {
     }
     recurringFields.style.display = 'none';
     wtFields.style.display = 'block';
+    if (billingTierRow) billingTierRow.style.display = 'none';
 
     // Populate fields from data model
     document.getElementById('wt-project-name').value = currentEstimate.workTicket.projectName || '';
@@ -16413,6 +17733,7 @@ function adaptBuilderForJobType() {
     }
     recurringFields.style.display = '';
     wtFields.style.display = 'none';
+    if (billingTierRow) billingTierRow.style.display = '';
   }
 }
 
@@ -16425,9 +17746,19 @@ function setScheduleType(type) {
   // Toggle fields
   document.getElementById('wt-single-visit-fields').style.display = type === 'single_visit' ? '' : 'none';
   document.getElementById('wt-multi-day-fields').style.display = type === 'multi_day' ? '' : 'none';
+  document.getElementById('wt-milestone-fields').style.display = type === 'milestone' ? '' : 'none';
+
+  // Show milestone option only for ENH division
+  const milestoneBtn = document.getElementById('wt-milestone-btn');
+  if (milestoneBtn) {
+    milestoneBtn.style.display = (currentEstimate.division === 'ENH') ? '' : 'none';
+  }
 
   if (type === 'multi_day') {
     renderMultiDayAllocation();
+  }
+  if (type === 'milestone') {
+    renderMilestonePhases();
   }
   markEstimateDirty();
 }
@@ -16488,6 +17819,232 @@ function getBusinessDays(startDateStr, count) {
 function formatDateShort(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MILESTONE SCHEDULING (ENH only — new schedule type)
+//  Generates tickets with non-consecutive dates and per-phase
+//  line item assignment. Does NOT modify generateWorkTickets().
+// ═══════════════════════════════════════════════════════════════
+
+function addMilestonePhase() {
+  if (!currentEstimate.workTicket.phases) currentEstimate.workTicket.phases = [];
+  const phaseNum = currentEstimate.workTicket.phases.length + 1;
+  currentEstimate.workTicket.phases.push({
+    phaseId: 'PH-' + Date.now(),
+    label: 'Phase ' + phaseNum,
+    date: '',
+    lineItemAssignments: []
+  });
+  renderMilestonePhases();
+  markEstimateDirty();
+}
+
+function removeMilestonePhase(idx) {
+  if (!currentEstimate.workTicket.phases) return;
+  currentEstimate.workTicket.phases.splice(idx, 1);
+  renderMilestonePhases();
+  markEstimateDirty();
+}
+
+function updateMilestonePhase(idx, field, value) {
+  if (!currentEstimate.workTicket.phases || !currentEstimate.workTicket.phases[idx]) return;
+  currentEstimate.workTicket.phases[idx][field] = value;
+  markEstimateDirty();
+}
+
+function renderMilestonePhases() {
+  const container = document.getElementById('wt-milestone-phases');
+  if (!container) return;
+
+  const phases = currentEstimate.workTicket.phases || [];
+  const totals = calculateBidTotals();
+  const totalHours = totals.totalHours || 0;
+
+  // Collect all assignable items: labor line items + material rows + sub rows
+  const allItems = [];
+  (currentEstimate.services || []).forEach((svc, sIdx) => {
+    (svc.lineItems || []).forEach(li => {
+      allItems.push({
+        id: li.lineItemId || ('LI-' + sIdx + '-' + (li.itemName || '')),
+        label: li.itemName || 'Unnamed item',
+        type: 'labor',
+        serviceIndex: sIdx,
+        serviceName: svc.proposalName || svc.name || ''
+      });
+    });
+    (svc.materials || []).forEach(m => {
+      allItems.push({
+        id: m.materialRowId || ('MAT-' + sIdx + '-' + (m.description || '')),
+        label: (m.description || 'Material') + ' (' + (m.quantity || 0) + ' ' + (m.unit || '') + ')',
+        type: 'material',
+        serviceIndex: sIdx,
+        serviceName: svc.proposalName || svc.name || ''
+      });
+    });
+    (svc.subcontractors || []).forEach(s => {
+      allItems.push({
+        id: s.subRowId || ('SUB-' + sIdx + '-' + (s.description || '')),
+        label: s.description || 'Subcontractor',
+        type: 'sub',
+        serviceIndex: sIdx,
+        serviceName: svc.proposalName || svc.name || ''
+      });
+    });
+  });
+
+  // Build assigned item ID set for all phases (to show unassigned)
+  const assignedSet = new Set();
+  phases.forEach(p => (p.lineItemAssignments || []).forEach(id => assignedSet.add(id)));
+
+  if (phases.length === 0) {
+    container.innerHTML = '<div style="font-size: 12px; color: #80868b; padding: 8px 0;">No phases defined. Click "+ Add Phase" to start.</div>';
+    return;
+  }
+
+  let html = '';
+  phases.forEach((phase, i) => {
+    const phaseItems = (phase.lineItemAssignments || []).map(id => allItems.find(it => it.id === id)).filter(Boolean);
+    html += `<div class="milestone-phase-card" style="background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px; margin-bottom: 8px;">
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+        <input type="text" class="form-input" value="${phase.label}" style="flex: 1; font-size: 12px; font-weight: 600; padding: 4px 8px;"
+          onchange="updateMilestonePhase(${i}, 'label', this.value)">
+        <input type="date" class="form-input" value="${phase.date || ''}" style="width: 140px; font-size: 12px; padding: 4px 8px;"
+          onchange="updateMilestonePhase(${i}, 'date', this.value)">
+        <button type="button" onclick="removeMilestonePhase(${i})" style="background: none; border: none; color: #d32f2f; cursor: pointer; font-size: 16px; padding: 0 4px;" title="Remove phase">&times;</button>
+      </div>
+      <div style="font-size: 11px; color: #5f6368; margin-bottom: 4px;">${phaseItems.length} item${phaseItems.length !== 1 ? 's' : ''} assigned</div>`;
+
+    // Show assigned items as chips
+    if (phaseItems.length > 0) {
+      html += '<div style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px;">';
+      phaseItems.forEach(it => {
+        const color = it.type === 'labor' ? '#e8f0fe' : it.type === 'material' ? '#e6f4ea' : '#fef7e0';
+        html += `<span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; background: ${color}; white-space: nowrap;">${it.label}
+          <span style="cursor: pointer; margin-left: 2px; color: #d32f2f;" onclick="removeMilestoneItem(${i}, '${it.id}')">&times;</span></span>`;
+      });
+      html += '</div>';
+    }
+
+    // Add item picker
+    html += `<select style="font-size: 11px; padding: 3px 6px; border: 1px solid #dadce0; border-radius: 4px; color: #5f6368; width: 100%;" onchange="addMilestoneItem(${i}, this.value); this.value='';">
+      <option value="">+ Assign line item...</option>`;
+    allItems.forEach(it => {
+      if (!assignedSet.has(it.id)) {
+        const prefix = it.type === 'labor' ? '' : it.type === 'material' ? '[M] ' : '[S] ';
+        html += `<option value="${it.id}">${prefix}${it.serviceName}: ${it.label}</option>`;
+      }
+    });
+    html += '</select></div>';
+  });
+
+  // Show unassigned items count
+  const unassignedCount = allItems.filter(it => !assignedSet.has(it.id)).length;
+  if (unassignedCount > 0 && phases.length > 0) {
+    html += `<div style="font-size: 11px; color: #e8a000; margin-top: 4px;">${unassignedCount} item${unassignedCount !== 1 ? 's' : ''} not yet assigned to a phase</div>`;
+  }
+
+  container.innerHTML = html;
+}
+
+function addMilestoneItem(phaseIdx, itemId) {
+  if (!itemId) return;
+  const phases = currentEstimate.workTicket.phases;
+  if (!phases || !phases[phaseIdx]) return;
+
+  // Remove from any other phase first
+  phases.forEach(p => {
+    p.lineItemAssignments = (p.lineItemAssignments || []).filter(id => id !== itemId);
+  });
+
+  phases[phaseIdx].lineItemAssignments.push(itemId);
+  renderMilestonePhases();
+  markEstimateDirty();
+}
+
+function removeMilestoneItem(phaseIdx, itemId) {
+  const phases = currentEstimate.workTicket.phases;
+  if (!phases || !phases[phaseIdx]) return;
+  phases[phaseIdx].lineItemAssignments = (phases[phaseIdx].lineItemAssignments || []).filter(id => id !== itemId);
+  renderMilestonePhases();
+  markEstimateDirty();
+}
+
+// Generate tickets for milestone schedule type — one ticket per phase.
+// Does NOT modify generateWorkTickets() (MNT protection Rule 4).
+function generateMilestoneTickets() {
+  const wt = currentEstimate.workTicket;
+  const phases = wt.phases || [];
+  const totals = calculateBidTotals();
+  const travelPercent = currentEstimate.travelPercent || 0;
+
+  // Build full services array (same shape as generateWorkTickets)
+  const allTicketServices = currentEstimate.services.filter(s => !s.isSubcontractor).map(s => {
+    const serviceHours = calcServiceHours(s);
+    return {
+      name: s.name,
+      proposalName: s.proposalName || s.name,
+      estimatedHours: Math.round(serviceHours * 100) / 100,
+      items: (s.lineItems || []).map(li => ({
+        id: li.lineItemId || '',
+        name: li.itemName,
+        quantities: li.quantities || {},
+        hoursPerVisit: calcItemHoursPerVisit(li)
+      })),
+      materials: (s.materials || []).map(m => ({
+        id: m.materialRowId || '',
+        description: m.description || '',
+        quantity: m.quantity || 0,
+        unit: m.unit || '',
+        billedPrice: (m.quantity || 0) * (m.unitCost || 0) * (1 + (m.markup || 0.20))
+      })),
+      subcontractors: (s.subcontractors || []).map(sub => ({
+        id: sub.subRowId || '',
+        description: sub.description || '',
+        billedPrice: (sub.cost || 0) * (1 + (sub.markup || 0.15))
+      }))
+    };
+  });
+
+  const totalEstHours = allTicketServices.reduce((sum, s) => sum + s.estimatedHours, 0);
+
+  return phases.filter(p => p.date).map((phase, i) => {
+    const assignedIds = new Set(phase.lineItemAssignments || []);
+
+    // Filter services to only include items assigned to this phase
+    const phaseServices = allTicketServices.map(s => {
+      const filteredItems = s.items.filter(li => assignedIds.has(li.id));
+      const filteredMats = s.materials.filter(m => assignedIds.has(m.id));
+      const filteredSubs = s.subcontractors.filter(sub => assignedIds.has(sub.id));
+      if (filteredItems.length === 0 && filteredMats.length === 0 && filteredSubs.length === 0) return null;
+
+      const phaseHours = filteredItems.reduce((sum, li) => sum + (li.hoursPerVisit || 0), 0);
+      return {
+        name: s.name,
+        proposalName: s.proposalName,
+        estimatedHours: Math.round(phaseHours * 100) / 100,
+        items: filteredItems,
+        materials: filteredMats.length > 0 ? filteredMats : undefined,
+        subcontractors: filteredSubs.length > 0 ? filteredSubs : undefined
+      };
+    }).filter(Boolean);
+
+    const phaseEstHours = phaseServices.reduce((sum, s) => sum + s.estimatedHours, 0);
+    const phaseTravelHours = Math.round(phaseEstHours * (travelPercent / 100) * 100) / 100;
+
+    return {
+      eventDate: phase.date,
+      services: phaseServices,
+      totalEstHours: Math.round(phaseEstHours * 100) / 100,
+      travelHours: phaseTravelHours,
+      jobType: 'work_ticket',
+      dayNumber: i + 1,
+      totalDays: phases.filter(p => p.date).length,
+      projectName: wt.projectName || '',
+      phaseLabel: phase.label || ('Phase ' + (i + 1)),
+      phaseId: phase.phaseId
+    };
+  });
 }
 
 function updateSummaryPanelForWorkTicket() {
@@ -16569,7 +18126,7 @@ async function _handleSaveBidInner() {
     propertyId: currentEstimate.propertyId || '',
     contactId: currentEstimate.contactId || '',
     contactName: currentEstimate.contactName || '',
-    division: bidSettings.division || 'Maintenance',
+    division: currentEstimate.division || 'MNT',
     propertyType: currentEstimate.propertyType,
     lotSizeSF: currentEstimate.lotSizeSF,
     laborRate: bidSettings.laborRate,
@@ -16764,6 +18321,7 @@ async function saveCatalogItem() {
       type: itemType,
       unit: unit,
       category: category,
+      division: catalogDivisionFilter || 'MNT',
       easy: easy,
       medium: medium,
       hard: hard,
