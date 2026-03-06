@@ -35,6 +35,7 @@ Resources:
               - "http://127.0.0.1:8000"
             AllowedMethods:
               - PUT
+              - GET
             AllowedHeaders:
               - Content-Type
             MaxAge: 3600
