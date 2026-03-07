@@ -5953,7 +5953,7 @@ function parseSSEBuffer(buffer) {
       if (currentEvent && currentData !== null) {
         try {
           parsed.push({ event: currentEvent, data: JSON.parse(currentData) });
-        } catch(e) { /* skip malformed JSON */ }
+        } catch(e) { console.warn('MARVIN SSE: malformed JSON in event', currentEvent, currentData); }
         lastParsedEnd = lines.slice(0, i + 1).join('\n').length + 1;
       }
       currentEvent = null;
@@ -6014,8 +6014,11 @@ async function streamMarvinResponse(prompt, historySlice, context, refs) {
           fullText = evt.data.message || fullText;
           action = evt.data.action || null;
           break;
-        case 'error':
-          throw new Error(evt.data.error || 'Stream error');
+        case 'error': {
+          const streamErr = new Error(evt.data.error || 'Stream error');
+          streamErr.marvinPartialText = fullText;
+          throw streamErr;
+        }
       }
     }
   }
@@ -7373,10 +7376,24 @@ async function sendMarvinMessage() {
       marvinChatHistory.push({ role: 'assistant', content: '(stopped)' });
     } else {
       console.error('MARVIN chat error:', err);
-      const errMsg = 'Sorry, I had trouble processing that. Please try again.';
-      refs.bubble.innerHTML = formatMarvinText(errMsg);
-      refs.bubble.classList.remove('typing');
-      marvinChatHistory.push({ role: 'assistant', content: errMsg });
+      // If MARVIN already streamed text before the error, show that
+      const partialText = err.marvinPartialText || '';
+      const bubbleText = refs.bubble.innerText || '';
+      if (partialText.trim() || bubbleText.trim()) {
+        // Keep whatever MARVIN already said — it's probably a good response
+        const displayText = partialText.trim() || bubbleText.trim();
+        refs.bubble.innerHTML = formatMarvinText(displayText);
+        refs.bubble.classList.remove('typing');
+        marvinChatHistory.push({ role: 'assistant', content: displayText });
+      } else {
+        // No streamed text at all — show the actual error, not a generic message
+        const errMsg = err.message && err.message !== 'Stream error'
+          ? 'Something went wrong: ' + err.message
+          : 'I couldn\'t reach the server. Check your connection and try again.';
+        refs.bubble.innerHTML = formatMarvinText(errMsg);
+        refs.bubble.classList.remove('typing');
+        marvinChatHistory.push({ role: 'assistant', content: errMsg });
+      }
     }
   } finally {
     marvinIsThinking = false;
@@ -7453,10 +7470,19 @@ async function sendMarvinBriefingMessage(promptText) {
 
   } catch (err) {
     console.error('MARVIN briefing error:', err);
-    const fallback = 'Good morning! Briefing couldn\'t load, but I\'m here — ask me anything.';
-    refs.bubble.innerHTML = formatMarvinText(fallback);
-    refs.bubble.classList.remove('typing');
-    marvinChatHistory.push({ role: 'assistant', content: fallback });
+    const partialText = err.marvinPartialText || '';
+    const bubbleText = refs.bubble.innerText || '';
+    if (partialText.trim() || bubbleText.trim()) {
+      const displayText = partialText.trim() || bubbleText.trim();
+      refs.bubble.innerHTML = formatMarvinText(displayText);
+      refs.bubble.classList.remove('typing');
+      marvinChatHistory.push({ role: 'assistant', content: displayText });
+    } else {
+      const fallback = 'Good morning! Briefing couldn\'t load, but I\'m here — ask me anything.';
+      refs.bubble.innerHTML = formatMarvinText(fallback);
+      refs.bubble.classList.remove('typing');
+      marvinChatHistory.push({ role: 'assistant', content: fallback });
+    }
   } finally {
     marvinIsThinking = false;
     marvinStreamController = null;
@@ -7730,10 +7756,21 @@ async function sendMarvinIdentifyMessage(context) {
 
   } catch (err) {
     console.error('MARVIN identify error:', err);
-    const errMsg = 'Sorry, I couldn\'t identify that element. Please try again.';
-    refs.bubble.innerHTML = formatMarvinText(errMsg);
-    refs.bubble.classList.remove('typing');
-    marvinChatHistory.push({ role: 'assistant', content: errMsg });
+    const partialText = err.marvinPartialText || '';
+    const bubbleText = refs.bubble.innerText || '';
+    if (partialText.trim() || bubbleText.trim()) {
+      const displayText = partialText.trim() || bubbleText.trim();
+      refs.bubble.innerHTML = formatMarvinText(displayText);
+      refs.bubble.classList.remove('typing');
+      marvinChatHistory.push({ role: 'assistant', content: displayText });
+    } else {
+      const errMsg = err.message && err.message !== 'Stream error'
+        ? 'Something went wrong: ' + err.message
+        : 'I couldn\'t identify that element. Check your connection and try again.';
+      refs.bubble.innerHTML = formatMarvinText(errMsg);
+      refs.bubble.classList.remove('typing');
+      marvinChatHistory.push({ role: 'assistant', content: errMsg });
+    }
   } finally {
     marvinIsThinking = false;
     marvinStreamController = null;
