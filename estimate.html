@@ -9568,9 +9568,9 @@ async function loadAllData() {
         try { bidSettings.plantCategories = JSON.parse(bidSettings.plantCategories); } catch (e) { bidSettings.plantCategories = null; }
       }
       renderSettingsForm();
-      refreshPlantCategoryDropdowns();
       debugLog('Loaded bid settings');
     }
+    refreshPlantCategoryDropdowns();
 
     // Contracts (load before bids so filtering works)
     if (data.contracts && data.contracts.success) {
