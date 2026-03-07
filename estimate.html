@@ -22888,9 +22888,9 @@ function trExportPayroll() {
 
   // Download
   const startStr = trDateStr(trWeekStart);
-  const end = new Date(trWeekStart);
-  end.setDate(end.getDate() + 6);
-  const endStr = trDateStr(end);
+  const endDl = new Date(trWeekStart);
+  endDl.setDate(endDl.getDate() + 6);
+  const endStr = trDateStr(endDl);
   trDownloadCSV(csv, `Endurance-Payroll-${startStr}-to-${endStr}.csv`);
   showToast('Payroll CSV exported', 'success');
 
