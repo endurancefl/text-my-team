@@ -7033,6 +7033,17 @@ function clearMarvinFile() {
   document.getElementById('marvin-sheet-picker').style.display = 'none';
 }
 
+async function ensureMarvinData() {
+  const loads = [];
+  if (typeof plantCatalog !== 'undefined' && (!plantCatalog || plantCatalog.length === 0)) {
+    if (typeof loadAndRenderPlantCatalog === 'function') loads.push(loadAndRenderPlantCatalog());
+  }
+  if (typeof properties !== 'undefined' && (!properties || properties.length === 0)) {
+    if (typeof loadPropertiesFromBackend === 'function') loads.push(loadPropertiesFromBackend());
+  }
+  if (loads.length > 0) await Promise.all(loads);
+}
+
 function buildMarvinContext() {
   const ctx = {
     currentView: currentView || 'estimates',
@@ -7365,6 +7376,7 @@ async function sendMarvinMessage() {
   messages.scrollTop = messages.scrollHeight;
 
   try {
+    await ensureMarvinData();
     const context = buildMarvinContext();
 
     // Attach file data if present
@@ -7489,6 +7501,7 @@ async function sendMarvinBriefingMessage(promptText) {
   messages.scrollTop = messages.scrollHeight;
 
   try {
+    await ensureMarvinData();
     const context = buildMarvinContext();
 
     if (MARVIN_STREAM_URL) {
@@ -7779,6 +7792,7 @@ async function sendMarvinIdentifyMessage(context) {
   messagesEl.scrollTop = messagesEl.scrollHeight;
 
   try {
+    await ensureMarvinData();
     const ctx = buildMarvinContext();
 
     if (MARVIN_STREAM_URL) {
