@@ -7701,6 +7701,18 @@
             ctx.strokeRect(r.x, r.y, r.w, r.h);
           });
           c.toBlob(function(blob) {
+            if (!blob) {
+              console.error('S3 upload: toBlob returned null — photo too large for canvas. Dimensions:', w, 'x', h);
+              photo.s3Uploaded = false;
+              photo.s3Uploading = false;
+              photo.s3Failed = true;
+              photo.s3Key = null;
+              session.nextIndex--;
+              srState.s3Pending--;
+              srRebuildThumbstrip();
+              return;
+            }
+            console.log('S3 upload: blob size', (blob.size / 1024).toFixed(0) + 'KB for', w + 'x' + h);
             s3UploadBlob(blob, url).then(function() {
               photo.s3Uploaded = true;
               photo.s3Uploading = false;
@@ -7708,7 +7720,8 @@
               photo._lastUploadedRectCount = photo.rects.length;
               srState.s3Pending--;
               srRebuildThumbstrip();
-            }).catch(function() {
+            }).catch(function(err) {
+              console.error('S3 upload failed:', err.message || err);
               photo.s3Uploaded = false;
               photo.s3Uploading = false;
               photo.s3Failed = true;
@@ -7719,8 +7732,18 @@
             });
           }, 'image/jpeg', 0.80);
         };
+        img.onerror = function() {
+          console.error('S3 upload: Image failed to load from base64, length:', (photo.originalBase64 || '').length);
+          photo.s3Uploading = false;
+          photo.s3Failed = true;
+          photo.s3Key = null;
+          session.nextIndex--;
+          srState.s3Pending--;
+          srRebuildThumbstrip();
+        };
         img.src = photo.originalBase64;
-      }).catch(function() {
+      }).catch(function(err) {
+        console.error('S3 session/upload error:', err.message || err);
         photo.s3Uploading = false;
         photo.s3Failed = true;
         srState.s3Pending--;
