@@ -7795,9 +7795,34 @@
           }),
           savedAt: Date.now()
         };
-        localStorage.setItem(SR_DRAFT_KEY, JSON.stringify(draft));
+        var json = JSON.stringify(draft);
+        try {
+          localStorage.setItem(SR_DRAFT_KEY, json);
+        } catch (quotaErr) {
+          // localStorage full — try again with thumbnails only (much smaller)
+          console.warn('Draft too large (' + (json.length / 1024 / 1024).toFixed(1) + 'MB), saving thumbnails only');
+          draft.photos = draft.photos.map(function(p) {
+            return {
+              originalBase64: p.thumbBase64 || p.originalBase64,  // fallback to thumb
+              thumbBase64: p.thumbBase64,
+              imgWidth: p.imgWidth,
+              imgHeight: p.imgHeight,
+              rects: p.rects,
+              note: p.note,
+              category: p.category
+            };
+          });
+          draft._thumbnailsOnly = true;
+          try {
+            localStorage.setItem(SR_DRAFT_KEY, JSON.stringify(draft));
+            console.log('Draft saved with thumbnails only');
+          } catch (e2) {
+            console.error('Draft save failed even with thumbnails — localStorage full');
+            iosAlert('Warning: report draft could not be saved. Do not close this page.');
+          }
+        }
       } catch (e) {
-        // localStorage full or unavailable — silently ignore
+        console.error('Draft save error:', e);
       }
     }
 
@@ -7835,7 +7860,11 @@
           note: p.note || '',
           category: p.category || '',
           uploaded: false,
-          failed: false
+          failed: false,
+          s3Uploaded: false,
+          s3Uploading: false,
+          s3Failed: false,
+          s3Key: null
         };
       });
 
