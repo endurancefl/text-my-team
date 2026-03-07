@@ -363,20 +363,30 @@ def generate_standard_report(metadata, photo_buffers, test=False):
     FIRST_PAGE = 4
     LATER_PAGE = 6
 
-    def make_rows(photos):
+    def make_rows(photos, prev_cat=""):
         rows = []
+        cur_cat = prev_cat
         for j in range(0, len(photos), 2):
             left = photos[j]
             right = photos[j + 1] if j + 1 < len(photos) else None
-            rows.append({"left": left, "right": right})
-        return rows
+            # Check if this row starts a new category
+            cat_header = ""
+            if left["category"] != cur_cat:
+                cat_header = left["category"]
+                cur_cat = left["category"]
+            if right and right["category"] != cur_cat:
+                cur_cat = right["category"]
+            rows.append({"left": left, "right": right, "cat_header": cat_header})
+        return rows, cur_cat
 
     pages = []
     if all_photos:
-        pages.append({"rows": make_rows(all_photos[:FIRST_PAGE]), "first": True})
+        rows, last_cat = make_rows(all_photos[:FIRST_PAGE])
+        pages.append({"rows": rows, "first": True})
         remaining = all_photos[FIRST_PAGE:]
         while remaining:
-            pages.append({"rows": make_rows(remaining[:LATER_PAGE]), "first": False})
+            rows, last_cat = make_rows(remaining[:LATER_PAGE], last_cat)
+            pages.append({"rows": rows, "first": False})
             remaining = remaining[LATER_PAGE:]
 
     context = {

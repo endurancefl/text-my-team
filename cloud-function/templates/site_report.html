@@ -43,6 +43,13 @@
 {% if not page.first %}<div style="page-break-before:always;"></div>{% endif %}
 <table class="photo-table" cellspacing="0" cellpadding="0">
   {% for row in page.rows %}
+  {% if row.cat_header %}
+  <tr>
+    <td colspan="3" class="cat-header-td">
+      <div class="category-header">{{ row.cat_header }}</div>
+    </td>
+  </tr>
+  {% endif %}
   <tr>
     <td class="photo-td">
       <div class="photo-frame {{ 'frame-first' if page.first else 'frame-full' }}">

@@ -40,3 +40,15 @@
   line-height: 1.25;
   overflow: hidden;
 }
+
+.cat-header-td {
+  padding-bottom: 8px;
+}
+
+.cat-header-td .category-header {
+  background: var(--green);
+  color: var(--white);
+  font-weight: bold;
+  font-size: 10pt;
+  padding: 5px 8px;
+}
