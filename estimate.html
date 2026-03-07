@@ -1245,14 +1245,8 @@
             <div class="plant-catalog-header">
               <div class="plant-catalog-search">
                 <input type="text" id="plant-search" class="form-input" placeholder="Search plants..." oninput="filterPlantCatalog()">
-                <select id="plant-category-filter" class="form-select" onchange="filterPlantCatalog()" style="width:auto;">
+                <select id="plant-category-filter" class="form-select" onchange="handlePlantCategoryFilterSelect(this)" style="width:auto;">
                   <option value="">All Categories</option>
-                  <option value="Shrub">Shrub</option>
-                  <option value="Tree">Tree</option>
-                  <option value="Annual">Annual</option>
-                  <option value="Perennial">Perennial</option>
-                  <option value="Ornamental Grass">Ornamental Grass</option>
-                  <option value="Ground Cover">Ground Cover</option>
                 </select>
               </div>
               <div class="plant-catalog-actions">
@@ -1282,13 +1276,7 @@
                 </div>
                 <div class="form-group">
                   <label class="form-label">Category</label>
-                  <select id="plant-category" class="form-select">
-                    <option value="Shrub">Shrub</option>
-                    <option value="Tree">Tree</option>
-                    <option value="Annual">Annual</option>
-                    <option value="Perennial">Perennial</option>
-                    <option value="Ornamental Grass">Ornamental Grass</option>
-                    <option value="Ground Cover">Ground Cover</option>
+                  <select id="plant-category" class="form-select" onchange="handlePlantCategorySelect(this)">
                   </select>
                 </div>
                 <div class="form-group">
@@ -2999,6 +2987,8 @@ let itemCatalog = [
   { item: 'Plant Removal — Tree', type: 'Labor', unit: 'Each/Hour', easy: 2, medium: 1, hard: 0.5, category: 'Renovation', division: 'ENH' },
   { item: 'Grade & Shape Bed', type: 'Labor', unit: 'SF/Hour', easy: 300, medium: 200, hard: 100, category: 'Renovation', division: 'ENH' }
 ];
+const DEFAULT_PLANT_CATEGORIES = ['Shrub', 'Tree', 'Annual', 'Perennial', 'Ornamental Grass', 'Ground Cover'];
+
 let bidSettings = {
   laborRate: 22.50,
   residentialLaborMarkup: 151.72,
@@ -3013,6 +3003,25 @@ let bidSettings = {
   dailyCrewCapacity: 33,
   dayClockAlertHours: 10
 };
+
+function buildFullSettingsPayload() {
+  return {
+    laborRate: bidSettings.laborRate,
+    residentialLaborMarkup: bidSettings.residentialLaborMarkup,
+    residentialMaterialMarkup: bidSettings.residentialMaterialMarkup,
+    residentialSubMarkup: bidSettings.residentialSubMarkup,
+    commercialLaborMarkup: bidSettings.commercialLaborMarkup,
+    commercialMaterialMarkup: bidSettings.commercialMaterialMarkup,
+    commercialSubMarkup: bidSettings.commercialSubMarkup,
+    defaultTravelTime: bidSettings.defaultTravelTime,
+    defaultMulchDepth: bidSettings.defaultMulchDepth,
+    defaultMulchPricePerYard: bidSettings.defaultMulchPricePerYard,
+    marvinKnowledgeBase: bidSettings.marvinKnowledgeBase || '',
+    dailyCrewCapacity: bidSettings.dailyCrewCapacity,
+    dayClockAlertHours: bidSettings.dayClockAlertHours || 10,
+    plantCategories: JSON.stringify(bidSettings.plantCategories || DEFAULT_PLANT_CATEGORIES)
+  };
+}
 let savedBids = [];
 let savedTemplates = [];
 let serviceCatalog = []; // Service Catalog entries from Google Sheets
@@ -6281,6 +6290,237 @@ function updateMarvinMapping(selectEl) {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  MARVIN IMPORT — Review Step (full row preview before commit)
+// ═══════════════════════════════════════════════════════════════
+
+function mirFlagValue(field, val) {
+  // Returns a warning message if the value looks ambiguous, empty string otherwise
+  if (!val) return '';
+  const s = String(val).trim();
+  if (field === 'size') {
+    // Range pattern: "30-45", "3-5 gallon", "30/45 gal"
+    if (/\d\s*[-\/]\s*\d/.test(s)) return 'Range detected — pick one size';
+    // Multiple sizes: "30 or 45", "30 & 45"
+    if (/\d\s+(?:or|and|&)\s+\d/i.test(s)) return 'Multiple sizes — pick one';
+  }
+  if (field === 'unitCost' || field === 'costPerUnit') {
+    // Range in price: "$30-$45", "30-45"
+    if (/\d\s*[-\/]\s*\d/.test(s)) return 'Price range — pick one value';
+  }
+  return '';
+}
+
+function renderMarvinImportReviewTable(actionId) {
+  const action = _marvinPendingActions[actionId];
+  if (!action || !action.data) return '';
+  const d = action.data;
+  const mappings = d.mappings || {};
+  const mappedCols = Object.entries(mappings).filter(([, dst]) => dst !== '(skip)');
+  if (mappedCols.length === 0) return '<div class="mir-warning">No columns mapped.</div>';
+
+  const isPlantCatalog = d.target === 'plantCatalog';
+  const hasCategoryMapped = isPlantCatalog && mappedCols.some(([, dst]) => dst === 'category');
+  const categoryOptions = getPlantCategories();
+
+  // Build review rows from file data or PDF extracted rows
+  let rows;
+  if (d.source === 'pdf' && d.extractedRows) {
+    rows = d.extractedRows.map((mapped, idx) => ({ idx, mapped: {...mapped}, selected: true }));
+  } else if (marvinAttachedFile && marvinAttachedFile.allRows) {
+    const headers = marvinAttachedFile.headers;
+    rows = marvinAttachedFile.allRows.map((row, idx) => {
+      const mapped = {};
+      Object.entries(mappings).forEach(([srcCol, dstField]) => {
+        if (dstField === '(skip)') return;
+        const colIdx = headers.indexOf(srcCol);
+        if (colIdx >= 0 && row[colIdx] !== undefined) {
+          mapped[dstField] = row[colIdx];
+        }
+      });
+      return { idx, mapped, selected: true };
+    });
+  } else {
+    return '<div class="mir-warning">File data no longer available.</div>';
+  }
+
+  action._reviewRows = rows;
+
+  const totalCount = rows.length;
+  const selectedCount = rows.filter(r => r.selected).length;
+
+  // Count flagged cells
+  let flagCount = 0;
+  rows.forEach(r => {
+    mappedCols.forEach(([, dst]) => {
+      if (dst === 'category') return;
+      const val = r.mapped[dst] !== undefined ? String(r.mapped[dst]) : '';
+      if (mirFlagValue(dst, val)) flagCount++;
+    });
+  });
+
+  let html = '';
+
+  // Warning banner for plantCatalog without category column
+  if (isPlantCatalog && !hasCategoryMapped) {
+    html += `<div class="mir-warning"><span class="material-icons-outlined" style="font-size:16px;vertical-align:middle;">warning</span> No category column mapped — all rows will default to "Shrub". Use the dropdowns below to set categories per row.</div>`;
+  }
+
+  // Warning banner for flagged values
+  if (flagCount > 0) {
+    html += `<div class="mir-warning"><span class="material-icons-outlined" style="font-size:16px;vertical-align:middle;">warning</span> ${flagCount} value${flagCount > 1 ? 's' : ''} flagged for review (highlighted in orange). Click to edit.</div>`;
+  }
+
+  // Controls row: select all + count
+  html += `<div class="mir-controls">
+    <label class="mir-select-all"><input type="checkbox" checked onchange="toggleAllReviewRows('${actionId}', this.checked)"> Select all</label>
+    <span class="mir-count" id="mir-count-${actionId}">${selectedCount} of ${totalCount} selected</span>
+  </div>`;
+
+  // Header row
+  const dstLabels = mappedCols.map(([, dst]) => dst);
+  html += `<div class="mir-table-wrap" id="mir-table-${actionId}"><div class="mir-header"><span class="mir-cell mir-cell-cb"></span>`;
+  dstLabels.forEach(label => {
+    html += `<span class="mir-cell">${escapeHtml(label)}</span>`;
+  });
+  if (isPlantCatalog) {
+    html += `<span class="mir-cell mir-cell-cat">Category</span>`;
+  }
+  html += `</div>`;
+
+  // Data rows — all text cells are editable inputs, category stays as dropdown
+  rows.forEach((r, i) => {
+    const rowClass = r.selected ? 'mir-row' : 'mir-row mir-excluded';
+    html += `<div class="${rowClass}" id="mir-row-${actionId}-${i}">`;
+    html += `<span class="mir-cell mir-cell-cb"><input type="checkbox" ${r.selected ? 'checked' : ''} onchange="toggleReviewRow('${actionId}', ${i}, this.checked)"></span>`;
+    mappedCols.forEach(([, dst]) => {
+      if (isPlantCatalog && dst === 'category') return; // handled by dropdown below
+      const val = r.mapped[dst] !== undefined ? String(r.mapped[dst]) : '';
+      const flag = mirFlagValue(dst, val);
+      const warnClass = flag ? ' mir-cell-warn' : '';
+      html += `<span class="mir-cell${warnClass}"${flag ? ` title="${escapeHtml(flag)}"` : ''}>`;
+      html += `<input type="text" class="mir-input${flag ? ' mir-input-warn' : ''}" value="${escapeHtml(val)}" data-action="${actionId}" data-row="${i}" data-field="${dst}" onchange="updateReviewRowField(this)"${flag ? ` title="${escapeHtml(flag)}"` : ''}>`;
+      html += `</span>`;
+    });
+    if (isPlantCatalog) {
+      const currentCat = r.mapped.category || (hasCategoryMapped ? '' : 'Shrub');
+      if (!r.mapped.category && !hasCategoryMapped) r.mapped.category = 'Shrub';
+      html += `<span class="mir-cell mir-cell-cat"><select class="mir-cat-select" onchange="handleReviewCategorySelect('${actionId}', ${i}, this)">`;
+      categoryOptions.forEach(opt => {
+        html += `<option value="${escapeHtml(opt)}" ${currentCat === opt ? 'selected' : ''}>${escapeHtml(opt)}</option>`;
+      });
+      html += `<option value="__add_new__">+ Add Category</option>`;
+      html += `</select></span>`;
+    }
+    html += `</div>`;
+  });
+
+  html += `</div>`;
+  return html;
+}
+
+function toggleAllReviewRows(actionId, checked) {
+  const action = _marvinPendingActions[actionId];
+  if (!action || !action._reviewRows) return;
+  action._reviewRows.forEach((r, i) => {
+    r.selected = checked;
+    const rowEl = document.getElementById(`mir-row-${actionId}-${i}`);
+    if (rowEl) {
+      rowEl.className = checked ? 'mir-row' : 'mir-row mir-excluded';
+      const cb = rowEl.querySelector('input[type="checkbox"]');
+      if (cb) cb.checked = checked;
+    }
+  });
+  updateReviewCount(actionId);
+}
+
+function toggleReviewRow(actionId, rowIdx, checked) {
+  const action = _marvinPendingActions[actionId];
+  if (!action || !action._reviewRows) return;
+  action._reviewRows[rowIdx].selected = checked;
+  const rowEl = document.getElementById(`mir-row-${actionId}-${rowIdx}`);
+  if (rowEl) {
+    rowEl.className = checked ? 'mir-row' : 'mir-row mir-excluded';
+  }
+  updateReviewCount(actionId);
+}
+
+function updateReviewRowCategory(actionId, rowIdx, value) {
+  const action = _marvinPendingActions[actionId];
+  if (!action || !action._reviewRows) return;
+  action._reviewRows[rowIdx].mapped.category = value;
+}
+
+async function handleReviewCategorySelect(actionId, rowIdx, selectEl) {
+  if (selectEl.value !== '__add_new__') {
+    updateReviewRowCategory(actionId, rowIdx, selectEl.value);
+    return;
+  }
+  const name = prompt('Enter new plant category name:');
+  if (!name || !name.trim()) {
+    selectEl.value = 'Shrub';
+    updateReviewRowCategory(actionId, rowIdx, 'Shrub');
+    return;
+  }
+  const trimmed = name.trim();
+  const cats = getPlantCategories();
+  if (!cats.some(c => c.toLowerCase() === trimmed.toLowerCase())) {
+    cats.push(trimmed);
+    bidSettings.plantCategories = cats;
+    await saveBidSettings(buildFullSettingsPayload());
+    showToast(`Category "${trimmed}" added`, 'success');
+  }
+  // Rebuild all mir-cat-select dropdowns in the review table to include the new option
+  const action = _marvinPendingActions[actionId];
+  if (action && action._reviewRows) {
+    const updatedCats = getPlantCategories();
+    document.querySelectorAll(`#mir-table-${actionId} .mir-cat-select`).forEach((sel, i) => {
+      const current = action._reviewRows[i]?.mapped.category || 'Shrub';
+      sel.innerHTML = updatedCats.map(c => `<option value="${escapeHtml(c)}" ${c === current ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('') +
+        '<option value="__add_new__">+ Add Category</option>';
+    });
+  }
+  selectEl.value = trimmed;
+  updateReviewRowCategory(actionId, rowIdx, trimmed);
+  refreshPlantCategoryDropdowns();
+}
+
+function updateReviewRowField(inputEl) {
+  const actionId = inputEl.getAttribute('data-action');
+  const rowIdx = parseInt(inputEl.getAttribute('data-row'));
+  const field = inputEl.getAttribute('data-field');
+  const action = _marvinPendingActions[actionId];
+  if (!action || !action._reviewRows) return;
+  action._reviewRows[rowIdx].mapped[field] = inputEl.value;
+  // Re-check flag status after edit
+  const flag = mirFlagValue(field, inputEl.value);
+  const cell = inputEl.closest('.mir-cell');
+  if (flag) {
+    inputEl.classList.add('mir-input-warn');
+    inputEl.title = flag;
+    if (cell) cell.classList.add('mir-cell-warn');
+  } else {
+    inputEl.classList.remove('mir-input-warn');
+    inputEl.title = '';
+    if (cell) cell.classList.remove('mir-cell-warn');
+  }
+}
+
+function updateReviewCount(actionId) {
+  const action = _marvinPendingActions[actionId];
+  if (!action || !action._reviewRows) return;
+  const total = action._reviewRows.length;
+  const selected = action._reviewRows.filter(r => r.selected).length;
+  const countEl = document.getElementById(`mir-count-${actionId}`);
+  if (countEl) countEl.textContent = `${selected} of ${total} selected`;
+  // Update confirm button text
+  const btnEl = document.getElementById(`mir-confirm-btn-${actionId}`);
+  if (btnEl) {
+    btnEl.innerHTML = `<span class="material-icons-outlined">check</span> Confirm Import ${selected} rows`;
+    btnEl.disabled = selected === 0;
+  }
+}
+
 function downloadExtractedCSV(actionId) {
   const action = _marvinPendingActions[actionId];
   if (!action || !action.data || !action.data.extractedRows) {
@@ -7495,7 +7735,11 @@ function applyMarvinAction(actionId, btn) {
       applyMarvinKBUpdate(action.data);
       break;
     case 'importData':
-      applyMarvinImport(action.data);
+      if (!action._reviewShown) {
+        showImportReviewStep(actionId, btn);
+      } else {
+        applyMarvinImportFiltered(actionId);
+      }
       return; // importData manages its own button state
     default:
       showToast('Unknown action type', 'error');
@@ -7601,19 +7845,7 @@ async function applyMarvinKBUpdate(data) {
 
   // Auto-save to backend
   try {
-    await saveBidSettings({
-      laborRate: bidSettings.laborRate,
-      residentialLaborMarkup: bidSettings.residentialLaborMarkup,
-      residentialMaterialMarkup: bidSettings.residentialMaterialMarkup,
-      residentialSubMarkup: bidSettings.residentialSubMarkup,
-      commercialLaborMarkup: bidSettings.commercialLaborMarkup,
-      commercialMaterialMarkup: bidSettings.commercialMaterialMarkup,
-      commercialSubMarkup: bidSettings.commercialSubMarkup,
-      defaultTravelTime: bidSettings.defaultTravelTime,
-      defaultMulchDepth: bidSettings.defaultMulchDepth,
-      defaultMulchPricePerYard: bidSettings.defaultMulchPricePerYard,
-      marvinKnowledgeBase: kb
-    });
+    await saveBidSettings(buildFullSettingsPayload());
   } catch (e) {
     console.warn('Could not auto-save knowledge base:', e);
   }
@@ -7642,12 +7874,53 @@ async function applyMarvinKBUpdate(data) {
  * For PDFs: add source: "pdf" and extractedRows: [all rows as mapped objects]
  */
 
+function showImportReviewStep(actionId, btn) {
+  const action = _marvinPendingActions[actionId];
+  if (!action || !action.data) return;
+  action._reviewShown = true;
+
+  expandMarvinPanel();
+
+  // Hide mapping dropdowns
+  const mappingsEl = document.getElementById('marvin-mappings-' + actionId);
+  if (mappingsEl) mappingsEl.style.display = 'none';
+
+  // Replace preview area with full review table
+  const previewWrap = document.getElementById('marvin-preview-' + actionId);
+  if (previewWrap) {
+    previewWrap.innerHTML = renderMarvinImportReviewTable(actionId);
+  }
+
+  // Change button to confirm
+  const selectedCount = (action._reviewRows || []).filter(r => r.selected).length;
+  btn.id = `mir-confirm-btn-${actionId}`;
+  btn.innerHTML = `<span class="material-icons-outlined">check</span> Confirm Import ${selectedCount} rows`;
+}
+
+function applyMarvinImportFiltered(actionId) {
+  const action = _marvinPendingActions[actionId];
+  if (!action || !action._reviewRows) return;
+
+  const selectedRows = action._reviewRows.filter(r => r.selected);
+  if (selectedRows.length === 0) {
+    showToast('No rows selected', 'error');
+    return;
+  }
+
+  // Pass filtered mapped rows into data for applyMarvinImport
+  action.data._filteredMappedRows = selectedRows.map(r => r.mapped);
+  applyMarvinImport(action.data);
+}
+
 async function applyMarvinImport(data) {
   const { target, mappings, source } = data;
 
   let importRows;
 
-  if (source === 'pdf' && data.extractedRows) {
+  // Use pre-filtered rows from review step if available
+  if (data._filteredMappedRows) {
+    importRows = data._filteredMappedRows;
+  } else if (source === 'pdf' && data.extractedRows) {
     importRows = data.extractedRows;
   } else if (marvinAttachedFile && marvinAttachedFile.allRows) {
     const headers = marvinAttachedFile.headers;
@@ -9291,7 +9564,11 @@ async function loadAllData() {
     // Bid settings
     if (data.bidSettings && data.bidSettings.success && data.bidSettings.settings) {
       bidSettings = { ...bidSettings, ...data.bidSettings.settings };
+      if (typeof bidSettings.plantCategories === 'string') {
+        try { bidSettings.plantCategories = JSON.parse(bidSettings.plantCategories); } catch (e) { bidSettings.plantCategories = null; }
+      }
       renderSettingsForm();
+      refreshPlantCategoryDropdowns();
       debugLog('Loaded bid settings');
     }
 
@@ -9428,6 +9705,10 @@ async function loadBidSettings() {
     debugLog('Bid settings response:', data);
     if (data.success && data.settings) {
       bidSettings = { ...bidSettings, ...data.settings };
+      // Parse plantCategories from JSON string if needed
+      if (typeof bidSettings.plantCategories === 'string') {
+        try { bidSettings.plantCategories = JSON.parse(bidSettings.plantCategories); } catch (e) { bidSettings.plantCategories = null; }
+      }
       renderSettingsForm();
       debugLog('Loaded settings from API');
     } else {
@@ -9437,6 +9718,7 @@ async function loadBidSettings() {
     console.error('Error loading bid settings:', err);
     debugLog('Using default settings');
   }
+  refreshPlantCategoryDropdowns();
 }
 
 async function loadBids() {
@@ -11971,6 +12253,79 @@ async function createDefaultServiceCatalog() {
 let plantCatalog = [];
 let plantImportData = null;
 
+function getPlantCategories() {
+  if (bidSettings.plantCategories && Array.isArray(bidSettings.plantCategories) && bidSettings.plantCategories.length > 0) {
+    return bidSettings.plantCategories;
+  }
+  return DEFAULT_PLANT_CATEGORIES;
+}
+
+function refreshPlantCategoryDropdowns(selectedValue) {
+  const cats = getPlantCategories();
+
+  // Filter dropdown (includes "All Categories" first + "+ Add Category" at bottom)
+  const filterEl = document.getElementById('plant-category-filter');
+  if (filterEl) {
+    const currentFilter = filterEl.value;
+    filterEl.innerHTML = '<option value="">All Categories</option>' +
+      cats.map(c => `<option value="${escapeHtml(c)}" ${c === currentFilter ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('') +
+      '<option value="__add_new__">+ Add Category</option>';
+  }
+
+  // Form dropdown (includes "+ Add Category" at bottom)
+  const formEl = document.getElementById('plant-category');
+  if (formEl) {
+    const val = selectedValue || formEl.value || 'Shrub';
+    formEl.innerHTML = cats.map(c => `<option value="${escapeHtml(c)}" ${c === val ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('') +
+      '<option value="__add_new__">+ Add Category</option>';
+  }
+}
+
+async function handlePlantCategorySelect(selectEl) {
+  if (selectEl.value !== '__add_new__') return;
+  const name = prompt('Enter new plant category name:');
+  if (!name || !name.trim()) {
+    selectEl.value = 'Shrub';
+    return;
+  }
+  const trimmed = name.trim();
+  const cats = getPlantCategories();
+  if (cats.some(c => c.toLowerCase() === trimmed.toLowerCase())) {
+    selectEl.value = trimmed;
+    return;
+  }
+  cats.push(trimmed);
+  bidSettings.plantCategories = cats;
+  await saveBidSettings(buildFullSettingsPayload());
+  refreshPlantCategoryDropdowns(trimmed);
+  showToast(`Category "${trimmed}" added`, 'success');
+}
+
+async function handlePlantCategoryFilterSelect(selectEl) {
+  if (selectEl.value !== '__add_new__') {
+    filterPlantCatalog();
+    return;
+  }
+  const name = prompt('Enter new plant category name:');
+  if (!name || !name.trim()) {
+    selectEl.value = '';
+    return;
+  }
+  const trimmed = name.trim();
+  const cats = getPlantCategories();
+  if (!cats.some(c => c.toLowerCase() === trimmed.toLowerCase())) {
+    cats.push(trimmed);
+    bidSettings.plantCategories = cats;
+    await saveBidSettings(buildFullSettingsPayload());
+    showToast(`Category "${trimmed}" added`, 'success');
+  }
+  refreshPlantCategoryDropdowns();
+  // Select the new category in the filter and apply
+  const filterEl = document.getElementById('plant-category-filter');
+  if (filterEl) filterEl.value = trimmed;
+  filterPlantCatalog();
+}
+
 async function loadAndRenderPlantCatalog() {
   try {
     const resp = await fetch(GOOGLE_SHEETS_URL + '?action=getPlantCatalog');
@@ -12051,7 +12406,7 @@ function showPlantForm(plantId) {
     document.getElementById('plant-edit-id').value = plantId;
     document.getElementById('plant-common-name').value = plant.commonName || '';
     document.getElementById('plant-botanical-name').value = plant.botanicalName || '';
-    document.getElementById('plant-category').value = plant.category || 'Shrub';
+    refreshPlantCategoryDropdowns(plant.category || 'Shrub');
     document.getElementById('plant-notes').value = plant.notes || '';
 
     // Photo preview
@@ -12069,7 +12424,7 @@ function showPlantForm(plantId) {
     document.getElementById('plant-edit-id').value = '';
     document.getElementById('plant-common-name').value = '';
     document.getElementById('plant-botanical-name').value = '';
-    document.getElementById('plant-category').value = 'Shrub';
+    refreshPlantCategoryDropdowns('Shrub');
     document.getElementById('plant-notes').value = '';
     document.getElementById('plant-photo-preview').innerHTML = '';
     document.getElementById('plant-photo-input').value = '';
@@ -20161,21 +20516,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Save settings to Google Sheets
   document.getElementById('save-settings-btn').addEventListener('click', async function() {
-    const settings = {
-      laborRate: bidSettings.laborRate,
-      residentialLaborMarkup: bidSettings.residentialLaborMarkup,
-      residentialMaterialMarkup: bidSettings.residentialMaterialMarkup,
-      residentialSubMarkup: bidSettings.residentialSubMarkup,
-      commercialLaborMarkup: bidSettings.commercialLaborMarkup,
-      commercialMaterialMarkup: bidSettings.commercialMaterialMarkup,
-      commercialSubMarkup: bidSettings.commercialSubMarkup,
-      defaultTravelTime: bidSettings.defaultTravelTime,
-      defaultMulchDepth: bidSettings.defaultMulchDepth,
-      defaultMulchPricePerYard: bidSettings.defaultMulchPricePerYard,
-      marvinKnowledgeBase: bidSettings.marvinKnowledgeBase || '',
-      dailyCrewCapacity: bidSettings.dailyCrewCapacity,
-      dayClockAlertHours: bidSettings.dayClockAlertHours || 10
-    };
+    const settings = buildFullSettingsPayload();
 
     const result = await saveBidSettings(settings);
     if (result.success) {

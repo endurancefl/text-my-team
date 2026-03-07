@@ -8060,3 +8060,143 @@ body.marvin-identify-active .main-content {
   text-align: right;
 }
 
+/* ─── Import Review Step (mir-*) ─── */
+.mir-warning {
+  background: #fff8e1;
+  border: 1px solid #ffe082;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 11px;
+  color: #795548;
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+.mir-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0 6px;
+  font-size: 11px;
+}
+.mir-select-all {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--text-primary, #202124);
+}
+.mir-select-all input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}
+.mir-count {
+  color: var(--text-secondary, #5f6368);
+  font-size: 11px;
+}
+.mir-table-wrap {
+  max-height: 50vh;
+  overflow-y: auto;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 10px;
+}
+.mir-header {
+  display: grid;
+  grid-template-columns: 28px repeat(auto-fit, minmax(60px, 1fr));
+  padding: 5px 6px;
+  background: #f8f9fa;
+  font-weight: 600;
+  color: var(--text-secondary, #5f6368);
+  border-bottom: 1px solid #e0e0e0;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.mir-row {
+  display: grid;
+  grid-template-columns: 28px repeat(auto-fit, minmax(60px, 1fr));
+  padding: 3px 6px;
+  border-bottom: 1px solid #f1f3f4;
+  align-items: center;
+  transition: opacity 0.15s, background 0.15s;
+}
+.mir-row:hover {
+  background: #f8f9fa;
+}
+.mir-excluded {
+  opacity: 0.4;
+  text-decoration: line-through;
+  background: #fafafa;
+}
+.mir-excluded:hover {
+  opacity: 0.55;
+}
+.mir-cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 3px;
+}
+.mir-cell-cb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  max-width: 28px;
+}
+.mir-cell-cb input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}
+.mir-cell-cat {
+  min-width: 100px;
+}
+.mir-cell-warn {
+  background: #fff3e0;
+  color: #e65100;
+  border-radius: 3px;
+}
+.mir-cat-select {
+  font-size: 10px;
+  padding: 1px 2px;
+  border: 1px solid #dadce0;
+  border-radius: 4px;
+  background: #fff;
+  color: var(--text-primary, #202124);
+  max-width: 110px;
+  cursor: pointer;
+}
+.mir-cat-select:focus {
+  border-color: #1A73E8;
+  outline: none;
+}
+.mir-input {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 10px;
+  padding: 1px 3px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-primary, #202124);
+  font-family: inherit;
+}
+.mir-input:hover {
+  border-color: #dadce0;
+  background: #fff;
+}
+.mir-input:focus {
+  border-color: #1A73E8;
+  background: #fff;
+  outline: none;
+}
+.mir-input-warn {
+  border-color: #e65100;
+  background: #fff3e0;
+}
+.mir-input-warn:focus {
+  border-color: #e65100;
+  background: #fff;
+}
+
