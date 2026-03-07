@@ -6194,3 +6194,139 @@ function saveTakeoffSections(data) {
   sheet.appendRow([division, configJSON, now]);
   return { success: true };
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  DAY CLOCK ALERT — Time-driven trigger (every 30 min)
+// ═══════════════════════════════════════════════════════════════
+// SETUP: Go to Triggers (clock icon) → Add Trigger:
+//   Function: checkOpenDayClocks
+//   Event source: Time-driven
+//   Type: Minutes timer
+//   Interval: Every 30 minutes
+
+function checkOpenDayClocks() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var tz = ss.getSpreadsheetTimeZone();
+
+  // 1. Read threshold from settings
+  var settingsSheet = ss.getSheetByName('BidSettings');
+  var threshold = 10;
+  if (settingsSheet) {
+    var sData = settingsSheet.getDataRange().getValues();
+    for (var i = 0; i < sData.length; i++) {
+      if (sData[i][0] === 'dayClockAlertHours') {
+        threshold = parseFloat(sData[i][1]) || 10;
+        break;
+      }
+    }
+  }
+  if (threshold <= 0) return;
+
+  // 2. Find open day_clock entries for today
+  var teSheet = ss.getSheetByName('TimeEntries');
+  if (!teSheet) return;
+  var teData = teSheet.getDataRange().getValues();
+  var headers = teData[0];
+  var col = {};
+  headers.forEach(function(h, i) { col[h] = i; });
+
+  var now = new Date();
+  var today = Utilities.formatDate(now, tz, 'yyyy-MM-dd');
+
+  var openClocks = [];
+  for (var r = 1; r < teData.length; r++) {
+    var row = teData[r];
+    if (row[col['Entry Type']] !== 'day_clock') continue;
+    if (row[col['Clock Out']]) continue;
+
+    var rowDate = row[col['Date']];
+    if (rowDate instanceof Date) {
+      rowDate = Utilities.formatDate(rowDate, tz, 'yyyy-MM-dd');
+    }
+    if (String(rowDate) !== today) continue;
+
+    var clockIn = parseClockTime_(row[col['Clock In']], row[col['Date']], tz);
+    if (!clockIn) continue;
+
+    var elapsed = (now - clockIn) / 3600000;
+    if (elapsed >= threshold) {
+      openClocks.push({
+        entryId: row[col['Entry ID']],
+        crew: row[col['Crew']],
+        clockIn: row[col['Clock In']],
+        hours: Math.round(elapsed * 10) / 10
+      });
+    }
+  }
+
+  if (openClocks.length === 0) return;
+
+  // 3. Look up crew leader emails
+  var cmSheet = ss.getSheetByName('Crew Members');
+  if (!cmSheet) return;
+  var cmData = cmSheet.getDataRange().getValues();
+  var cmH = cmData[0];
+  var cmC = {};
+  cmH.forEach(function(h, i) { cmC[h] = i; });
+
+  var leaderEmails = {};
+  for (var c = 1; c < cmData.length; c++) {
+    var m = cmData[c];
+    if (String(m[cmC['Role']] || '').toLowerCase() === 'leader' && m[cmC['Email']]) {
+      leaderEmails[String(m[cmC['Default Crew']] || m[cmC['Crew']] || '')] = m[cmC['Email']];
+    }
+  }
+
+  // 4. Dedup via PropertiesService
+  var props = PropertiesService.getScriptProperties();
+  var log = JSON.parse(props.getProperty('dayClockAlerts') || '{}');
+
+  // 5. Send emails
+  openClocks.forEach(function(oc) {
+    if (log[oc.entryId]) return;
+    var email = leaderEmails[oc.crew];
+    if (!email) return;
+
+    MailApp.sendEmail({
+      to: email,
+      subject: 'Endurance — Day clock still running (' + oc.crew + ')',
+      htmlBody:
+        '<p>Hi,</p>' +
+        '<p>The day clock for <strong>' + oc.crew +
+        '</strong> has been running for <strong>' +
+        oc.hours + ' hours</strong> (started at ' +
+        oc.clockIn + ').</p>' +
+        '<p>If the day is over, please open the Crew ' +
+        'app and tap "End Day" to clock everyone out.</p>' +
+        '<p style="color:#888;font-size:12px;">— Endurance Services</p>'
+    });
+
+    log[oc.entryId] = now.getTime();
+  });
+
+  // 6. Clean up old log entries (>48h)
+  var cutoff = now.getTime() - 172800000;
+  Object.keys(log).forEach(function(k) {
+    if (log[k] < cutoff) delete log[k];
+  });
+  props.setProperty('dayClockAlerts', JSON.stringify(log));
+}
+
+function parseClockTime_(timeStr, dateVal, tz) {
+  if (!timeStr) return null;
+  var m = String(timeStr).match(/(\d+):(\d+)\s*(AM|PM)/i);
+  if (!m) return null;
+  var h = parseInt(m[1]), min = parseInt(m[2]);
+  var ap = m[3].toUpperCase();
+  if (ap === 'PM' && h !== 12) h += 12;
+  if (ap === 'AM' && h === 12) h = 0;
+  var d;
+  if (dateVal instanceof Date) {
+    d = new Date(dateVal);
+  } else {
+    var parts = String(dateVal).split('-');
+    d = new Date(parts[0], parts[1] - 1, parts[2]);
+  }
+  d.setHours(h, min, 0, 0);
+  return d;
+}
