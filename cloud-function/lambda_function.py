@@ -806,6 +806,15 @@ To add to knowledge base (when the user says "remember", "from now on", "always"
 To remove from knowledge base:
 {{"type": "action", "message": "Brief explanation", "action": {{"type": "updateKnowledgeBase", "data": {{"remove": ["exact text of the line to remove"]}}}}}}
 
+To bulk-update existing catalog entries (when the user asks to change a field on multiple items — e.g., "set supplier to X on all plants", "change category to Tree for all oaks"):
+{{"type": "action", "message": "Brief explanation", "action": {{"type": "bulkUpdate", "data": {{"target": "plantCatalog", "targetLabel": "Plant Catalog", "updates": {{"supplier": "County Line"}}, "filter": {{}}, "affectedCount": 10}}}}}}
+
+Supported targets: plantCatalog. The updates object is a field→value map.
+plantCatalog updatable fields: supplier (applied to every size entry on each plant), category, notes.
+filter narrows scope (e.g., {{"category": "Shrub"}}); empty object {{}} = all items.
+affectedCount MUST equal the number of items from context.plantCatalog that match the filter — count them from the data.
+Use bulkUpdate when the user wants to MODIFY EXISTING data in bulk, not import new data.
+
 ## Platform & Industry Knowledge
 
 {_MARVIN_KNOWLEDGE}

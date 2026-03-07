@@ -6134,6 +6134,12 @@ function renderMarvinActionCard(action) {
       btnText = 'Import ' + (action.data?.rowCount || '') + ' rows';
       btnClass = 'apply';
       break;
+    case 'bulkUpdate':
+      iconName = 'edit_note';
+      iconClass = 'bulk-update';
+      btnText = 'Update ' + (action.data?.affectedCount || 0) + ' items';
+      btnClass = 'apply';
+      break;
     default:
       return '';
   }
@@ -6200,6 +6206,13 @@ function renderMarvinActionCard(action) {
 
     detail = previewHtml;
     detailIsHtml = true;
+  } else if (action.type === 'bulkUpdate' && action.data) {
+    const d = action.data;
+    const fields = Object.entries(d.updates || {}).map(([k, v]) => `${k} → ${v}`).join(', ');
+    const filterDesc = d.filter && Object.keys(d.filter).length > 0
+      ? Object.entries(d.filter).map(([k, v]) => `${k}: ${v}`).join(', ')
+      : 'all items';
+    detail = `Set ${fields} on ${d.affectedCount || 0} ${d.targetLabel || d.target} (${filterDesc})`;
   } else if (action.type === 'updateKnowledgeBase') {
     const entries = action.data?.entries || action.data?.remove || [];
     detail = entries.join('\n');
@@ -6212,7 +6225,8 @@ function renderMarvinActionCard(action) {
     createSection: 'New Section',
     navigate: 'Navigate',
     updateKnowledgeBase: action.data?.remove ? 'Remove from Notes' : 'Remember This',
-    importData: 'Import Data'
+    importData: 'Import Data',
+    bulkUpdate: 'Bulk Update'
   };
 
   return `
@@ -7195,6 +7209,19 @@ function buildMarvinContext() {
     }));
   }
 
+  // Plant catalog (all plants for bulk update context)
+  if (typeof plantCatalog !== 'undefined' && plantCatalog && plantCatalog.length > 0) {
+    ctx.plantCatalog = plantCatalog.map(p => ({
+      plantId: p.plantId,
+      commonName: p.commonName || '',
+      botanicalName: p.botanicalName || '',
+      category: p.category || '',
+      sizes: (p.sizes || []).map(s => ({
+        size: s.size, supplier: s.supplier || '', supplierCost: s.supplierCost || 0
+      }))
+    }));
+  }
+
   // Bid settings (full relevant config)
   ctx.bidSettings = {
     laborRate: bidSettings.laborRate,
@@ -7741,6 +7768,9 @@ function applyMarvinAction(actionId, btn) {
         applyMarvinImportFiltered(actionId);
       }
       return; // importData manages its own button state
+    case 'bulkUpdate':
+      applyMarvinBulkUpdate(action.data, btn);
+      return; // bulkUpdate manages its own button state
     default:
       showToast('Unknown action type', 'error');
       return;
@@ -7848,6 +7878,114 @@ async function applyMarvinKBUpdate(data) {
     await saveBidSettings(buildFullSettingsPayload());
   } catch (e) {
     console.warn('Could not auto-save knowledge base:', e);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MARVIN BULK UPDATE
+// ═══════════════════════════════════════════════════════════════
+
+async function applyMarvinBulkUpdate(data, btn) {
+  const { target, updates, filter } = data;
+  if (!target || !updates || Object.keys(updates).length === 0) {
+    showToast('Invalid bulk update data', 'error');
+    return;
+  }
+
+  if (target !== 'plantCatalog') {
+    showToast('Bulk update not supported for ' + target, 'error');
+    return;
+  }
+
+  if (typeof plantCatalog === 'undefined' || !plantCatalog || plantCatalog.length === 0) {
+    showToast('Plant catalog is empty', 'error');
+    return;
+  }
+
+  // Filter matching plants
+  const matchingPlants = plantCatalog.filter(p => {
+    if (!filter || Object.keys(filter).length === 0) return true;
+    return Object.entries(filter).every(([key, val]) => {
+      const plantVal = (p[key] || '').toString().toLowerCase();
+      return plantVal === val.toString().toLowerCase();
+    });
+  });
+
+  if (matchingPlants.length === 0) {
+    showToast('No plants match the filter', 'error');
+    return;
+  }
+
+  // Disable button, show progress
+  btn.disabled = true;
+  const origHtml = btn.innerHTML;
+  let successCount = 0;
+  let errorCount = 0;
+
+  for (let i = 0; i < matchingPlants.length; i++) {
+    const plant = matchingPlants[i];
+    btn.innerHTML = `<span class="material-icons-outlined">sync</span> Updating ${i + 1}/${matchingPlants.length}...`;
+
+    // Build updated entry
+    const entry = {
+      savePlantEntry: true,
+      plantId: plant.plantId,
+      commonName: plant.commonName || '',
+      botanicalName: plant.botanicalName || '',
+      category: updates.category || plant.category || '',
+      sizes: (plant.sizes || []).map(s => ({
+        size: s.size,
+        supplierCost: s.supplierCost || 0,
+        defaultMarkup: s.defaultMarkup || 0.2,
+        supplier: updates.supplier !== undefined ? updates.supplier : (s.supplier || ''),
+        sku: s.sku || ''
+      })),
+      photoFileId: plant.photoFileId || '',
+      notes: updates.notes !== undefined ? updates.notes : (plant.notes || '')
+    };
+
+    try {
+      const resp = await fetch(GOOGLE_SHEETS_URL, {
+        method: 'POST',
+        body: JSON.stringify(entry)
+      });
+      const result = await resp.json();
+      if (result.success) {
+        successCount++;
+      } else {
+        errorCount++;
+        console.warn('Bulk update failed for', plant.commonName, result.error);
+      }
+    } catch (e) {
+      errorCount++;
+      console.warn('Bulk update error for', plant.commonName, e);
+    }
+  }
+
+  // Reload catalog
+  if (typeof loadAndRenderPlantCatalog === 'function') {
+    await loadAndRenderPlantCatalog();
+  }
+
+  // Update button state
+  btn.className = 'marvin-action-btn applied';
+  btn.innerHTML = '<span class="material-icons-outlined">check_circle</span> Updated ' + successCount + ' items';
+  btn.onclick = null;
+  btn.disabled = false;
+
+  // Summary toast
+  const fieldSummary = Object.entries(updates).map(([k, v]) => `${k} → ${v}`).join(', ');
+  if (errorCount > 0) {
+    showToast(`Updated ${successCount} plants (${errorCount} failed): ${fieldSummary}`, 'info');
+  } else {
+    showToast(`Updated ${successCount} plants: ${fieldSummary}`, 'success');
+  }
+
+  // Add summary to chat
+  const refs = appendMarvinMessage('assistant', '', null);
+  if (refs && refs.bubble) {
+    refs.bubble.innerHTML = formatMarvinText(`Updated **${successCount}** plant${successCount !== 1 ? 's' : ''}: ${fieldSummary}${errorCount > 0 ? ` (${errorCount} failed)` : ''}`);
+    refs.messagesEl.scrollTop = refs.messagesEl.scrollHeight;
   }
 }
 

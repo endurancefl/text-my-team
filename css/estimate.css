@@ -8010,6 +8010,11 @@ body.marvin-identify-active .main-content {
   color: #2e7d32;
 }
 
+.marvin-action-icon.bulk-update {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
 .marvin-csv-download-btn {
   display: flex;
   align-items: center;

@@ -624,6 +624,7 @@ Standalone database of plants used across ENH estimates:
 - Photos stored in Google Drive (file IDs, not base64)
 - When a plant is linked to a material row, auto-fills description, unitCost, and markup from catalog
 - CSV import stub available (full pipeline planned for follow-up)
+- Plant catalog data is included in MARVIN's context as `context.plantCatalog` — use it to answer questions about existing plants and count affected items for bulkUpdate actions.
 
 #### Milestone Scheduling (ENH only)
 

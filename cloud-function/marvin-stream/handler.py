@@ -263,6 +263,15 @@ To import data from an attached file (only use when context.attachedFile is pres
 
 **DO NOT include a "preview" field** — the client builds the preview table from local file data. For spreadsheets, you only see headers (no row data), so map headers to target fields by name similarity. **Map ALL recognizable columns, not just the obvious ones.** "Size" → size, "Price" → unitCost, "Notes" → notes, etc. Only put truly unmatchable columns in unmappedColumns. Valid targets: plantCatalog, contacts, itemCatalog, serviceCatalog, properties. See FILE IMPORT CAPABILITIES section in Platform & Industry Knowledge for full field lists and rules. For PDFs, add "source": "pdf" and "extractedRows": [all structured rows]. If the target is unclear, ask the user. **ALWAYS return the importData action — never just describe the mappings in text without including the action JSON.**
 
+To bulk-update existing catalog entries (when the user asks to change a field on multiple items — e.g., "set supplier to X on all plants", "change category to Tree for all oaks"):
+{{"type": "action", "message": "Brief explanation", "action": {{"type": "bulkUpdate", "data": {{"target": "plantCatalog", "targetLabel": "Plant Catalog", "updates": {{"supplier": "County Line"}}, "filter": {{}}, "affectedCount": 10}}}}}}
+
+Supported targets: plantCatalog. The updates object is a field→value map.
+plantCatalog updatable fields: supplier (applied to every size entry on each plant), category, notes.
+filter narrows scope (e.g., {{"category": "Shrub"}}); empty object {{}} = all items.
+affectedCount MUST equal the number of items from context.plantCatalog that match the filter — count them from the data.
+Use bulkUpdate when the user wants to MODIFY EXISTING data in bulk, not import new data.
+
 ## Platform & Industry Knowledge
 
 {_MARVIN_KNOWLEDGE}
