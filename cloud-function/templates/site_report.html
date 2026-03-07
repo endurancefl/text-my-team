@@ -38,22 +38,31 @@
 <div class="report-title">Site Recommendation Report</div>
 <hr class="title-rule">
 
-{# ── Photo Grid by Category ── #}
-{% for cat_name, photos in categories.items() %}
-<div class="category-section">
-  <div class="category-header" style="bookmark-level: 1; bookmark-label: '{{ cat_name }}';">{{ cat_name }}</div>
-  <div class="photo-grid">
-    {% for photo in photos %}
-    <div class="photo-cell">
-      <div class="photo-frame">
-        {% if photo.data_uri %}
-        <img src="{{ photo.data_uri }}" alt="Photo {{ photo.num }}">
-        {% endif %}
+{# ── Photo Pages ── #}
+{% for page in pages %}
+{% if not page.first %}<div style="page-break-before:always;"></div>{% endif %}
+<table class="photo-table" cellspacing="0" cellpadding="0">
+  {% for row in page.rows %}
+  <tr>
+    <td class="photo-td">
+      <div class="photo-frame {{ 'frame-first' if page.first else 'frame-full' }}">
+        {% if row.left.data_uri %}<img src="{{ row.left.data_uri }}">{% endif %}
       </div>
-      <div class="note-box">{{ photo.num }}. {% if photo.note %}Note: {{ photo.note }}{% endif %}</div>
-    </div>
-    {% endfor %}
-  </div>
-</div>
+      <div class="note-box">{{ row.left.num }}. {% if row.left.note %}{{ row.left.note }}{% endif %}</div>
+    </td>
+    <td class="photo-gap"></td>
+    {% if row.right %}
+    <td class="photo-td">
+      <div class="photo-frame {{ 'frame-first' if page.first else 'frame-full' }}">
+        {% if row.right.data_uri %}<img src="{{ row.right.data_uri }}">{% endif %}
+      </div>
+      <div class="note-box">{{ row.right.num }}. {% if row.right.note %}{{ row.right.note }}{% endif %}</div>
+    </td>
+    {% else %}
+    <td class="photo-td"></td>
+    {% endif %}
+  </tr>
+  {% endfor %}
+</table>
 {% endfor %}
 {% endblock %}

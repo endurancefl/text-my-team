@@ -347,26 +347,44 @@ def generate_standard_report(metadata, photo_buffers, test=False):
     report_date = metadata.get("date", "")
     photo_metas = metadata.get("photos", [])
 
-    categories = OrderedDict()
-    photo_num = 1
+    # Build flat photo list
+    all_photos = []
     for i, pmeta in enumerate(photo_metas):
-        cat = pmeta.get("category") or "Uncategorized"
-        if cat not in categories:
-            categories[cat] = []
         buf = photo_buffers[i] if i < len(photo_buffers) else None
-        categories[cat].append({
-            "num": photo_num,
-            "note": (pmeta.get("note", "") or "")[:150],
+        all_photos.append({
+            "num": i + 1,
+            "note": (pmeta.get("note", "") or "")[:200],
+            "category": pmeta.get("category") or "Uncategorized",
             "data_uri": _buffer_to_data_uri(buf),
         })
-        photo_num += 1
+
+    # Build explicit table rows, paired into 2-column rows
+    # Page 1: 4 photos (2 rows), subsequent: 6 photos (3 rows)
+    FIRST_PAGE = 4
+    LATER_PAGE = 6
+
+    def make_rows(photos):
+        rows = []
+        for j in range(0, len(photos), 2):
+            left = photos[j]
+            right = photos[j + 1] if j + 1 < len(photos) else None
+            rows.append({"left": left, "right": right})
+        return rows
+
+    pages = []
+    if all_photos:
+        pages.append({"rows": make_rows(all_photos[:FIRST_PAGE]), "first": True})
+        remaining = all_photos[FIRST_PAGE:]
+        while remaining:
+            pages.append({"rows": make_rows(remaining[:LATER_PAGE]), "first": False})
+            remaining = remaining[LATER_PAGE:]
 
     context = {
         "address": address,
         "inspector": inspector,
         "date": report_date,
         "logo_uri": _logo_data_uri(),
-        "categories": categories,
+        "pages": pages,
     }
 
     pdf_bytes = _render_pdf("site_report.html", context, test=test)

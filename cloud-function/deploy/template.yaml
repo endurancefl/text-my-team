@@ -56,7 +56,7 @@ Resources:
           PHOTO_BUCKET: !Ref PhotoUploadBucket
           ANTHROPIC_API_KEY: '{{resolve:secretsmanager:marvin-api-key:SecretString:key}}'
           DOCRAPTOR_API_KEY: '{{resolve:secretsmanager:docraptor-api-key:SecretString:key}}'
-          DOCRAPTOR_TEST_MODE: 'true'
+          DOCRAPTOR_TEST_MODE: 'false'
       Events:
         GeneratePdf:
           Type: HttpApi

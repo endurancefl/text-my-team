@@ -1,48 +1,31 @@
-/* Site Report — 2-column photo grid layout (PrinceXML-compatible) */
+/* Site Report — table-based 2-column layout for PrinceXML */
 
-.photo-grid {
+.photo-table {
   width: 100%;
+  border-collapse: collapse;
 }
 
-/* Clear floats after grid */
-.photo-grid::after {
-  content: "";
-  display: block;
-  clear: both;
-}
-
-.photo-cell {
-  float: left;
+.photo-td {
   width: 48%;
-  margin-right: 4%;
-  margin-bottom: 8px;
-  page-break-inside: avoid;
+  vertical-align: top;
+  padding-bottom: 7px;
 }
 
-.photo-cell:nth-child(2n) {
-  margin-right: 0;
-}
-
-/* Force new row every 2 cells — prevents float snagging */
-.photo-cell:nth-child(2n+1) {
-  clear: left;
+.photo-gap {
+  width: 4%;
 }
 
 .photo-frame {
   border: 0.5px solid var(--light-gray);
   border-radius: 3px;
   width: 100%;
-  height: 200px;
   overflow: hidden;
-  display: block;
-  text-align: center;
-  background: #f0f0f0;
 }
 
 .photo-frame img {
   width: 100%;
-  height: 100%;
-  object-fit: contain;
+  height: auto;
+  display: block;
 }
 
 .note-box {
@@ -50,15 +33,10 @@
   border-top: none;
   border-left: 3px solid var(--green);
   border-radius: 0 0 3px 3px;
-  min-height: 22px;
+  height: 43px;
   padding: 2px 4px 2px 6px;
   font-size: 8pt;
   color: var(--dark);
   line-height: 1.25;
   overflow: hidden;
-}
-
-/* Second+ category starts on new page; first flows after header */
-.category-section + .category-section {
-  page-break-before: always;
 }
