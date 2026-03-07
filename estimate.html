@@ -7906,8 +7906,15 @@ async function applyMarvinBulkUpdate(data, btn) {
   const matchingPlants = plantCatalog.filter(p => {
     if (!filter || Object.keys(filter).length === 0) return true;
     return Object.entries(filter).every(([key, val]) => {
+      const filterVal = val.toString().toLowerCase();
+      // supplier lives inside sizes array — check if ALL sizes match
+      if (key === 'supplier') {
+        const sizes = p.sizes || [];
+        if (sizes.length === 0) return filterVal === '';
+        return sizes.every(s => (s.supplier || '').toLowerCase() === filterVal);
+      }
       const plantVal = (p[key] || '').toString().toLowerCase();
-      return plantVal === val.toString().toLowerCase();
+      return plantVal === filterVal;
     });
   });
 

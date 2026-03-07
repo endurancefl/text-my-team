@@ -811,8 +811,12 @@ To bulk-update existing catalog entries (when the user asks to change a field on
 
 Supported targets: plantCatalog. The updates object is a field→value map.
 plantCatalog updatable fields: supplier (applied to every size entry on each plant), category, notes.
-filter narrows scope (e.g., {{"category": "Shrub"}}); empty object {{}} = all items.
-affectedCount MUST equal the number of items from context.plantCatalog that match the filter — count them from the data.
+filter narrows scope; empty object {{}} = all items. Examples:
+  {{"category": "Shrub"}} — only plants with category Shrub
+  {{"supplier": ""}} — only plants where ALL sizes have a blank/empty supplier
+  {{"supplier": "County Line"}} — only plants where ALL sizes have supplier "County Line"
+Use "" (empty string) in filter to match blank/missing values.
+affectedCount MUST equal the number of items from context.plantCatalog that match the filter — count them carefully from the data. For supplier filters, check each plant's sizes array.
 Use bulkUpdate when the user wants to MODIFY EXISTING data in bulk, not import new data.
 
 ## Platform & Industry Knowledge
