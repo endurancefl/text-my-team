@@ -6475,10 +6475,199 @@ function parseMarvinSheet(workbook, sheetIndex, fileName) {
   document.getElementById('marvin-file-chip').style.display = 'flex';
   document.getElementById('marvin-file-chip-text').textContent = marvinAttachedFile.summary;
 
-  const input = document.getElementById('marvin-chat-input');
-  if (!input.value.trim()) {
-    input.value = `I've attached ${fileName} with ${cleanRows.length} rows. What should I do with this data?`;
+  // Auto-detect target and show import card immediately — no LLM needed for column mapping
+  const autoResult = autoDetectImportMapping(headers);
+  if (autoResult) {
+    const action = {
+      type: 'importData',
+      data: {
+        target: autoResult.target,
+        targetLabel: autoResult.targetLabel,
+        mappings: autoResult.mappings,
+        unmappedColumns: autoResult.unmappedColumns,
+        rowCount: cleanRows.length
+      }
+    };
+    // Show as a system-initiated import card in the chat
+    const { bubble, actionContainer, messagesEl } = appendMarvinMessage('assistant',
+      `I found ${cleanRows.length} rows with ${headers.length} columns that look like **${autoResult.targetLabel}** data. Review the column mappings below and click Import when ready.`);
+    const text = `I found ${cleanRows.length} rows with ${headers.length} columns that look like **${autoResult.targetLabel}** data. Review the column mappings below and click Import when ready.`;
+    bubble.innerHTML = formatMarvinText(text);
+    actionContainer.innerHTML = renderMarvinActionCard(action);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    marvinChatHistory.push({ role: 'assistant', content: text });
+    // Hide chip — data is shown in card
+    document.getElementById('marvin-file-chip').style.display = 'none';
+  } else {
+    // Could not auto-detect — let user send to MARVIN for help
+    const input = document.getElementById('marvin-chat-input');
+    if (!input.value.trim()) {
+      input.value = `I've attached ${fileName} with ${cleanRows.length} rows. What should I do with this data?`;
+    }
   }
+}
+
+// Deterministic column mapping — no LLM involved
+function autoDetectImportMapping(headers) {
+  const lower = headers.map(h => h.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim());
+
+  // Target detection: score each target by how many headers match its fields
+  const targetAliases = {
+    plantCatalog: {
+      label: 'Plant Catalog',
+      keywords: ['plant', 'botanical', 'common name', 'shrub', 'tree', 'gallon', 'specimen'],
+      fields: {
+        commonName:    ['common name', 'plant name', 'name', 'plant', 'common'],
+        botanicalName: ['botanical name', 'scientific name', 'latin name', 'botanical', 'bot name', 'species'],
+        category:      ['category', 'type', 'plant type'],
+        size:          ['size', 'cont size', 'container size', 'container', 'pot size', 'pot'],
+        unitCost:      ['price', 'unit price', 'cost', 'unit cost', 'each', 'ea', 'cost each'],
+        supplier:      ['supplier', 'vendor', 'nursery', 'source', 'grower'],
+        notes:         ['notes', 'specifications', 'specs', 'comments', 'description', 'remarks']
+      }
+    },
+    contacts: {
+      label: 'Contacts',
+      keywords: ['email', 'phone', 'first name', 'last name', 'contact'],
+      fields: {
+        firstName:      ['first name', 'first', 'fname'],
+        lastName:       ['last name', 'last', 'lname', 'surname'],
+        name:           ['name', 'full name', 'contact name', 'contact'],
+        displayName:    ['display name', 'display'],
+        email:          ['email', 'e-mail', 'email address'],
+        phone:          ['phone', 'cell', 'mobile', 'telephone', 'phone number'],
+        company:        ['company', 'business', 'organization', 'org'],
+        billingAddress: ['billing address', 'billing'],
+        propertyAddress:['property address', 'service address'],
+        stage:          ['stage', 'status', 'lead status'],
+        source:         ['source', 'lead source', 'referral'],
+        notes:          ['notes', 'comments', 'description']
+      }
+    },
+    properties: {
+      label: 'Properties',
+      keywords: ['address', 'property', 'lot size', 'lawn', 'irrigation'],
+      fields: {
+        address:   ['address', 'street', 'property address', 'street address', 'service address'],
+        city:      ['city', 'town'],
+        state:     ['state', 'st'],
+        zip:       ['zip', 'zip code', 'postal', 'postal code', 'zipcode'],
+        propertyType: ['property type', 'type'],
+        pin:       ['pin', 'gate pin'],
+        gateCode:  ['gate code', 'gate', 'access code'],
+        crew:      ['crew', 'assigned crew'],
+        lotSizeSF: ['lot size', 'lot sf', 'total sf'],
+        lawnRawSF: ['lawn sf', 'lawn size', 'turf sf'],
+        notes:     ['notes', 'comments', 'description']
+      }
+    },
+    itemCatalog: {
+      label: 'Item Catalog',
+      keywords: ['production rate', 'sf/hour', 'lf/hour', 'purchase unit', 'coverage'],
+      fields: {
+        item:          ['item', 'item name', 'name', 'line item'],
+        type:          ['type', 'item type'],
+        unit:          ['unit', 'production unit', 'rate unit'],
+        category:      ['category'],
+        division:      ['division', 'div'],
+        easy:          ['easy', 'easy rate'],
+        medium:        ['medium', 'med', 'medium rate'],
+        hard:          ['hard', 'hard rate'],
+        purchaseUnit:  ['purchase unit', 'buy unit'],
+        costPerUnit:   ['cost per unit', 'unit cost', 'cost'],
+        coveragePerUnit: ['coverage', 'coverage per unit'],
+        defaultDepth:  ['depth', 'default depth']
+      }
+    },
+    serviceCatalog: {
+      label: 'Service Catalog',
+      keywords: ['service name', 'visits', 'billing tier', 'map color'],
+      fields: {
+        serviceName:   ['service name', 'service', 'name'],
+        defaultVisits: ['visits', 'default visits', 'frequency'],
+        billingTier:   ['billing tier', 'tier', 'billing'],
+        category:      ['category'],
+        mapColor:      ['map color', 'color'],
+        description:   ['description', 'desc'],
+        durationType:  ['duration type', 'duration']
+      }
+    }
+  };
+
+  // Score each target
+  let bestTarget = null;
+  let bestScore = 0;
+
+  for (const [target, config] of Object.entries(targetAliases)) {
+    let score = 0;
+    // Keyword matches in headers
+    for (const kw of config.keywords) {
+      if (lower.some(h => h.includes(kw))) score += 2;
+    }
+    // Field alias matches
+    for (const [, aliases] of Object.entries(config.fields)) {
+      for (const alias of aliases) {
+        if (lower.some(h => h === alias || h.includes(alias))) { score += 1; break; }
+      }
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      bestTarget = target;
+    }
+  }
+
+  if (!bestTarget || bestScore < 2) return null;
+
+  const config = targetAliases[bestTarget];
+  const mappings = {};
+  const unmappedColumns = [];
+  const usedFields = new Set();
+
+  // Map each header to the best matching field (two-pass: exact then fuzzy)
+  const headerQueue = headers.map(h => ({ original: h, norm: h.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim() }));
+
+  // Pass 1: exact alias matches only
+  headerQueue.forEach(({ original, norm }) => {
+    for (const [field, aliases] of Object.entries(config.fields)) {
+      if (usedFields.has(field)) continue;
+      if (aliases.includes(norm)) {
+        mappings[original] = field;
+        usedFields.add(field);
+        break;
+      }
+    }
+  });
+
+  // Pass 2: fuzzy (substring) matches for unmatched headers
+  headerQueue.forEach(({ original, norm }) => {
+    if (mappings[original]) return;
+    let matched = false;
+    for (const [field, aliases] of Object.entries(config.fields)) {
+      if (usedFields.has(field)) continue;
+      for (const alias of aliases) {
+        if (norm.includes(alias) || alias.includes(norm)) {
+          mappings[original] = field;
+          usedFields.add(field);
+          matched = true;
+          break;
+        }
+      }
+      if (matched) break;
+    }
+    if (!matched) {
+      unmappedColumns.push(original);
+    }
+  });
+
+  // Must have at least one mapping
+  if (Object.keys(mappings).length === 0) return null;
+
+  return {
+    target: bestTarget,
+    targetLabel: config.label,
+    mappings,
+    unmappedColumns
+  };
 }
 
 function handleMarvinSheetChange(sheetIndex) {
