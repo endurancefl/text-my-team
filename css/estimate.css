@@ -7462,7 +7462,7 @@ body.marvin-identify-active .marvin-panel * {
   border: 2px solid #10b981;
   background: rgba(16, 185, 129, 0.08);
   pointer-events: none;
-  z-index: 199;
+  z-index: 10001;
   box-shadow: 0 0 0 2000px rgba(0, 0, 0, 0.05);
   border-radius: 4px;
   transition: top 0.08s ease, left 0.08s ease, width 0.08s ease, height 0.08s ease;
@@ -7478,7 +7478,7 @@ body.marvin-identify-active .marvin-panel * {
   padding: 3px 8px;
   border-radius: 4px;
   pointer-events: none;
-  z-index: 199;
+  z-index: 10001;
   white-space: nowrap;
   max-width: 360px;
   overflow: hidden;

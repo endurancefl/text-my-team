@@ -7614,6 +7614,8 @@ function marvinIdentifyHover(e) {
   const panel = document.getElementById('marvin-panel');
   if (panel && panel.contains(el)) return;
   if (el === document.body || el === document.documentElement) return;
+  // Skip modal/config backdrops — let hover pass through to children
+  if (el.classList.contains('modal-overlay') || el.classList.contains('config-panel-overlay')) return;
 
   const rect = el.getBoundingClientRect();
   const highlight = document.getElementById('marvin-identify-highlight');
@@ -7655,6 +7657,8 @@ function marvinIdentifyClick(e) {
   const panel = document.getElementById('marvin-panel');
   if (panel && panel.contains(el)) return; // let panel clicks through
   if (el === document.body || el === document.documentElement) return;
+  // Skip modal/config backdrops — don't identify the overlay itself
+  if (el.classList.contains('modal-overlay') || el.classList.contains('config-panel-overlay')) return;
 
   e.preventDefault();
   e.stopPropagation();
