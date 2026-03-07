@@ -6456,7 +6456,7 @@ function parseMarvinSheet(workbook, sheetIndex, fileName) {
     sheetName,
     headers,
     rowCount: cleanRows.length,
-    sampleRows: cleanRows.slice(0, 5),
+    sampleRows: cleanRows.slice(0, 50),
     allRows: cleanRows,
     skippedRows,
     summary: `${fileName}${sheetLabel} — ${cleanRows.length} rows, ${headers.length} columns${skippedNote}${headerNote}`
@@ -6854,7 +6854,7 @@ async function sendMarvinMessage() {
           sheetName: marvinAttachedFile.sheetName,
           headers: marvinAttachedFile.headers,
           rowCount: marvinAttachedFile.rowCount,
-          sampleRows: marvinAttachedFile.sampleRows.slice(0, 8),
+          sampleRows: marvinAttachedFile.sampleRows,
           skippedRowCount: (marvinAttachedFile.skippedRows || []).length,
         };
       } else if (marvinAttachedFile.type === 'pdf') {

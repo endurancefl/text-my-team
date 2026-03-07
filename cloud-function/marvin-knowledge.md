@@ -655,7 +655,7 @@ MARVIN has 7 custom tools that fetch data directly from the Google Sheets backen
 
 ## FILE IMPORT CAPABILITIES
 
-When the user attaches a file, you receive its headers and sample rows in `context.attachedFile`. Your job:
+When the user attaches a file, you receive its headers and ALL data rows in `context.attachedFile.sampleRows`. **CRITICAL: Only reference data that actually appears in sampleRows. NEVER invent, guess, or extrapolate additional rows. The sampleRows contain ALL the data from the file.** Your job:
 
 1. Identify what kind of data it is
 2. Suggest the best import target

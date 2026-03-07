@@ -282,7 +282,7 @@ The JSON below contains EVERYTHING currently loaded in the platform. This is aut
 - **contractSchedule**: Tickets for a specific contract detail view.
 - **Active estimate fields**: When the user has an estimate open — property info, measurements, takeoffs, services with line items, calculated totals, tier breakdowns.
 - **knowledgeBase**: Company-specific instructions and preferences.
-- **attachedFile**: When present, the user has attached a file. For spreadsheets: contains name, type, sheetName, headers (column names), rowCount, sampleRows (first 8 data rows), skippedRowCount. For PDFs: contains name, type, textContent (extracted text up to 8000 chars), totalChars, truncated. **When you see attachedFile, analyze the data and respond with an importData action** mapping source columns to target fields. The client has ALL rows in memory — you only see a sample for analysis.
+- **attachedFile**: When present, the user has attached a file. For spreadsheets: contains name, type, sheetName, headers (column names), rowCount, sampleRows (ALL data rows from the file), skippedRowCount. For PDFs: contains name, type, textContent (extracted text up to 8000 chars), totalChars, truncated. **When you see attachedFile, analyze the ACTUAL data in sampleRows and respond with an importData action** mapping source columns to target fields. **CRITICAL: Only reference plants/items/data that actually appear in sampleRows. NEVER invent, guess, or extrapolate additional rows beyond what is provided. The sampleRows contain ALL the data from the file.**
 
 ```json
 {{ctx_str}}
