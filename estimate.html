@@ -6111,6 +6111,32 @@ function countBulkUpdateMatches(data) {
   }).length;
 }
 
+// Fetch plant catalog if needed and re-render a bulkUpdate action card with real count
+async function refreshBulkUpdateCard(actionId) {
+  const action = _marvinPendingActions[actionId];
+  if (!action || action.type !== 'bulkUpdate') return;
+  if (typeof loadAndRenderPlantCatalog === 'function') {
+    await loadAndRenderPlantCatalog();
+  }
+  const realCount = countBulkUpdateMatches(action.data);
+  action.data._realCount = realCount;
+  // Find and update the existing card's button and detail text
+  const btn = document.querySelector(`[onclick*="${actionId}"]`);
+  if (btn) {
+    btn.innerHTML = `<span class="material-icons-outlined">check</span> Update ${realCount} items`;
+    // Update detail text in the card
+    const detailEl = btn.closest('.marvin-action-card')?.querySelector('.marvin-action-detail');
+    if (detailEl) {
+      const d = action.data;
+      const fields = Object.entries(d.updates || {}).map(([k, v]) => `${k} → ${v}`).join(', ');
+      const filterDesc = d.filter && Object.keys(d.filter).length > 0
+        ? Object.entries(d.filter).map(([k, v]) => `where ${k} is ${v === '' ? 'blank' : v}`).join(', ')
+        : 'all items';
+      detailEl.textContent = `Set ${fields} on ${realCount} ${d.targetLabel || d.target} (${filterDesc})`;
+    }
+  }
+}
+
 // Store pending actions for safe retrieval by button clicks
 const _marvinPendingActions = {};
 
@@ -6163,6 +6189,10 @@ function renderMarvinActionCard(action) {
       action.data._realCount = realCount;
       btnText = 'Update ' + realCount + ' items';
       btnClass = 'apply';
+      // If catalog not loaded yet, fetch it and re-render the card
+      if (action.data.target === 'plantCatalog' && (typeof plantCatalog === 'undefined' || !plantCatalog || plantCatalog.length === 0)) {
+        setTimeout(() => refreshBulkUpdateCard(actionId), 0);
+      }
       break;
     }
     default:
@@ -7957,9 +7987,16 @@ async function applyMarvinBulkUpdate(data, btn) {
     return;
   }
 
+  // Load catalog if not yet fetched
   if (typeof plantCatalog === 'undefined' || !plantCatalog || plantCatalog.length === 0) {
-    showToast('Plant catalog is empty', 'error');
-    return;
+    if (typeof loadAndRenderPlantCatalog === 'function') {
+      btn.innerHTML = '<span class="material-icons-outlined">sync</span> Loading catalog...';
+      await loadAndRenderPlantCatalog();
+    }
+    if (!plantCatalog || plantCatalog.length === 0) {
+      showToast('Plant catalog is empty', 'error');
+      return;
+    }
   }
 
   // Filter matching plants
