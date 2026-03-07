@@ -7540,7 +7540,13 @@
           headers: { 'Content-Type': 'image/jpeg' },
           body: blob
         }).then(function(resp) {
-          if (!resp.ok) throw new Error('S3 PUT failed: ' + resp.status);
+          if (!resp.ok) {
+            if (resp.status === 403) {
+              console.warn('S3 PUT 403 — pre-signed URL expired, invalidating session');
+              srState.s3Session = null;
+            }
+            throw new Error('S3 PUT failed: ' + resp.status);
+          }
           return true;
         }).catch(function(err) {
           // Retry once
@@ -7549,7 +7555,13 @@
             headers: { 'Content-Type': 'image/jpeg' },
             body: blob
           }).then(function(resp) {
-            if (!resp.ok) throw new Error('S3 PUT retry failed: ' + resp.status);
+            if (!resp.ok) {
+              if (resp.status === 403) {
+                console.warn('S3 PUT retry 403 — pre-signed URL expired, invalidating session');
+                srState.s3Session = null;
+              }
+              throw new Error('S3 PUT retry failed: ' + resp.status);
+            }
             return true;
           });
         });
@@ -7652,14 +7664,22 @@
     };
 
     // --- S3 upload-as-you-go for Site Report ---
+    var SR_S3_SESSION_TTL = 12 * 60 * 1000; // 12 minutes (URLs expire at 15)
+
     function srEnsureS3Session() {
+      // Expire stale sessions — pre-signed URLs last 15 min, refresh at 12
+      if (srState.s3Session && (Date.now() - srState.s3Session.createdAt) > SR_S3_SESSION_TTL) {
+        console.log('S3 session expired after', Math.round((Date.now() - srState.s3Session.createdAt) / 1000) + 's — requesting fresh URLs');
+        srState.s3Session = null;
+      }
       if (srState.s3Session) return Promise.resolve(srState.s3Session);
       return requestS3UploadUrls({ count: 100 }).then(function(data) {
         srState.s3Session = {
           sessionId: data.sessionId,
           urls: data.urls,
           keys: data.keys,
-          nextIndex: 0
+          nextIndex: 0,
+          createdAt: Date.now()
         };
         return srState.s3Session;
       });
@@ -8757,6 +8777,8 @@
             return count < SR_S3_MAX_RETRIES;
           });
           if (retriable.length > 0) {
+            // Invalidate stale S3 session so retries get fresh pre-signed URLs
+            srState.s3Session = null;
             retriable.forEach(function(p) {
               var id = srState.photos.indexOf(p);
               srState._s3RetryCounts[id] = (srState._s3RetryCounts[id] || 0) + 1;
