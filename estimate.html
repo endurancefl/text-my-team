@@ -6092,6 +6092,25 @@ function appendMarvinMessage(role, content, action) {
   }
 }
 
+// Count real matches for bulkUpdate from live data (don't trust LLM counts)
+function countBulkUpdateMatches(data) {
+  if (!data || data.target !== 'plantCatalog') return data?.affectedCount || 0;
+  if (typeof plantCatalog === 'undefined' || !plantCatalog) return 0;
+  const filter = data.filter;
+  if (!filter || Object.keys(filter).length === 0) return plantCatalog.length;
+  return plantCatalog.filter(p => {
+    return Object.entries(filter).every(([key, val]) => {
+      const filterVal = val.toString().toLowerCase();
+      if (key === 'supplier') {
+        const sizes = p.sizes || [];
+        if (sizes.length === 0) return filterVal === '';
+        return sizes.every(s => (s.supplier || '').toLowerCase() === filterVal);
+      }
+      return (p[key] || '').toString().toLowerCase() === filterVal;
+    });
+  }).length;
+}
+
 // Store pending actions for safe retrieval by button clicks
 const _marvinPendingActions = {};
 
@@ -6137,12 +6156,15 @@ function renderMarvinActionCard(action) {
       btnText = 'Import ' + (action.data?.rowCount || '') + ' rows';
       btnClass = 'apply';
       break;
-    case 'bulkUpdate':
+    case 'bulkUpdate': {
       iconName = 'edit_note';
       iconClass = 'bulk-update';
-      btnText = 'Update ' + (action.data?.affectedCount || 0) + ' items';
+      const realCount = countBulkUpdateMatches(action.data);
+      action.data._realCount = realCount;
+      btnText = 'Update ' + realCount + ' items';
       btnClass = 'apply';
       break;
+    }
     default:
       return '';
   }
@@ -6211,11 +6233,12 @@ function renderMarvinActionCard(action) {
     detailIsHtml = true;
   } else if (action.type === 'bulkUpdate' && action.data) {
     const d = action.data;
+    const realCount = d._realCount != null ? d._realCount : (d.affectedCount || 0);
     const fields = Object.entries(d.updates || {}).map(([k, v]) => `${k} → ${v}`).join(', ');
     const filterDesc = d.filter && Object.keys(d.filter).length > 0
       ? Object.entries(d.filter).map(([k, v]) => `where ${k} is ${v === '' ? 'blank' : v}`).join(', ')
       : 'all items';
-    detail = `Set ${fields} on ${d.affectedCount || 0} ${d.targetLabel || d.target} (${filterDesc})`;
+    detail = `Set ${fields} on ${realCount} ${d.targetLabel || d.target} (${filterDesc})`;
   } else if (action.type === 'updateKnowledgeBase') {
     const entries = action.data?.entries || action.data?.remove || [];
     detail = entries.join('\n');
