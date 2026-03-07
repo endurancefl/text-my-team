@@ -6213,7 +6213,7 @@ function renderMarvinActionCard(action) {
     const d = action.data;
     const fields = Object.entries(d.updates || {}).map(([k, v]) => `${k} → ${v}`).join(', ');
     const filterDesc = d.filter && Object.keys(d.filter).length > 0
-      ? Object.entries(d.filter).map(([k, v]) => `${k}: ${v}`).join(', ')
+      ? Object.entries(d.filter).map(([k, v]) => `where ${k} is ${v === '' ? 'blank' : v}`).join(', ')
       : 'all items';
     detail = `Set ${fields} on ${d.affectedCount || 0} ${d.targetLabel || d.target} (${filterDesc})`;
   } else if (action.type === 'updateKnowledgeBase') {
