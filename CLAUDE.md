@@ -35,8 +35,8 @@
 | `crew.html` | Crew leader mobile app (HTML + JS) | ~8,440 |
 | `crew.css` | All CSS for crew.html (extracted) | ~4,210 |
 | `index.html` | Customer service request portal | ~3,100 |
-| `estimate.html` | Bidding & estimating tool (MNT + ENH divisions) | ~21,516 |
-| `css/estimate.css` | All CSS for estimate.html | ~7,787 |
+| `estimate.html` | Bidding & estimating tool (MNT + ENH divisions) | ~23,700 |
+| `css/estimate.css` | All CSS for estimate.html | ~8,050 |
 | `sign.html` | Standalone contract e-signature page | ~686 |
 | `backend/combined-apps-script.js` | Google Apps Script backend | ~6,112 |
 | `docs/platform-architecture.md` | Living architecture doc (MUST update on every change) |

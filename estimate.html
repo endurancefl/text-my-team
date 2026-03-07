@@ -10,6 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
   <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.js"></script>
   <link rel="stylesheet" href="css/estimate.css?v=property-grid-fix">
@@ -2058,6 +2059,13 @@
 
     <!-- MARVIN Conversational AI Panel -->
     <aside class="marvin-panel" id="marvin-panel">
+      <div class="marvin-drop-overlay" id="marvin-drop-overlay">
+        <div class="marvin-drop-content">
+          <span class="material-icons-outlined" style="font-size:48px;">upload_file</span>
+          <div>Drop file here</div>
+          <div class="marvin-drop-hint">CSV, Excel, or PDF</div>
+        </div>
+      </div>
       <div class="marvin-panel-header">
         <div class="marvin-panel-title">
           <span class="marvin-panel-icon material-icons-outlined">auto_awesome</span>
@@ -2101,7 +2109,17 @@
           <span></span><span></span><span></span>
         </div>
       </div>
+      <div class="marvin-file-chip" id="marvin-file-chip" style="display:none;">
+        <span class="material-icons-outlined" style="font-size:14px;">description</span>
+        <span id="marvin-file-chip-text"></span>
+        <select id="marvin-sheet-picker" class="marvin-sheet-picker" style="display:none;" onchange="handleMarvinSheetChange(this.value)"></select>
+        <button onclick="clearMarvinFile()" class="marvin-file-chip-remove">&times;</button>
+      </div>
       <div class="marvin-panel-input">
+        <button class="marvin-attach-btn" id="marvin-attach-btn" onclick="document.getElementById('marvin-file-input').click()" title="Attach file">
+          <span class="material-icons-outlined">attach_file</span>
+        </button>
+        <input type="file" id="marvin-file-input" accept=".csv,.xlsx,.xls,.pdf" style="display:none;" onchange="handleMarvinFileSelect(this)">
         <textarea id="marvin-chat-input" placeholder="Ask MARVIN anything..." rows="1" onkeydown="handleMarvinKeydown(event)" oninput="autoGrowMarvinInput(this)"></textarea>
         <button class="marvin-send-btn" id="marvin-send-btn" onclick="sendMarvinMessage()">
           <span class="material-icons-outlined">send</span>
@@ -2890,6 +2908,11 @@ const GOOGLE_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbygkHGZmIYUj9
 const OFFICE_PHONE = '4075794403';
 const DEBUG = false;
 function debugLog(...args) { if (DEBUG) console.log(...args); }
+
+// ── pdf.js worker setup ──
+if (window.pdfjsLib) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+}
 
 // ── Unified Takeoff Grid Feature Flag ──
 const USE_NEW_TAKEOFF = true;
@@ -5695,6 +5718,11 @@ let marvinIsThinking = false;
 let marvinTypewriterActive = null; // tracks active typewriter animation
 let marvinIdentifyMode = false;
 let marvinStreamController = null;
+let marvinAttachedFile = null;    // { name, type, rows, headers, rawData, summary, ... }
+let marvinWorkbook = null;        // SheetJS workbook for multi-sheet files
+let marvinLastImportIds = null;   // { target, ids: [...] } for undo
+let marvinUndoTimer = null;       // 60-second undo window timer
+const MARVIN_MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 const MARVIN_CHAT_URL = 'https://ibjyxrp542.execute-api.us-east-1.amazonaws.com/prod/marvin';
 const MARVIN_STREAM_URL = 'https://nis3ltiml5c64yuk55gujzloi40ysogk.lambda-url.us-east-1.on.aws/';
@@ -5754,6 +5782,13 @@ function toggleMarvinPanel() {
 
 function clearMarvinChat() {
   marvinChatHistory = [];
+  marvinAttachedFile = null;
+  marvinWorkbook = null;
+  marvinLastImportIds = null;
+  if (marvinUndoTimer) { clearTimeout(marvinUndoTimer); marvinUndoTimer = null; }
+  document.getElementById('marvin-file-chip').style.display = 'none';
+  document.getElementById('marvin-file-input').value = '';
+  document.getElementById('marvin-sheet-picker').style.display = 'none';
   const messages = document.getElementById('marvin-panel-messages');
   messages.innerHTML = `
     <div class="marvin-welcome" id="marvin-welcome">
@@ -6044,6 +6079,12 @@ function renderMarvinActionCard(action) {
       btnText = action.data?.remove ? 'Remove' : 'Save to Notes';
       btnClass = 'apply';
       break;
+    case 'importData':
+      iconName = 'upload_file';
+      iconClass = 'import-data';
+      btnText = 'Import ' + (action.data?.rowCount || '') + ' rows';
+      btnClass = 'apply';
+      break;
     default:
       return '';
   }
@@ -6071,6 +6112,45 @@ function renderMarvinActionCard(action) {
       return html;
     }).join('');
     detailIsHtml = true;
+  } else if (action.type === 'importData' && action.data) {
+    const d = action.data;
+    let previewHtml = `<div class="marvin-import-meta">
+      <strong>${d.rowCount} rows</strong> → ${escapeHtml(d.targetLabel || d.target)}
+      ${d.skippedRowCount ? `<span class="marvin-import-skipped">(${d.skippedRowCount} empty rows skipped)</span>` : ''}
+    </div>`;
+
+    const targetFieldsByType = {
+      plantCatalog: ['commonName','botanicalName','category','size','unitCost','supplier','notes','(skip)'],
+      contacts: ['firstName','lastName','name','displayName','email','phone','company','billingAddress','propertyAddress','stage','source','notes','(skip)'],
+      itemCatalog: ['item','type','unit','category','division','easy','medium','hard','purchaseUnit','costPerUnit','coveragePerUnit','defaultDepth','(skip)'],
+      serviceCatalog: ['serviceName','defaultVisits','billingTier','category','mapColor','description','durationType','(skip)'],
+      properties: ['address','city','state','zip','propertyType','pin','gateCode','crew','crewPhone','lotSizeSF','lawnRawSF','hardEdgeLF','softEdgeLF','mulchBedSF','hedgeSF','drivewayPavementSF','treeCount','irrigationZones','notes','(skip)']
+    };
+    const availableFields = targetFieldsByType[d.target] || ['(skip)'];
+
+    previewHtml += `<div class="marvin-import-mappings" id="marvin-mappings-${actionId}">`;
+    const allSrcCols = [...Object.keys(d.mappings || {}), ...(d.unmappedColumns || [])];
+    allSrcCols.forEach((src, colIndex) => {
+      const currentDst = (d.mappings || {})[src] || '(skip)';
+      const options = availableFields.map(f =>
+        `<option value="${f}" ${f === currentDst ? 'selected' : ''}>${f}</option>`
+      ).join('');
+      previewHtml += `<div class="marvin-mapping-row">
+        <span class="marvin-mapping-src">${escapeHtml(src)}</span>
+        <span class="marvin-mapping-arrow">\u2192</span>
+        <select class="marvin-mapping-select" data-action-id="${actionId}" data-col-index="${colIndex}" onchange="updateMarvinMapping(this)">
+          ${options}
+        </select>
+      </div>`;
+    });
+    previewHtml += '</div>';
+
+    previewHtml += `<div class="marvin-import-preview-wrap" id="marvin-preview-${actionId}">`;
+    previewHtml += renderMarvinImportPreview(d);
+    previewHtml += '</div>';
+
+    detail = previewHtml;
+    detailIsHtml = true;
   } else if (action.type === 'updateKnowledgeBase') {
     const entries = action.data?.entries || action.data?.remove || [];
     detail = entries.join('\n');
@@ -6082,7 +6162,8 @@ function renderMarvinActionCard(action) {
     setField: 'Update Field',
     createSection: 'New Section',
     navigate: 'Navigate',
-    updateKnowledgeBase: action.data?.remove ? 'Remove from Notes' : 'Remember This'
+    updateKnowledgeBase: action.data?.remove ? 'Remove from Notes' : 'Remember This',
+    importData: 'Import Data'
   };
 
   return `
@@ -6098,7 +6179,291 @@ function renderMarvinActionCard(action) {
         <span class="material-icons-outlined">${action.type === 'navigate' ? 'arrow_forward' : 'check'}</span>
         ${btnText}
       </button>
+      ${action.type === 'importData' && action.data?.source === 'pdf' ? `
+        <button class="marvin-csv-download-btn" onclick="downloadExtractedCSV('${actionId}')">
+          <span class="material-icons-outlined" style="font-size:14px;">download</span>
+          Download as CSV to review first
+        </button>
+      ` : ''}
     </div>`;
+}
+
+function renderMarvinImportPreview(d) {
+  if (!d.preview || !d.preview.length) return '';
+  const cols = Object.values(d.mappings || {});
+  if (cols.length === 0) return '';
+  let html = '<div class="marvin-import-preview-table">';
+  html += '<div class="marvin-import-row header">' +
+    cols.map(c => `<span>${escapeHtml(c)}</span>`).join('') + '</div>';
+  d.preview.forEach(row => {
+    html += '<div class="marvin-import-row">' +
+      cols.map(c => `<span>${escapeHtml(String(row[c] || ''))}</span>`).join('') + '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function updateMarvinMapping(selectEl) {
+  const actionId = selectEl.getAttribute('data-action-id');
+  const colIndex = parseInt(selectEl.getAttribute('data-col-index'));
+  const newDst = selectEl.value;
+  const action = _marvinPendingActions[actionId];
+  if (!action || !action.data) return;
+
+  const allSrcCols = [...Object.keys(action.data.mappings || {}), ...(action.data.unmappedColumns || [])];
+  const srcCol = allSrcCols[colIndex];
+  if (!srcCol) return;
+
+  if (newDst === '(skip)') {
+    delete action.data.mappings[srcCol];
+    if (!action.data.unmappedColumns) action.data.unmappedColumns = [];
+    if (!action.data.unmappedColumns.includes(srcCol)) action.data.unmappedColumns.push(srcCol);
+  } else {
+    action.data.mappings[srcCol] = newDst;
+    if (action.data.unmappedColumns) {
+      action.data.unmappedColumns = action.data.unmappedColumns.filter(c => c !== srcCol);
+    }
+  }
+
+  const previewWrap = document.getElementById('marvin-preview-' + actionId);
+  if (previewWrap) {
+    previewWrap.innerHTML = renderMarvinImportPreview(action.data);
+  }
+}
+
+function downloadExtractedCSV(actionId) {
+  const action = _marvinPendingActions[actionId];
+  if (!action || !action.data || !action.data.extractedRows) {
+    showToast('No extracted data available.', 'error');
+    return;
+  }
+
+  const rows = action.data.extractedRows;
+  if (rows.length === 0) return;
+
+  const headers = Object.keys(rows[0]);
+  const csvLines = [headers.join(',')];
+
+  rows.forEach(row => {
+    const line = headers.map(h => {
+      let val = String(row[h] || '');
+      if (val.includes(',') || val.includes('"') || val.includes('\n')) {
+        val = '"' + val.replace(/"/g, '""') + '"';
+      }
+      return val;
+    }).join(',');
+    csvLines.push(line);
+  });
+
+  const csvContent = csvLines.join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const baseName = (marvinAttachedFile ? marvinAttachedFile.name : 'extracted')
+    .replace(/\.pdf$/i, '');
+  a.download = baseName + '-extracted.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  showToast('CSV downloaded. Review it, then import here or re-upload with edits.', 'info');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MARVIN FILE UPLOAD & SMART IMPORT
+// ═══════════════════════════════════════════════════════════════
+
+function initMarvinDragDrop() {
+  const panel = document.getElementById('marvin-panel');
+  const overlay = document.getElementById('marvin-drop-overlay');
+  if (!panel || !overlay) return;
+
+  let dragCounter = 0;
+
+  panel.addEventListener('dragenter', (e) => {
+    e.preventDefault();
+    dragCounter++;
+    overlay.classList.add('active');
+  });
+
+  panel.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    dragCounter--;
+    if (dragCounter <= 0) {
+      dragCounter = 0;
+      overlay.classList.remove('active');
+    }
+  });
+
+  panel.addEventListener('dragover', (e) => {
+    e.preventDefault();
+  });
+
+  panel.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dragCounter = 0;
+    overlay.classList.remove('active');
+
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['csv', 'xlsx', 'xls', 'pdf'].includes(ext)) {
+      showToast('Unsupported file type. Use CSV, Excel, or PDF.', 'error');
+      return;
+    }
+
+    processMarvinFile(file);
+  });
+}
+
+function handleMarvinFileSelect(input) {
+  const file = input.files[0];
+  if (!file) return;
+  processMarvinFile(file);
+}
+
+async function processMarvinFile(file) {
+  if (file.size > MARVIN_MAX_FILE_SIZE) {
+    showToast('File is too large (max 10MB). Trim it or split into smaller files.', 'error');
+    return;
+  }
+
+  const ext = file.name.split('.').pop().toLowerCase();
+
+  try {
+    if (ext === 'pdf') {
+      await processMarvinPDF(file);
+    } else {
+      await processMarvinSpreadsheet(file);
+    }
+  } catch (err) {
+    console.error('File processing error:', err);
+    showToast('Could not read this file: ' + err.message, 'error');
+  }
+}
+
+async function processMarvinSpreadsheet(file) {
+  const data = await file.arrayBuffer();
+  const workbook = XLSX.read(data);
+  marvinWorkbook = workbook;
+
+  const sheetNames = workbook.SheetNames;
+  if (sheetNames.length > 1) {
+    const picker = document.getElementById('marvin-sheet-picker');
+    picker.innerHTML = sheetNames.map((name, i) =>
+      `<option value="${i}">${name}</option>`
+    ).join('');
+    picker.style.display = 'inline-block';
+  } else {
+    document.getElementById('marvin-sheet-picker').style.display = 'none';
+  }
+
+  parseMarvinSheet(workbook, 0, file.name);
+}
+
+function parseMarvinSheet(workbook, sheetIndex, fileName) {
+  const sheetName = workbook.SheetNames[sheetIndex];
+  const sheet = workbook.Sheets[sheetName];
+  const raw = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+  if (raw.length < 2) {
+    showToast('Sheet "' + sheetName + '" needs a header row and at least one data row.', 'error');
+    return;
+  }
+
+  const headers = raw[0].map(h => String(h || '').trim());
+  const allDataRows = raw.slice(1);
+
+  const threshold = Math.ceil(headers.length * 0.3);
+  const cleanRows = [];
+  const skippedRows = [];
+  allDataRows.forEach((row, idx) => {
+    const filledCols = row.filter(cell => cell !== undefined && cell !== null && String(cell).trim() !== '').length;
+    if (filledCols >= threshold) {
+      cleanRows.push(row);
+    } else if (filledCols > 0) {
+      skippedRows.push({ rowNum: idx + 2, row });
+    }
+  });
+
+  const sheetLabel = workbook.SheetNames.length > 1 ? ` (sheet: ${sheetName})` : '';
+  const skippedNote = skippedRows.length > 0 ? ` · ${skippedRows.length} rows skipped` : '';
+
+  marvinAttachedFile = {
+    name: fileName,
+    type: 'spreadsheet',
+    sheetName,
+    headers,
+    rowCount: cleanRows.length,
+    sampleRows: cleanRows.slice(0, 5),
+    allRows: cleanRows,
+    skippedRows,
+    summary: `${fileName}${sheetLabel} — ${cleanRows.length} rows, ${headers.length} columns${skippedNote}`
+  };
+
+  document.getElementById('marvin-file-chip').style.display = 'flex';
+  document.getElementById('marvin-file-chip-text').textContent = marvinAttachedFile.summary;
+
+  const input = document.getElementById('marvin-chat-input');
+  if (!input.value.trim()) {
+    input.value = `I've attached ${fileName} with ${cleanRows.length} rows. What should I do with this data?`;
+  }
+}
+
+function handleMarvinSheetChange(sheetIndex) {
+  if (!marvinWorkbook) return;
+  parseMarvinSheet(marvinWorkbook, parseInt(sheetIndex), marvinAttachedFile.name);
+}
+
+async function processMarvinPDF(file) {
+  if (!window.pdfjsLib) {
+    showToast('PDF support requires pdf.js. CSV and Excel still work.', 'error');
+    return;
+  }
+
+  const data = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data }).promise;
+  const pageCount = pdf.numPages;
+  let fullText = '';
+
+  for (let i = 1; i <= pageCount; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const pageText = content.items.map(item => item.str).join(' ');
+    fullText += pageText + '\n';
+  }
+
+  if (fullText.trim().length < 50) {
+    showToast('This PDF appears to be scanned. I can only read PDFs with embedded text. Try re-saving with OCR or using a spreadsheet instead.', 'error');
+    return;
+  }
+
+  marvinAttachedFile = {
+    name: file.name,
+    type: 'pdf',
+    pageCount,
+    pdfText: fullText,
+    summary: `${file.name} — ${pageCount} pages`
+  };
+
+  document.getElementById('marvin-file-chip').style.display = 'flex';
+  document.getElementById('marvin-file-chip-text').textContent = marvinAttachedFile.summary;
+
+  const input = document.getElementById('marvin-chat-input');
+  if (!input.value.trim()) {
+    input.value = `I've attached ${file.name} (${pageCount} pages). Can you pull any data from this for import?`;
+  }
+}
+
+function clearMarvinFile() {
+  marvinAttachedFile = null;
+  marvinWorkbook = null;
+  document.getElementById('marvin-file-chip').style.display = 'none';
+  document.getElementById('marvin-file-input').value = '';
+  document.getElementById('marvin-sheet-picker').style.display = 'none';
 }
 
 function buildMarvinContext() {
@@ -6403,7 +6768,11 @@ async function sendMarvinMessage() {
 
   skipTypewriter();
 
-  appendMarvinMessage('user', text);
+  if (marvinAttachedFile) {
+    appendMarvinMessage('user', '\u{1F4CE} ' + marvinAttachedFile.name + '\n' + text);
+  } else {
+    appendMarvinMessage('user', text);
+  }
   marvinChatHistory.push({ role: 'user', content: text });
   input.value = '';
   input.style.height = 'auto';
@@ -6417,6 +6786,32 @@ async function sendMarvinMessage() {
 
   try {
     const context = buildMarvinContext();
+
+    // Attach file data if present
+    if (marvinAttachedFile) {
+      if (marvinAttachedFile.type === 'spreadsheet') {
+        context.attachedFile = {
+          name: marvinAttachedFile.name,
+          type: 'spreadsheet',
+          sheetName: marvinAttachedFile.sheetName,
+          headers: marvinAttachedFile.headers,
+          rowCount: marvinAttachedFile.rowCount,
+          sampleRows: marvinAttachedFile.sampleRows.slice(0, 8),
+          skippedRowCount: (marvinAttachedFile.skippedRows || []).length,
+        };
+      } else if (marvinAttachedFile.type === 'pdf') {
+        context.attachedFile = {
+          name: marvinAttachedFile.name,
+          type: 'pdf',
+          textContent: marvinAttachedFile.pdfText.slice(0, 8000),
+          totalChars: marvinAttachedFile.pdfText.length,
+          truncated: marvinAttachedFile.pdfText.length > 8000
+        };
+      }
+      // Hide the chip after sending, but keep the data for import
+      document.getElementById('marvin-file-chip').style.display = 'none';
+      document.getElementById('marvin-file-input').value = '';
+    }
 
     if (MARVIN_STREAM_URL) {
       // Streaming path — real-time SSE via Function URL
@@ -6843,6 +7238,9 @@ function applyMarvinAction(actionId, btn) {
     case 'updateKnowledgeBase':
       applyMarvinKBUpdate(action.data);
       break;
+    case 'importData':
+      applyMarvinImport(action.data);
+      return; // importData manages its own button state
     default:
       showToast('Unknown action type', 'error');
       return;
@@ -6963,6 +7361,469 @@ async function applyMarvinKBUpdate(data) {
   } catch (e) {
     console.warn('Could not auto-save knowledge base:', e);
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MARVIN IMPORT EXECUTION & UNDO
+// ═══════════════════════════════════════════════════════════════
+
+/*
+ * LAMBDA BACKEND: Marvin File Import Support
+ *
+ * When context.attachedFile is present in Marvin's request,
+ * the Lambda system prompt should include instructions for
+ * handling file data:
+ *
+ * FILE IMPORT CAPABILITIES:
+ * Available targets and fields:
+ *   plantCatalog: commonName (req), botanicalName, category, size, unitCost, supplier, notes
+ *   contacts: firstName, lastName, name, displayName, email, phone, company, billingAddress, propertyAddress, stage, source, notes
+ *   itemCatalog: item (req), type, unit, category, division, easy, medium, hard, purchaseUnit, costPerUnit, coveragePerUnit, defaultDepth
+ *   serviceCatalog: serviceName (req), defaultVisits, billingTier, category, mapColor, description, durationType
+ *   properties: address (req), city, state, zip, propertyType, pin, gateCode, crew, crewPhone, lotSizeSF, lawnRawSF, hardEdgeLF, softEdgeLF, mulchBedSF, hedgeSF, drivewayPavementSF, treeCount, irrigationZones, notes
+ *
+ * Return importData action: { type: "importData", data: { target, targetLabel, mappings: {src: dst}, unmappedColumns: [], rowCount, preview: [first 3 rows] } }
+ * For PDFs: add source: "pdf" and extractedRows: [all rows as mapped objects]
+ */
+
+async function applyMarvinImport(data) {
+  const { target, mappings, source } = data;
+
+  let importRows;
+
+  if (source === 'pdf' && data.extractedRows) {
+    importRows = data.extractedRows;
+  } else if (marvinAttachedFile && marvinAttachedFile.allRows) {
+    const headers = marvinAttachedFile.headers;
+    importRows = marvinAttachedFile.allRows.map(row => {
+      const mapped = {};
+      Object.entries(mappings).forEach(([srcCol, dstField]) => {
+        if (dstField === '(skip)') return;
+        const colIdx = headers.indexOf(srcCol);
+        if (colIdx >= 0 && row[colIdx] !== undefined) {
+          mapped[dstField] = row[colIdx];
+        }
+      });
+      return mapped;
+    });
+  } else {
+    showToast('File data no longer available. Please re-attach the file.', 'error');
+    return;
+  }
+
+  const total = importRows.length;
+  let imported = 0;
+  let updated = 0;
+  let skipped = 0;
+  let errors = 0;
+  const createdIds = [];
+
+  const actionCards = document.querySelectorAll('.marvin-action-btn.apply');
+  const btn = actionCards[actionCards.length - 1];
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<span class="material-icons-outlined">hourglass_top</span> Importing 0/${total}...`;
+  }
+
+  for (let i = 0; i < importRows.length; i++) {
+    const mapped = importRows[i];
+    try {
+      const result = await importRowByTarget(target, mapped);
+      if (result.action === 'created') {
+        imported++;
+        if (result.id) createdIds.push(result.id);
+      } else if (result.action === 'updated') {
+        updated++;
+      } else if (result.action === 'skipped') {
+        skipped++;
+      }
+    } catch (err) {
+      console.error('Import row failed:', err, mapped);
+      errors++;
+    }
+
+    if (btn && (i % 5 === 0 || i === importRows.length - 1)) {
+      const done = imported + updated + skipped + errors;
+      btn.innerHTML = `<span class="material-icons-outlined">hourglass_top</span> Importing ${done}/${total}...`;
+    }
+
+    if (i > 0 && i % 5 === 0) {
+      await new Promise(r => setTimeout(r, 100));
+    }
+  }
+
+  let navViewId = null;
+  let navLabel = null;
+  switch (target) {
+    case 'plantCatalog':
+      if (typeof loadAndRenderPlantCatalog === 'function') await loadAndRenderPlantCatalog();
+      navViewId = 'plant-catalog';
+      navLabel = 'Plant Catalog';
+      break;
+    case 'contacts':
+      if (typeof loadContacts === 'function') await loadContacts();
+      if (currentView === 'contacts') renderContactsList();
+      navViewId = 'contacts';
+      navLabel = 'Contacts';
+      break;
+    case 'itemCatalog':
+      if (typeof loadItemCatalog === 'function') await loadItemCatalog();
+      if (typeof renderCatalog === 'function') renderCatalog();
+      navViewId = 'catalog';
+      navLabel = 'Item Catalog';
+      break;
+    case 'serviceCatalog':
+      if (typeof loadServiceCatalog === 'function') await loadServiceCatalog();
+      if (typeof renderServiceCatalog === 'function') renderServiceCatalog();
+      navViewId = 'services';
+      navLabel = 'Service Catalog';
+      break;
+    case 'properties':
+      if (typeof loadPropertiesFromBackend === 'function') await loadPropertiesFromBackend();
+      if (currentView === 'properties' && typeof renderPropertiesList === 'function') renderPropertiesList();
+      navViewId = 'properties';
+      navLabel = 'Properties';
+      break;
+  }
+
+  if (btn) {
+    btn.disabled = true;
+    btn.className = 'marvin-action-btn applied';
+    btn.innerHTML = `<span class="material-icons-outlined">check_circle</span> Done`;
+    btn.onclick = null;
+  }
+
+  const parts = [];
+  if (imported > 0) parts.push(`${imported} created`);
+  if (updated > 0) parts.push(`${updated} updated`);
+  if (skipped > 0) parts.push(`${skipped} skipped (duplicates)`);
+  if (errors > 0) parts.push(`${errors} failed`);
+  const summary = parts.join(', ');
+
+  const refs = appendMarvinMessage('assistant', '', null);
+  let resultHtml = `Import complete: ${summary}.`;
+  if (navViewId) {
+    resultHtml += ` <a href="#" onclick="showView('${navViewId}'); return false;" style="color:#1A73E8;text-decoration:underline;">View ${navLabel} \u2192</a>`;
+  }
+  refs.bubble.innerHTML = formatMarvinText(resultHtml);
+  refs.bubble.style.cssText = 'font-size:13px;';
+  refs.messagesEl.scrollTop = refs.messagesEl.scrollHeight;
+  marvinChatHistory.push({ role: 'assistant', content: `Import complete: ${summary}` });
+
+  if (createdIds.length > 0 && target !== 'itemCatalog') {
+    marvinLastImportIds = { target, ids: createdIds };
+    showMarvinUndoImport(createdIds.length);
+  }
+
+  marvinAttachedFile = null;
+  marvinWorkbook = null;
+
+  showToast(summary, errors > 0 ? 'error' : 'success');
+}
+
+async function importRowByTarget(target, mapped) {
+  switch (target) {
+    case 'plantCatalog': return await importPlantRow(mapped);
+    case 'contacts': return await importContactRow(mapped);
+    case 'itemCatalog': return await importItemCatalogRow(mapped);
+    case 'serviceCatalog': return await importServiceCatalogRow(mapped);
+    case 'properties': return await importPropertyRow(mapped);
+    default: throw new Error('Unknown target: ' + target);
+  }
+}
+
+async function importPlantRow(mapped) {
+  const name = (mapped.commonName || '').trim();
+  if (!name) return { action: 'skipped' };
+
+  const existing = (typeof plantCatalog !== 'undefined' ? plantCatalog : [])
+    .find(p => (p.commonName || '').toLowerCase() === name.toLowerCase());
+
+  let sizes = existing ? [...(existing.sizes || [])] : [];
+  const size = (mapped.size || '').trim();
+  const cost = parseFloat(mapped.unitCost || mapped.costPerUnit || 0);
+  const supplier = (mapped.supplier || '').trim();
+
+  if (size) {
+    const idx = sizes.findIndex(s => s.size.toLowerCase() === size.toLowerCase());
+    if (idx >= 0) {
+      sizes[idx].supplierCost = cost;
+      if (supplier) sizes[idx].supplier = supplier;
+    } else {
+      sizes.push({ size, supplierCost: cost, defaultMarkup: 0.20, supplier, sku: '' });
+    }
+  }
+
+  const resp = await fetch(GOOGLE_SHEETS_URL, {
+    method: 'POST',
+    body: JSON.stringify({
+      savePlantEntry: true,
+      plantId: existing ? existing.plantId : null,
+      commonName: name,
+      botanicalName: mapped.botanicalName || (existing ? existing.botanicalName : '') || '',
+      category: mapped.category || (existing ? existing.category : '') || 'Shrub',
+      sizes,
+      photoFileId: existing ? existing.photoFileId : '',
+      notes: mapped.notes || ''
+    })
+  });
+  const result = await resp.json();
+  return {
+    action: existing ? 'updated' : 'created',
+    id: result.plantId || result.id || null
+  };
+}
+
+async function importContactRow(mapped) {
+  let firstName = (mapped.firstName || '').trim();
+  let lastName = (mapped.lastName || '').trim();
+  if (!firstName && !lastName && mapped.name) {
+    const parts = mapped.name.trim().split(/\s+/);
+    firstName = parts[0] || '';
+    lastName = parts.slice(1).join(' ') || '';
+  }
+  if (!firstName && !lastName) return { action: 'skipped' };
+
+  const email = (mapped.email || '').trim().toLowerCase();
+  const fullName = (firstName + ' ' + lastName).trim().toLowerCase();
+  const existing = (typeof contacts !== 'undefined' ? contacts : []).find(c => {
+    if (email && (c.email || '').toLowerCase() === email) return true;
+    const cName = ((c.firstName || '') + ' ' + (c.lastName || '') || c.name || '').trim().toLowerCase();
+    return cName === fullName;
+  });
+
+  if (existing) {
+    return { action: 'skipped' };
+  }
+
+  const resp = await fetch(GOOGLE_SHEETS_URL, {
+    method: 'POST',
+    body: JSON.stringify({
+      saveContact: true,
+      firstName, lastName,
+      displayName: mapped.displayName || '',
+      email: mapped.email || '',
+      phone: mapped.phone || '',
+      company: mapped.company || '',
+      billingAddress: mapped.billingAddress || '',
+      propertyAddress: mapped.propertyAddress || mapped.address || '',
+      stage: mapped.stage || 'Lead',
+      source: mapped.source || 'Import',
+      notes: mapped.notes || ''
+    })
+  });
+  const result = await resp.json();
+  return { action: 'created', id: result.contactId || result.id || null };
+}
+
+async function importItemCatalogRow(mapped) {
+  const itemName = (mapped.item || mapped.itemName || mapped.name || '').trim();
+  if (!itemName) return { action: 'skipped' };
+
+  const division = mapped.division || 'MNT';
+  const existing = (typeof itemCatalog !== 'undefined' ? itemCatalog : []).find(i =>
+    (i.item || '').toLowerCase() === itemName.toLowerCase() &&
+    (i.division || 'MNT') === division
+  );
+
+  if (existing) {
+    return { action: 'skipped' };
+  }
+
+  const resp = await fetch(GOOGLE_SHEETS_URL, {
+    method: 'POST',
+    body: JSON.stringify({
+      addItem: true,
+      item: itemName,
+      type: mapped.type || 'Labor',
+      unit: mapped.unit || 'SF/Hour',
+      category: mapped.category || 'General',
+      division,
+      easy: parseInt(mapped.easy || 0),
+      medium: parseInt(mapped.medium || 0),
+      hard: parseInt(mapped.hard || 0),
+      purchaseUnit: mapped.purchaseUnit || '',
+      costPerUnit: parseFloat(mapped.costPerUnit || 0),
+      coveragePerUnit: parseInt(mapped.coveragePerUnit || 0),
+      defaultDepth: parseFloat(mapped.defaultDepth || 0)
+    })
+  });
+  const result = await resp.json();
+  return { action: 'created', id: result.id || null };
+}
+
+async function importServiceCatalogRow(mapped) {
+  const name = (mapped.serviceName || mapped.name || '').trim();
+  if (!name) return { action: 'skipped' };
+
+  const existing = (typeof serviceCatalog !== 'undefined' ? serviceCatalog : []).find(s =>
+    (s.serviceName || s.name || '').toLowerCase() === name.toLowerCase()
+  );
+
+  if (existing) {
+    return { action: 'skipped' };
+  }
+
+  await saveServiceCatalogItem({
+    serviceName: name,
+    defaultVisits: parseInt(mapped.defaultVisits || mapped.visits || 0),
+    billingTier: mapped.billingTier || 'fixed',
+    category: mapped.category || 'Maintenance',
+    mapColor: mapped.mapColor || 'green',
+    description: mapped.description || '',
+    durationType: mapped.durationType || 'scalable'
+  });
+  return { action: 'created' };
+}
+
+async function importPropertyRow(mapped) {
+  const address = (mapped.address || mapped.streetAddress || mapped.street || mapped.propertyAddress || '').trim();
+  if (!address) return { action: 'skipped' };
+
+  const normalizedAddr = address.toLowerCase().replace(/[.,#]/g, '').replace(/\s+/g, ' ');
+  const existing = (typeof properties !== 'undefined' ? properties : []).find(p => {
+    const pAddr = (p.propertyAddress || p.address || '').toLowerCase().replace(/[.,#]/g, '').replace(/\s+/g, ' ');
+    return pAddr === normalizedAddr || pAddr.startsWith(normalizedAddr) || normalizedAddr.startsWith(pAddr);
+  });
+
+  if (existing) {
+    return { action: 'skipped' };
+  }
+
+  let city = (mapped.city || '').trim();
+  let state = (mapped.state || '').trim().toUpperCase();
+  let zip = (mapped.zip || mapped.zipCode || mapped.postalCode || '').trim();
+
+  if (!city && !state && address.includes(',')) {
+    const parts = address.split(',').map(p => p.trim());
+    if (parts.length >= 2) {
+      const lastPart = parts[parts.length - 1];
+      const stateZipMatch = lastPart.match(/([A-Z]{2})\s*(\d{5})/i);
+      if (stateZipMatch) {
+        state = stateZipMatch[1].toUpperCase();
+        zip = stateZipMatch[2];
+      }
+      if (parts.length >= 3) city = parts[1];
+      else if (parts.length === 2 && !stateZipMatch) city = parts[1];
+    }
+  }
+
+  const resp = await fetch(GOOGLE_SHEETS_URL, {
+    method: 'POST',
+    body: JSON.stringify({
+      saveProperty: true,
+      address: address.split(',')[0].trim(),
+      city,
+      state,
+      zip,
+      propertyType: mapped.propertyType || mapped.type || 'Residential',
+      pin: mapped.pin || mapped.accessCode || '',
+      gateCode: mapped.gateCode || '',
+      crew: mapped.crew || '',
+      crewPhone: mapped.crewPhone || '',
+      lotSizeSF: parseFloat(mapped.lotSizeSF || mapped.lotSize || 0),
+      lawnRawSF: parseFloat(mapped.lawnRawSF || mapped.lawnSF || 0),
+      hardEdgeLF: parseFloat(mapped.hardEdgeLF || 0),
+      softEdgeLF: parseFloat(mapped.softEdgeLF || 0),
+      mulchBedSF: parseFloat(mapped.mulchBedSF || mapped.mulchSF || 0),
+      hedgeSF: parseFloat(mapped.hedgeSF || 0),
+      drivewayPavementSF: parseFloat(mapped.drivewayPavementSF || mapped.drivewaySF || 0),
+      treeCount: parseInt(mapped.treeCount || mapped.trees || 0),
+      irrigationZones: parseInt(mapped.irrigationZones || mapped.zones || 0),
+      notes: mapped.notes || ''
+    })
+  });
+  const result = await resp.json();
+  return { action: 'created', id: result.propertyId || result.id || null };
+}
+
+function showMarvinUndoImport(count) {
+  if (marvinUndoTimer) clearTimeout(marvinUndoTimer);
+
+  const refs = appendMarvinMessage('assistant', '', null);
+  refs.bubble.innerHTML = `<div class="marvin-undo-banner">
+    <span>Undo import? (${count} new items)</span>
+    <button class="marvin-undo-btn" onclick="executeMarvinUndo(this)">Undo</button>
+    <span class="marvin-undo-countdown" id="marvin-undo-countdown">60s</span>
+  </div>`;
+  refs.messagesEl.scrollTop = refs.messagesEl.scrollHeight;
+
+  let remaining = 60;
+  marvinUndoTimer = setInterval(() => {
+    remaining--;
+    const el = document.getElementById('marvin-undo-countdown');
+    if (el) el.textContent = remaining + 's';
+    if (remaining <= 0) {
+      clearInterval(marvinUndoTimer);
+      marvinUndoTimer = null;
+      marvinLastImportIds = null;
+      if (el) el.parentElement.innerHTML = '<span style="color:#80868b;font-size:12px;">Undo expired</span>';
+    }
+  }, 1000);
+}
+
+async function executeMarvinUndo(btn) {
+  if (!marvinLastImportIds || !marvinLastImportIds.ids.length) {
+    showToast('Nothing to undo.', 'error');
+    return;
+  }
+
+  if (marvinUndoTimer) clearTimeout(marvinUndoTimer);
+  marvinUndoTimer = null;
+
+  const { target, ids } = marvinLastImportIds;
+  btn.disabled = true;
+  btn.textContent = 'Undoing...';
+
+  let deleted = 0;
+  for (const id of ids) {
+    try {
+      let payload;
+      switch (target) {
+        case 'plantCatalog':
+          payload = { deletePlantEntry: true, plantId: id };
+          break;
+        case 'contacts':
+          payload = { deleteContact: true, contactId: id };
+          break;
+        case 'serviceCatalog':
+          payload = { deleteServiceCatalog: true, serviceId: id };
+          break;
+        case 'properties':
+          payload = { deleteProperty: true, propertyId: id };
+          break;
+      }
+      if (payload) {
+        await fetch(GOOGLE_SHEETS_URL, { method: 'POST', body: JSON.stringify(payload) });
+        deleted++;
+      }
+    } catch (err) {
+      console.error('Undo delete failed:', err);
+    }
+  }
+
+  marvinLastImportIds = null;
+  btn.parentElement.innerHTML = `<span style="color:#2e7d32;font-size:12px;">\u2713 ${deleted} items removed</span>`;
+
+  switch (target) {
+    case 'plantCatalog':
+      if (typeof loadAndRenderPlantCatalog === 'function') await loadAndRenderPlantCatalog();
+      break;
+    case 'contacts':
+      if (typeof loadContacts === 'function') await loadContacts();
+      if (currentView === 'contacts') renderContactsList();
+      break;
+    case 'serviceCatalog':
+      if (typeof loadServiceCatalog === 'function') await loadServiceCatalog();
+      if (typeof renderServiceCatalog === 'function') renderServiceCatalog();
+      break;
+    case 'properties':
+      if (typeof loadPropertiesFromBackend === 'function') await loadPropertiesFromBackend();
+      if (currentView === 'properties' && typeof renderPropertiesList === 'function') renderPropertiesList();
+      break;
+  }
+
+  showToast(`Undo complete: ${deleted} items removed.`, 'success');
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -18565,6 +19426,9 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app-container').classList.add('active');
   loadAllData();
+
+  // Marvin drag-and-drop file upload
+  initMarvinDragDrop();
 
   // Navigation
   document.querySelectorAll('.nav-item[data-view]').forEach(item => {

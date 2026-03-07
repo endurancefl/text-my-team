@@ -6936,6 +6936,7 @@ select option:checked {
 
 /* Panel */
 .marvin-panel {
+  position: relative;
   width: 0;
   min-width: 0;
   overflow: hidden;
@@ -7836,4 +7837,212 @@ body.marvin-identify-active .main-content {
 .tr-action-btn { background: none; border: none; cursor: pointer; padding: 4px; color: var(--gw-text-secondary, #5f6368); border-radius: 4px; }
 .tr-action-btn:hover { background: #f0f0f0; color: #202124; }
 .tr-action-btn.delete:hover { color: #d93025; background: #fce8e6; }
+
+/* ─── Marvin File Attachment ─── */
+.marvin-attach-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  color: var(--gw-text-secondary, #5f6368);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.marvin-attach-btn:hover {
+  background: rgba(0,0,0,0.06);
+  color: var(--gw-text-primary, #202124);
+}
+
+.marvin-file-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  margin: 0 12px 4px;
+  background: #e8f0fe;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #1967d2;
+}
+.marvin-file-chip-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  color: #5f6368;
+  padding: 0 2px;
+  line-height: 1;
+}
+.marvin-file-chip-remove:hover {
+  color: #d93025;
+}
+
+.marvin-sheet-picker {
+  font-size: 11px;
+  padding: 1px 4px;
+  border: 1px solid #a8c7fa;
+  border-radius: 4px;
+  background: white;
+  color: #1967d2;
+  cursor: pointer;
+  max-width: 120px;
+}
+
+/* ─── Drag-and-Drop Overlay ─── */
+.marvin-drop-overlay {
+  display: none;
+  position: absolute;
+  inset: 0;
+  background: rgba(26, 115, 232, 0.08);
+  border: 2px dashed #1A73E8;
+  border-radius: 12px;
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+}
+.marvin-drop-overlay.active {
+  display: flex;
+}
+.marvin-drop-content {
+  text-align: center;
+  color: #1A73E8;
+  font-size: 14px;
+  font-weight: 500;
+}
+.marvin-drop-hint {
+  font-size: 12px;
+  color: #5f6368;
+  font-weight: 400;
+  margin-top: 4px;
+}
+
+/* ─── Import Action Card Styles ─── */
+.marvin-import-meta {
+  font-size: 12px;
+  margin-bottom: 8px;
+  color: var(--gw-text-secondary, #5f6368);
+}
+.marvin-import-skipped {
+  color: #e65100;
+  font-size: 11px;
+  margin-left: 6px;
+}
+
+.marvin-import-mappings {
+  font-size: 11px;
+  margin-bottom: 10px;
+}
+.marvin-mapping-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+}
+.marvin-mapping-src {
+  color: var(--gw-text-secondary, #5f6368);
+  background: #f1f3f4;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: 'Roboto Mono', monospace;
+  font-size: 10px;
+}
+.marvin-mapping-arrow {
+  color: #80868b;
+  font-size: 10px;
+}
+.marvin-mapping-select {
+  font-size: 11px;
+  padding: 1px 4px;
+  border: 1px solid #dadce0;
+  border-radius: 4px;
+  background: white;
+  color: #1e7e34;
+  font-weight: 500;
+  cursor: pointer;
+}
+.marvin-mapping-select:hover {
+  border-color: #1A73E8;
+}
+
+.marvin-import-preview-table {
+  font-size: 10px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.marvin-import-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+  padding: 4px 6px;
+  border-bottom: 1px solid #eee;
+}
+.marvin-import-row.header {
+  background: #f8f9fa;
+  font-weight: 600;
+  color: var(--gw-text-secondary, #5f6368);
+}
+.marvin-import-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 2px;
+}
+
+.marvin-action-icon.import-data {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.marvin-csv-download-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px 0 2px;
+  font-size: 11px;
+  color: var(--gw-text-secondary, #5f6368);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.marvin-csv-download-btn:hover {
+  color: var(--gw-text-primary, #202124);
+}
+
+/* ─── Undo Import Banner ─── */
+.marvin-undo-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: #fff8e1;
+  border: 1px solid #ffe082;
+  border-radius: 8px;
+  font-size: 12px;
+}
+.marvin-undo-btn {
+  background: none;
+  border: 1px solid #e65100;
+  color: #e65100;
+  border-radius: 4px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.marvin-undo-btn:hover {
+  background: #fff3e0;
+}
+.marvin-undo-countdown {
+  color: #80868b;
+  font-size: 11px;
+  min-width: 28px;
+  text-align: right;
+}
 
