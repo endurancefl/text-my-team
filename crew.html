@@ -8882,11 +8882,7 @@
           .then(function(r) { return r.json(); })
           .then(function(data) {
             if (data.success) {
-              srProgressBar.style.width = '100%';
-              srProgressLabel.textContent = 'Success! Saved to Drive.';
-              srClearDraft();
-
-              // Auto-download the PDF
+              // Auto-download PDF immediately — don't wait for photo uploads
               var url = URL.createObjectURL(srState.generatedPdfBlob);
               var a = document.createElement('a');
               a.href = url;
@@ -8914,6 +8910,101 @@
                 srUploadDriveBtn.disabled = false;
                 srUploadDriveBtn.onclick = function() { window.open(data.pdfUrl, '_blank'); };
               }
+
+              // Upload photos to Drive in background (needed for Before & After reports)
+              srProgressBar.style.width = '80%';
+              srProgressLabel.textContent = 'Saving photos to Drive...';
+              var totalPhotos = srState.compositedPhotos.length;
+              var uploadedCount = 0;
+              var photoResults = [];
+              var nextPhotoIndex = 0;
+
+              function uploadNextPhoto() {
+                if (nextPhotoIndex >= totalPhotos) return Promise.resolve();
+                var i = nextPhotoIndex++;
+                var photo = srState.compositedPhotos[i];
+
+                function attemptUpload(retryCount) {
+                  return fetch(GOOGLE_SHEETS_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                      siteReportPhoto: true,
+                      photoBase64: photo.base64,
+                      photoIndex: i,
+                      filename: filename,
+                      property: srState.selectedProp.address
+                    })
+                  })
+                  .then(function(r) { return r.json(); })
+                  .then(function(photoData) {
+                    if (photoData.success && photoData.photoUrl) {
+                      photoResults.push({ index: i, url: photoData.photoUrl, fileId: photoData.fileId || '' });
+                    } else if (retryCount < 2) {
+                      return new Promise(function(resolve) {
+                        setTimeout(function() { resolve(attemptUpload(retryCount + 1)); }, Math.pow(2, retryCount) * 1000);
+                      });
+                    } else {
+                      photoResults.push({ index: i, url: '', fileId: '' });
+                    }
+                    uploadedCount++;
+                    srProgressLabel.textContent = 'Saving photos ' + uploadedCount + '/' + totalPhotos + '...';
+                  })
+                  .catch(function() {
+                    if (retryCount < 2) {
+                      return new Promise(function(resolve) {
+                        setTimeout(function() { resolve(attemptUpload(retryCount + 1)); }, Math.pow(2, retryCount) * 1000);
+                      });
+                    }
+                    photoResults.push({ index: i, url: '', fileId: '' });
+                    uploadedCount++;
+                  });
+                }
+                return attemptUpload(0).then(function() { return uploadNextPhoto(); });
+              }
+
+              var uploadWorkers = [];
+              for (var w = 0; w < Math.min(4, totalPhotos); w++) {
+                uploadWorkers.push(uploadNextPhoto());
+              }
+
+              Promise.all(uploadWorkers).then(function() {
+                photoResults.sort(function(a, b) { return a.index - b.index; });
+                srProgressBar.style.width = '95%';
+                srProgressLabel.textContent = 'Saving report data...';
+
+                var reportData = {
+                  address: srState.selectedProp.address,
+                  inspector: srState.inspectorName,
+                  date: srState.reportDate,
+                  photos: srState.compositedPhotos.map(function(p, i) {
+                    return {
+                      url: photoResults[i] ? photoResults[i].url : '',
+                      fileId: photoResults[i] ? photoResults[i].fileId : '',
+                      note: p.note,
+                      category: p.category
+                    };
+                  })
+                };
+
+                return fetch(GOOGLE_SHEETS_URL, {
+                  method: 'POST',
+                  body: JSON.stringify({
+                    siteReportJson: true,
+                    jsonData: reportData,
+                    filename: filename,
+                    property: srState.selectedProp.address
+                  })
+                });
+              })
+              .then(function(r) { return r.json(); })
+              .then(function() {
+                srProgressBar.style.width = '100%';
+                srProgressLabel.textContent = 'Success! Saved to Drive.';
+                srClearDraft();
+              })
+              .catch(function() {
+                srProgressLabel.textContent = 'PDF saved. Photo backup to Drive failed.';
+              });
             } else {
               srProgressBar.style.width = '100%';
               srProgressLabel.textContent = 'Upload failed. Tap to download PDF.';
