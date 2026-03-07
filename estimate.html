@@ -6229,15 +6229,25 @@ function renderMarvinActionCard(action) {
 }
 
 function renderMarvinImportPreview(d) {
-  if (!d.preview || !d.preview.length) return '';
-  const cols = Object.values(d.mappings || {});
-  if (cols.length === 0) return '';
+  // Build preview from LOCAL file data — never from MARVIN-generated rows
+  const mappings = d.mappings || {};
+  const mappedCols = Object.entries(mappings).filter(([, dst]) => dst !== '(skip)');
+  if (mappedCols.length === 0) return '';
+  if (!marvinAttachedFile || !marvinAttachedFile.allRows) return '';
+
+  const headers = marvinAttachedFile.headers;
+  const previewRows = marvinAttachedFile.allRows.slice(0, 3);
+
   let html = '<div class="marvin-import-preview-table">';
   html += '<div class="marvin-import-row header">' +
-    cols.map(c => `<span>${escapeHtml(c)}</span>`).join('') + '</div>';
-  d.preview.forEach(row => {
+    mappedCols.map(([, dst]) => `<span>${escapeHtml(dst)}</span>`).join('') + '</div>';
+  previewRows.forEach(row => {
     html += '<div class="marvin-import-row">' +
-      cols.map(c => `<span>${escapeHtml(String(row[c] || ''))}</span>`).join('') + '</div>';
+      mappedCols.map(([src]) => {
+        const colIdx = headers.indexOf(src);
+        const val = colIdx >= 0 && row[colIdx] !== undefined ? String(row[colIdx]) : '';
+        return `<span>${escapeHtml(val)}</span>`;
+      }).join('') + '</div>';
   });
   html += '</div>';
   return html;
@@ -6854,7 +6864,6 @@ async function sendMarvinMessage() {
           sheetName: marvinAttachedFile.sheetName,
           headers: marvinAttachedFile.headers,
           rowCount: marvinAttachedFile.rowCount,
-          sampleRows: marvinAttachedFile.sampleRows,
           skippedRowCount: (marvinAttachedFile.skippedRows || []).length,
         };
       } else if (marvinAttachedFile.type === 'pdf') {

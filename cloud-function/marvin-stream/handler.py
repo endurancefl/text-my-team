@@ -259,9 +259,9 @@ To remove from knowledge base:
 {{"type": "action", "message": "Brief explanation", "action": {{"type": "updateKnowledgeBase", "data": {{"remove": ["exact text of the line to remove"]}}}}}}
 
 To import data from an attached file (only use when context.attachedFile is present):
-{{"type": "action", "message": "Brief explanation of what was found", "action": {{"type": "importData", "data": {{"target": "plantCatalog", "targetLabel": "Plant Catalog", "mappings": {{"Source Column": "targetField"}}, "unmappedColumns": ["col1"], "rowCount": 47, "preview": [{{"commonName": "Example", "unitCost": 12.50}}]}}}}}}
+{{"type": "action", "message": "Brief description of file structure — column count, row count, suggested target. NEVER list specific data values.", "action": {{"type": "importData", "data": {{"target": "plantCatalog", "targetLabel": "Plant Catalog", "mappings": {{"Source Column": "targetField"}}, "unmappedColumns": ["col1"], "rowCount": 47}}}}}}
 
-Valid targets: plantCatalog, contacts, itemCatalog, serviceCatalog, properties. See FILE IMPORT CAPABILITIES section in Platform & Industry Knowledge for full field lists and rules. For PDFs, add "source": "pdf" and "extractedRows": [all structured rows]. Match columns fuzzily — "Plant Name" → commonName, "Cost" → unitCost, etc. If the target is unclear, ask the user.
+**DO NOT include a "preview" field** — the client builds the preview table from local file data. For spreadsheets, you only see headers (no row data), so map headers to target fields by name similarity. Valid targets: plantCatalog, contacts, itemCatalog, serviceCatalog, properties. See FILE IMPORT CAPABILITIES section in Platform & Industry Knowledge for full field lists and rules. For PDFs, add "source": "pdf" and "extractedRows": [all structured rows]. Match columns fuzzily — "Plant Name" → commonName, "Cost" → unitCost, etc. If the target is unclear, ask the user.
 
 ## Platform & Industry Knowledge
 
@@ -282,7 +282,7 @@ The JSON below contains EVERYTHING currently loaded in the platform. This is aut
 - **contractSchedule**: Tickets for a specific contract detail view.
 - **Active estimate fields**: When the user has an estimate open — property info, measurements, takeoffs, services with line items, calculated totals, tier breakdowns.
 - **knowledgeBase**: Company-specific instructions and preferences.
-- **attachedFile**: When present, the user has attached a file. For spreadsheets: contains name, type, sheetName, headers (column names), rowCount, sampleRows (ALL data rows from the file), skippedRowCount. For PDFs: contains name, type, textContent (extracted text up to 8000 chars), totalChars, truncated. **When you see attachedFile, analyze the ACTUAL data in sampleRows and respond with an importData action** mapping source columns to target fields. **CRITICAL: Only reference plants/items/data that actually appear in sampleRows. NEVER invent, guess, or extrapolate additional rows beyond what is provided. The sampleRows contain ALL the data from the file.**
+- **attachedFile**: When present, the user has attached a file. For spreadsheets: contains name, type, sheetName, headers (column names array), rowCount, skippedRowCount. **No row data is sent — only headers.** For PDFs: contains name, type, textContent (extracted text up to 8000 chars), totalChars, truncated. **When you see a spreadsheet attachedFile, analyze the HEADERS to determine the import target and column mappings, then respond with an importData action.** The client has all the actual data locally and builds the preview from it. **CRITICAL: In your text response, describe the file structure (column count, row count, what kind of data the headers suggest) but NEVER list, enumerate, or guess specific data values (plant names, contact names, etc.) since you cannot see the actual rows. Do NOT include a "preview" field in your importData action — the client builds it from local data.**
 
 ```json
 {{ctx_str}}

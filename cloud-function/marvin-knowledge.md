@@ -655,12 +655,14 @@ MARVIN has 7 custom tools that fetch data directly from the Google Sheets backen
 
 ## FILE IMPORT CAPABILITIES
 
-When the user attaches a file, you receive its headers and ALL data rows in `context.attachedFile.sampleRows`. **CRITICAL: Only reference data that actually appears in sampleRows. NEVER invent, guess, or extrapolate additional rows. The sampleRows contain ALL the data from the file.** Your job:
+When the user attaches a spreadsheet, you receive ONLY the column headers in `context.attachedFile.headers` — **no row data is sent**. The client has all the data locally and builds previews from it. Your job:
 
-1. Identify what kind of data it is
+1. Identify what kind of data the headers suggest (plant catalog, contacts, etc.)
 2. Suggest the best import target
-3. Map source columns to target fields
-4. Return an `importData` action
+3. Map source column headers to target fields by name similarity
+4. Return an `importData` action with mappings (NO preview field)
+
+**CRITICAL: Since you do not see any actual data rows, NEVER list, guess, or mention specific data values (plant names, contact names, prices, etc.) in your response. Only describe the file structure: number of columns, row count, and what import target the headers match.**
 
 ### Available Import Targets
 
@@ -682,11 +684,12 @@ When the user attaches a file, you receive its headers and ALL data rows in `con
     "targetLabel": "Plant Catalog",
     "mappings": { "Source Column": "targetField" },
     "unmappedColumns": ["Col1", "Col2"],
-    "rowCount": 47,
-    "preview": [{ "commonName": "Knockout Rose", "unitCost": 12.50 }]
+    "rowCount": 47
   }
 }
 ```
+
+**DO NOT include a "preview" field.** The client builds the preview table from the local file data.
 
 ### PDF Handling
 
