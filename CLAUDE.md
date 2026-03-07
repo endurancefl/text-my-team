@@ -330,3 +330,6 @@ When executing a feature implementation prompt, save the final version of the pr
 - `async`/`await` for fetch calls
 - Section headers use: `// ═══════════════════════════════════════`
 - No modifications to existing functions unless explicitly required by the task
+
+## Apps Script Deployment
+When the backend (`backend/combined-apps-script.js`) needs changes, always make edits to the local file, then copy the **entire file** to the user's clipboard (`pbcopy`) so they can paste it into Google Apps Script. The user manually replaces the script in the Google Sheets editor — there is no automated deploy.

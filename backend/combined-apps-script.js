@@ -75,9 +75,11 @@ function doGet(e) {
       case 'getCrewSchedule':
         return jsonResponse(getCrewSchedule(e.parameter.phone, e.parameter.date));
       case 'getCrewMembers':
-        return jsonResponse(getCrewMembers(e.parameter.phone));
+        return jsonResponse(getCrewMembers(e.parameter.phone, e.parameter.crew));
       case 'getCrews':
         return jsonResponse(getCrews());
+      case 'getTimeEntries':
+        return jsonResponse(getTimeEntries(e.parameter.startDate, e.parameter.endDate, e.parameter.crew));
       case 'getRouteOrder':
         return jsonResponse(getRouteOrder(e.parameter.crew, e.parameter.dayOfWeek));
       case 'getWeeklyReportData':
@@ -2826,7 +2828,7 @@ function getCrewSchedule(phone, dateStr) {
  * Get crew members for daily check-in.
  * Called with: ?action=getCrewMembers&phone=4075551234
  */
-function getCrewMembers(phone) {
+function getCrewMembers(phone, crewParam) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var cmSheet = ss.getSheetByName('Crew Members');
   if (!cmSheet) return { success: false, error: 'Crew Members sheet not found' };
@@ -2839,6 +2841,26 @@ function getCrewMembers(phone) {
   var cmCrewCol = findCol(cmHeaders, ['Crew', 'crew']);
   var cmStatusCol = findCol(cmHeaders, ['Status', 'status']);
 
+  // ── Mode 2: crew-name-based (estimate.html Time Review) ──
+  // Called with ?action=getCrewMembers&crew=all (or specific crew name)
+  if (crewParam && !phone) {
+    var crews = {};
+    for (var g = 1; g < cmData.length; g++) {
+      var gCrew = cmCrewCol !== -1 ? String(cmData[g][cmCrewCol] || '').trim() : '';
+      if (!gCrew) continue;
+      var gStatus = cmStatusCol !== -1 ? String(cmData[g][cmStatusCol] || '').toLowerCase() : 'active';
+      if (gStatus !== 'active' && gStatus !== '') continue;
+      if (crewParam !== 'all' && gCrew !== crewParam) continue;
+      if (!crews[gCrew]) crews[gCrew] = [];
+      crews[gCrew].push({
+        name: cmData[g][cmNameCol] || '',
+        role: cmRoleCol !== -1 ? (cmData[g][cmRoleCol] || 'Member') : 'Member'
+      });
+    }
+    return { success: true, crews: crews };
+  }
+
+  // ── Mode 1: phone-based (crew.html) ──
   var crewName = null;
   var cleanPhone = String(phone).replace(/\D/g, '');
 
@@ -2914,6 +2936,68 @@ function verifyPin(pin) {
     success: false,
     error: 'Invalid PIN'
   })).setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * Get time entries filtered by date range and crew.
+ * Called with: ?action=getTimeEntries&startDate=2026-03-02&endDate=2026-03-08&crew=all
+ */
+function getTimeEntries(startDate, endDate, crewFilter) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('TimeEntries');
+  if (!sheet) return { success: true, entries: [] };
+
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return { success: true, entries: [] };
+
+  var headers = data[0];
+  var col = {};
+  headers.forEach(function(h, i) { col[h] = i; });
+
+  var tz = ss.getSpreadsheetTimeZone();
+  crewFilter = crewFilter || 'all';
+  var entries = [];
+
+  for (var r = 1; r < data.length; r++) {
+    var row = data[r];
+    var entryId = col['Entry ID'] !== undefined ? row[col['Entry ID']] : '';
+    if (!entryId) continue;
+
+    // Normalize date
+    var rowDate = col['Date'] !== undefined ? row[col['Date']] : '';
+    if (rowDate instanceof Date) {
+      rowDate = Utilities.formatDate(rowDate, tz, 'yyyy-MM-dd');
+    } else {
+      rowDate = String(rowDate);
+    }
+
+    // Date range filter
+    if (startDate && rowDate < startDate) continue;
+    if (endDate && rowDate > endDate) continue;
+
+    // Crew filter
+    var crew = col['Crew'] !== undefined ? (row[col['Crew']] || '') : '';
+    if (crewFilter !== 'all' && crew !== crewFilter) continue;
+
+    entries.push({
+      entryId: entryId,
+      crew: crew,
+      date: rowDate,
+      entryType: col['Entry Type'] !== undefined ? (row[col['Entry Type']] || '') : '',
+      ticketId: col['Ticket ID'] !== undefined ? (row[col['Ticket ID']] || '') : '',
+      propertyAddress: col['Property Address'] !== undefined ? (row[col['Property Address']] || '') : '',
+      serviceName: col['Service Name'] !== undefined ? (row[col['Service Name']] || '') : '',
+      durationType: col['Duration Type'] !== undefined ? (row[col['Duration Type']] || '') : '',
+      clockIn: col['Clock In'] !== undefined ? (row[col['Clock In']] || '') : '',
+      clockOut: col['Clock Out'] !== undefined ? (row[col['Clock Out']] || '') : '',
+      durationMinutes: col['Duration Minutes'] !== undefined ? (parseInt(row[col['Duration Minutes']]) || 0) : 0,
+      crewMembers: col['Crew Members'] !== undefined ? (row[col['Crew Members']] || '[]') : '[]',
+      memberCount: col['Member Count'] !== undefined ? (parseInt(row[col['Member Count']]) || 0) : 0,
+      notes: col['Notes'] !== undefined ? (row[col['Notes']] || '') : ''
+    });
+  }
+
+  return { success: true, entries: entries };
 }
 
 /**
