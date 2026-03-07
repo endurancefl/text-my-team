@@ -1,24 +1,36 @@
-/* Site Report — 2-column photo grid layout */
+/* Site Report — 2-column photo grid layout (PrinceXML-compatible) */
 
 .photo-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
+  width: 100%;
+}
+
+/* Clear floats after grid */
+.photo-grid::after {
+  content: "";
+  display: block;
+  clear: both;
 }
 
 .photo-cell {
+  float: left;
+  width: 48%;
+  margin-right: 4%;
+  margin-bottom: 14px;
   page-break-inside: avoid;
+}
+
+.photo-cell:nth-child(2n) {
+  margin-right: 0;
 }
 
 .photo-frame {
   border: 0.5px solid var(--light-gray);
   border-radius: 3px;
   width: 100%;
-  aspect-ratio: 258 / 195;
+  height: 190px;
   overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
+  text-align: center;
   background: #f0f0f0;
 }
 
@@ -39,11 +51,6 @@
   color: var(--dark);
   line-height: 1.25;
   overflow: hidden;
-}
-
-/* Page 1 header takes space — only 2 rows fit */
-.page-first .photo-grid {
-  /* handled by page breaks */
 }
 
 /* Category starts on new page */
