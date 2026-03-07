@@ -8882,155 +8882,38 @@
           .then(function(r) { return r.json(); })
           .then(function(data) {
             if (data.success) {
-              srProgressBar.style.width = '70%';
-              var totalPhotos = srState.compositedPhotos.length;
-              var uploadedCount = 0;
-              srProgressLabel.textContent = 'Uploading photos 0/' + totalPhotos + '...';
+              srProgressBar.style.width = '100%';
+              srProgressLabel.textContent = 'Success! Saved to Drive.';
+              srClearDraft();
 
-              // Upload with concurrency limit of 4 to avoid overwhelming server
-              var photoResults = [];
-              var nextPhotoIndex = 0;
-              var concurrency = 4;
+              // Auto-download the PDF
+              var url = URL.createObjectURL(srState.generatedPdfBlob);
+              var a = document.createElement('a');
+              a.href = url;
+              a.download = filename + '.pdf';
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
 
-              function uploadNextPhoto() {
-                if (nextPhotoIndex >= totalPhotos) return Promise.resolve();
-                var i = nextPhotoIndex++;
-                var photo = srState.compositedPhotos[i];
-
-                // Upload with retry logic (up to 2 retries with exponential backoff)
-                function attemptUpload(retryCount) {
-                  return fetch(GOOGLE_SHEETS_URL, {
-                    method: 'POST',
-                    body: JSON.stringify({
-                      siteReportPhoto: true,
-                      photoBase64: photo.base64,
-                      photoIndex: i,
-                      filename: filename,
-                      property: srState.selectedProp.address
-                    })
-                  })
-                  .then(function(r) { return r.json(); })
-                  .then(function(photoData) {
-                    if (photoData.success && photoData.photoUrl) {
-                      photoResults.push({
-                        index: i,
-                        url: photoData.photoUrl,
-                        fileId: photoData.fileId || ''
-                      });
-                      srState.photos[i].uploaded = true;
-                      srState.photos[i].failed = false;
-                    } else if (retryCount < 2) {
-                      var delay = Math.pow(2, retryCount) * 1000;
-                      return new Promise(function(resolve) {
-                        setTimeout(function() {
-                          resolve(attemptUpload(retryCount + 1));
-                        }, delay);
-                      });
-                    } else {
-                      photoResults.push({ index: i, url: '', fileId: '' });
-                      srState.photos[i].failed = true;
-                    }
-                    uploadedCount++;
-                    srProgressLabel.textContent = 'Uploading photos ' + uploadedCount + '/' + totalPhotos + '...';
-                  })
-                  .catch(function() {
-                    if (retryCount < 2) {
-                      var delay = Math.pow(2, retryCount) * 1000;
-                      return new Promise(function(resolve) {
-                        setTimeout(function() {
-                          resolve(attemptUpload(retryCount + 1));
-                        }, delay);
-                      });
-                    }
-                    photoResults.push({ index: i, url: '', fileId: '' });
-                    srState.photos[i].failed = true;
-                    uploadedCount++;
-                  });
-                }
-
-                return attemptUpload(0).then(function() {
-                  return uploadNextPhoto();
-                });
+              srGenerateBtn.textContent = 'Download PDF';
+              srGenerateBtn.disabled = false;
+              srGenerateBtn.onclick = function() {
+                var url2 = URL.createObjectURL(srState.generatedPdfBlob);
+                var a2 = document.createElement('a');
+                a2.href = url2;
+                a2.download = filename + '.pdf';
+                document.body.appendChild(a2);
+                a2.click();
+                document.body.removeChild(a2);
+                URL.revokeObjectURL(url2);
+              };
+              if (data.pdfUrl) {
+                srUploadDriveBtn.textContent = 'View in Drive';
+                srUploadDriveBtn.style.display = 'block';
+                srUploadDriveBtn.disabled = false;
+                srUploadDriveBtn.onclick = function() { window.open(data.pdfUrl, '_blank'); };
               }
-
-              var uploadWorkers = [];
-              for (var w = 0; w < Math.min(concurrency, totalPhotos); w++) {
-                uploadWorkers.push(uploadNextPhoto());
-              }
-
-              Promise.all(uploadWorkers).then(function() {
-                var results = photoResults;
-                // Sort by index to maintain order
-                results.sort(function(a, b) { return a.index - b.index; });
-
-                srProgressBar.style.width = '90%';
-                srProgressLabel.textContent = 'Saving report data...';
-
-                var reportData = {
-                  address: srState.selectedProp.address,
-                  inspector: srState.inspectorName,
-                  date: srState.reportDate,
-                  photos: srState.compositedPhotos.map(function(p, i) {
-                    return {
-                      url: results[i] ? results[i].url : '',
-                      fileId: results[i] ? results[i].fileId : '',
-                      note: p.note,
-                      category: p.category
-                    };
-                  })
-                };
-
-                return fetch(GOOGLE_SHEETS_URL, {
-                  method: 'POST',
-                  body: JSON.stringify({
-                    siteReportJson: true,
-                    jsonData: reportData,
-                    filename: filename,
-                    property: srState.selectedProp.address
-                  })
-                });
-              })
-              .then(function(r) { return r.json(); })
-              .then(function() {
-                srProgressBar.style.width = '100%';
-                srProgressLabel.textContent = 'Success! Saved to Drive.';
-                srClearDraft();
-
-                // Now auto-download the PDF
-                var url = URL.createObjectURL(srState.generatedPdfBlob);
-                var a = document.createElement('a');
-                a.href = url;
-                a.download = filename + '.pdf';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-
-                srGenerateBtn.textContent = 'Download PDF';
-                srGenerateBtn.disabled = false;
-                srGenerateBtn.onclick = function() {
-                  var url2 = URL.createObjectURL(srState.generatedPdfBlob);
-                  var a2 = document.createElement('a');
-                  a2.href = url2;
-                  a2.download = filename + '.pdf';
-                  document.body.appendChild(a2);
-                  a2.click();
-                  document.body.removeChild(a2);
-                  URL.revokeObjectURL(url2);
-                };
-                if (data.pdfUrl) {
-                  srUploadDriveBtn.textContent = 'View in Drive';
-                  srUploadDriveBtn.style.display = 'block';
-                  srUploadDriveBtn.disabled = false;
-                  srUploadDriveBtn.onclick = function() { window.open(data.pdfUrl, '_blank'); };
-                }
-              })
-              .catch(function() {
-                srProgressBar.style.width = '100%';
-                srProgressLabel.textContent = 'PDF uploaded but data save failed';
-                srGenerateBtn.textContent = 'Download PDF';
-                srGenerateBtn.disabled = false;
-              });
             } else {
               srProgressBar.style.width = '100%';
               srProgressLabel.textContent = 'Upload failed. Tap to download PDF.';
