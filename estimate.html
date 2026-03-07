@@ -2075,6 +2075,9 @@
           </div>
         </div>
         <div class="marvin-panel-actions">
+          <button class="marvin-panel-btn marvin-expand-btn" id="marvin-expand-btn" onclick="toggleMarvinExpand()" title="Expand" style="display:none;">
+            <span class="material-icons-outlined">open_in_full</span>
+          </button>
           <button class="marvin-panel-btn" id="marvin-identify-btn" onclick="toggleMarvinIdentifyMode()" title="Identify element">
             <span class="material-icons-outlined">my_location</span>
           </button>
@@ -5777,10 +5780,42 @@ function toggleMarvinPanel() {
     checkMorningBriefing();
   } else {
     if (marvinIdentifyMode) exitMarvinIdentifyMode();
+    collapseMarvinPanel();
   }
 }
 
+function toggleMarvinExpand() {
+  const panel = document.getElementById('marvin-panel');
+  const btn = document.getElementById('marvin-expand-btn');
+  if (panel.classList.contains('expanded')) {
+    collapseMarvinPanel();
+  } else {
+    panel.classList.add('expanded');
+    btn.querySelector('.material-icons-outlined').textContent = 'close_fullscreen';
+    btn.title = 'Collapse';
+  }
+}
+
+function expandMarvinPanel() {
+  const panel = document.getElementById('marvin-panel');
+  const btn = document.getElementById('marvin-expand-btn');
+  btn.style.display = '';
+  panel.classList.add('expanded');
+  btn.querySelector('.material-icons-outlined').textContent = 'close_fullscreen';
+  btn.title = 'Collapse';
+}
+
+function collapseMarvinPanel() {
+  const panel = document.getElementById('marvin-panel');
+  const btn = document.getElementById('marvin-expand-btn');
+  panel.classList.remove('expanded');
+  btn.style.display = 'none';
+  btn.querySelector('.material-icons-outlined').textContent = 'open_in_full';
+  btn.title = 'Expand';
+}
+
 function clearMarvinChat() {
+  collapseMarvinPanel();
   marvinChatHistory = [];
   marvinAttachedFile = null;
   marvinWorkbook = null;
@@ -6051,6 +6086,11 @@ const _marvinPendingActions = {};
 function renderMarvinActionCard(action) {
   const actionId = 'marvin-action-' + Date.now() + Math.random().toString(36).slice(2, 6);
   _marvinPendingActions[actionId] = action;
+
+  // Auto-expand panel for import data cards
+  if (action.type === 'importData') {
+    setTimeout(() => expandMarvinPanel(), 100);
+  }
 
   let iconName, iconClass, btnText, btnClass;
 
@@ -7518,6 +7558,7 @@ async function applyMarvinImport(data) {
   marvinAttachedFile = null;
   marvinWorkbook = null;
 
+  collapseMarvinPanel();
   showToast(summary, errors > 0 ? 'error' : 'success');
 }
 

@@ -6951,6 +6951,20 @@ select option:checked {
   width: 400px;
   min-width: 400px;
 }
+.marvin-panel.open.expanded {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  min-width: 100vw;
+  z-index: 300;
+  border-left: none;
+  box-shadow: -4px 0 24px rgba(0,0,0,0.15);
+}
+.marvin-panel.expanded .marvin-expand-btn .material-icons-outlined::before {
+  content: 'close_fullscreen';
+}
 
 /* Panel Header */
 .marvin-panel-header {
