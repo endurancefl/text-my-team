@@ -699,7 +699,26 @@ If text is truncated (`truncated: true`), tell the user you only saw part and as
 
 ### Column Matching Rules
 
-Match columns **fuzzily**: "Common Name", "Plant Name", "Name", "plant" → `commonName`. "Cost", "Price", "Unit Cost" → `unitCost`. If the target isn't clear, ask the user.
+**Map ALL recognizable columns — not just the obvious ones.** Every column that has a reasonable target field match should be included in `mappings`. Only put truly unmatchable columns in `unmappedColumns`. Err on the side of including more mappings — the user can change any mapping via dropdown before importing.
+
+Common fuzzy matches for **plantCatalog**:
+- "Common Name", "Plant Name", "Name", "Plant" → `commonName`
+- "Botanical Name", "Scientific Name", "Latin Name", "Bot. Name" → `botanicalName`
+- "Size", "Cont. Size", "Container Size", "Container", "Pot Size" → `size`
+- "Price", "Unit Price", "Cost", "Unit Cost", "Each" → `unitCost`
+- "Qty", "Qty.", "Quantity", "Count", "#" → `(skip)` (no quantity field in plant catalog)
+- "Category", "Type", "Plant Type" → `category`
+- "Supplier", "Vendor", "Nursery", "Source" → `supplier`
+- "Notes", "Specifications", "Specs", "Comments", "Description" → `notes`
+
+Common fuzzy matches for **contacts**:
+- "First", "First Name" → `firstName`; "Last", "Last Name" → `lastName`; "Name", "Full Name" → `name`
+- "Email", "E-mail" → `email`; "Phone", "Cell", "Mobile" → `phone`
+- "Company", "Business", "Organization" → `company`
+
+Common fuzzy matches for **properties**:
+- "Address", "Street", "Property Address" → `address`
+- "City" → `city`; "State" → `state`; "Zip", "Zip Code", "Postal" → `zip`
 
 ### Property Address Parsing
 
