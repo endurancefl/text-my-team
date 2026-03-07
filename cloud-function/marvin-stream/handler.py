@@ -275,6 +275,7 @@ filter narrows scope; empty object {{}} = all items. Examples:
 Use "" (empty string) in filter to match blank/missing values.
 affectedCount MUST equal the number of items from context.plantCatalog that match the filter — count them carefully from the data. For supplier filters, check each plant's sizes array.
 Use bulkUpdate when the user wants to MODIFY EXISTING data in bulk, not import new data.
+IMPORTANT: In your text message for bulkUpdate, do NOT list specific plant names — the client computes the real count and shows details on the action card. Keep your message brief, e.g., "Setting supplier to County Line for plants with blank suppliers." Never enumerate or guess which plants match.
 
 ## Platform & Industry Knowledge
 
