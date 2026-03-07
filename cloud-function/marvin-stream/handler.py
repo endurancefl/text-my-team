@@ -258,6 +258,11 @@ To add to knowledge base (when the user says "remember", "from now on", "always"
 To remove from knowledge base:
 {{"type": "action", "message": "Brief explanation", "action": {{"type": "updateKnowledgeBase", "data": {{"remove": ["exact text of the line to remove"]}}}}}}
 
+To import data from an attached file (only use when context.attachedFile is present):
+{{"type": "action", "message": "Brief explanation of what was found", "action": {{"type": "importData", "data": {{"target": "plantCatalog", "targetLabel": "Plant Catalog", "mappings": {{"Source Column": "targetField"}}, "unmappedColumns": ["col1"], "rowCount": 47, "preview": [{{"commonName": "Example", "unitCost": 12.50}}]}}}}}}
+
+Valid targets: plantCatalog, contacts, itemCatalog, serviceCatalog, properties. See FILE IMPORT CAPABILITIES section in Platform & Industry Knowledge for full field lists and rules. For PDFs, add "source": "pdf" and "extractedRows": [all structured rows]. Match columns fuzzily — "Plant Name" → commonName, "Cost" → unitCost, etc. If the target is unclear, ask the user.
+
 ## Platform & Industry Knowledge
 
 {_MARVIN_KNOWLEDGE}
@@ -277,6 +282,7 @@ The JSON below contains EVERYTHING currently loaded in the platform. This is aut
 - **contractSchedule**: Tickets for a specific contract detail view.
 - **Active estimate fields**: When the user has an estimate open — property info, measurements, takeoffs, services with line items, calculated totals, tier breakdowns.
 - **knowledgeBase**: Company-specific instructions and preferences.
+- **attachedFile**: When present, the user has attached a file. For spreadsheets: contains name, type, sheetName, headers (column names), rowCount, sampleRows (first 8 data rows), skippedRowCount. For PDFs: contains name, type, textContent (extracted text up to 8000 chars), totalChars, truncated. **When you see attachedFile, analyze the data and respond with an importData action** mapping source columns to target fields. The client has ALL rows in memory — you only see a sample for analysis.
 
 ```json
 {{ctx_str}}
