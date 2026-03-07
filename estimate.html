@@ -84,6 +84,12 @@
           </svg>
           <span>Financials</span>
         </div>
+        <div class="nav-item" data-view="timeReview" id="time-review-nav">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          <span>Time Review</span>
+        </div>
         <!-- CONFIGURATION -->
         <span class="sidebar-section-label">CONFIGURATION</span>
         <div class="nav-item" data-view="catalog">
@@ -1205,6 +1211,18 @@
                 placeholder="- Minimum monthly contract: $350 residential, $800 commercial&#10;- Always use 48&quot; mowers on residential under 20,000 SF&#10;- Our mulch supplier charges $42/CY&#10;- Standard travel time: 25% for Winter Park, 35% for Clermont&#10;- Seasonal color: petunias in spring, mums in fall"></textarea>
             </div>
           </div>
+          <div class="settings-card" style="grid-column: 1 / -1;">
+            <div class="settings-card-header">Day Clock Alerts</div>
+            <div class="settings-card-body">
+              <div class="settings-row">
+                <span class="settings-row-label">Alert after hours</span>
+                <input type="number" class="settings-input" id="setting-dayclock-alert-hours" step="0.5" min="0" max="24" placeholder="e.g., 10">
+              </div>
+              <p style="font-size: 11px; color: var(--gw-text-secondary, #5f6368); margin: 8px 0 0; line-height: 1.5;">
+                When a crew's day clock has been running longer than this without being ended, an email alert is sent to the crew leader. Set to 0 to disable. Requires an Email column in the Crew Members sheet.
+              </p>
+            </div>
+          </div>
           <div style="margin-top: 20px;">
             <button class="btn btn-primary" id="save-settings-btn">Save Settings</button>
           </div>
@@ -1575,6 +1593,79 @@
         <!-- FINANCIALS VIEW -->
         <div class="view" id="view-financials">
           <div id="financials-content" style="max-width: 1000px; margin: 0 auto;"></div>
+        </div>
+
+        <!-- TIME REVIEW VIEW -->
+        <div class="view" id="view-timeReview">
+          <div style="max-width: 1200px; margin: 0 auto;">
+            <!-- Toolbar -->
+            <div class="sched-toolbar" style="flex-wrap: wrap; gap: 8px; align-items: center;">
+              <div style="display: flex; align-items: center; gap: 4px;">
+                <button class="btn btn-secondary" onclick="trSetWeek(-1)" style="padding: 6px 10px;">&larr; Prev</button>
+                <span id="tr-week-label" style="font-weight: 600; font-size: 14px; min-width: 220px; text-align: center;"></span>
+                <button class="btn btn-secondary" onclick="trSetWeek(1)" style="padding: 6px 10px;">Next &rarr;</button>
+              </div>
+              <select class="form-select" id="tr-crew-filter" onchange="trApplyFilters()" style="width: 160px; font-size: 13px;">
+                <option value="all">All Crews</option>
+              </select>
+              <select class="form-select" id="tr-member-filter" onchange="trApplyFilters()" style="width: 180px; font-size: 13px;">
+                <option value="all">All Members</option>
+              </select>
+              <button class="btn btn-secondary" onclick="loadTimeReview()" style="padding: 6px 10px;" title="Refresh">&#8635;</button>
+              <span id="tr-payroll-badge"></span>
+              <div style="margin-left: auto; display: flex; gap: 8px;">
+                <button class="btn btn-primary" onclick="trExportPayroll()">Export Payroll</button>
+                <button class="btn btn-secondary" onclick="trExportDetail()">Export Detail</button>
+              </div>
+            </div>
+
+            <!-- Open Day Clock Warning Banner -->
+            <div id="tr-open-clock-banner" style="display: none;"></div>
+
+            <!-- Summary Cards -->
+            <div class="tr-summary-cards" id="tr-summary-cards">
+              <div class="tr-summary-card"><div class="tr-card-value" id="tr-total-hours">0</div><div class="tr-card-label">Total Hours</div></div>
+              <div class="tr-summary-card"><div class="tr-card-value" id="tr-direct-hours">0</div><div class="tr-card-label">Direct Hours</div></div>
+              <div class="tr-summary-card"><div class="tr-card-value" id="tr-travel-hours">0</div><div class="tr-card-label">Travel Hours</div></div>
+              <div class="tr-summary-card"><div class="tr-card-value" id="tr-shop-hours">0</div><div class="tr-card-label">Shop Hours</div></div>
+              <div class="tr-summary-card"><div class="tr-card-value" id="tr-member-count">0</div><div class="tr-card-label">Members</div></div>
+            </div>
+
+            <!-- Add Entry Button -->
+            <div style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
+              <button class="btn btn-secondary" onclick="openTrAddModal()" style="font-size: 13px;">+ Add Entry</button>
+            </div>
+
+            <!-- Time Entries Table -->
+            <div style="overflow-x: auto;">
+              <table class="tr-table" id="tr-entries-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Crew</th>
+                    <th>Member</th>
+                    <th>Type</th>
+                    <th>Property</th>
+                    <th>Service</th>
+                    <th>Clock In</th>
+                    <th>Clock Out</th>
+                    <th>Hours</th>
+                    <th>Notes</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="tr-entries-body"></tbody>
+              </table>
+            </div>
+
+            <!-- Empty State -->
+            <div id="tr-empty-state" style="display: none; text-align: center; padding: 60px 20px; color: var(--gw-text-secondary, #5f6368);">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" style="width: 48px; height: 48px; margin-bottom: 12px; opacity: 0.4;">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              <p id="tr-empty-message" style="font-size: 14px;">No time entries found for this week.</p>
+            </div>
+          </div>
         </div>
 
         <!-- CONTACTS VIEW -->
@@ -2732,6 +2823,62 @@
     </div>
   </div>
 
+  <!-- Add Time Entry Modal -->
+  <div class="modal-overlay" id="tr-add-modal" style="display: none;">
+    <div class="modal" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3>Add Time Entry</h3>
+        <button class="modal-close" onclick="closeTrAddModal()">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 20px 24px;">
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label class="form-label">Crew</label>
+          <select class="form-select" id="tr-add-crew" onchange="trAddCrewChanged()"></select>
+        </div>
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label class="form-label">Date</label>
+          <input type="date" class="form-input" id="tr-add-date">
+        </div>
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label class="form-label">Type</label>
+          <select class="form-select" id="tr-add-type">
+            <option value="Direct">Direct</option>
+            <option value="Travel">Travel</option>
+            <option value="Shop">Shop</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label class="form-label">Property</label>
+          <input type="text" class="form-input" id="tr-add-property" placeholder="e.g., 123 Oak St">
+        </div>
+        <div style="display: flex; gap: 12px; margin-bottom: 12px;">
+          <div class="form-group" style="flex: 1;">
+            <label class="form-label">Clock In</label>
+            <input type="text" class="form-input" id="tr-add-clock-in" placeholder="8:00 AM">
+          </div>
+          <div class="form-group" style="flex: 1;">
+            <label class="form-label">Clock Out</label>
+            <input type="text" class="form-input" id="tr-add-clock-out" placeholder="5:00 PM">
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label class="form-label">Members</label>
+          <div id="tr-add-members" style="max-height: 150px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 6px; padding: 8px;">
+            <span style="color: var(--gw-text-secondary, #5f6368); font-size: 12px;">Select a crew first</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Notes</label>
+          <textarea class="form-input" id="tr-add-notes" rows="2" placeholder="Optional notes..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; padding: 16px 24px; border-top: 1px solid var(--gw-divider);">
+        <button class="btn btn-secondary" onclick="closeTrAddModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="trSaveNewEntry()">Add Entry</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification -->
   <div class="toast-notification" id="toast-notification"></div>
 
@@ -2837,7 +2984,8 @@ let bidSettings = {
   defaultTravelTime: 30,
   division: 'Maintenance',
   marvinKnowledgeBase: '',
-  dailyCrewCapacity: 33
+  dailyCrewCapacity: 33,
+  dayClockAlertHours: 10
 };
 let savedBids = [];
 let savedTemplates = [];
@@ -11944,6 +12092,7 @@ function showView(viewId) {
       'properties': 'Properties',
       'invoices': 'Invoices',
       'worktickets': 'Reminders',
+      'timeReview': 'Time Review',
       'settings': 'Settings'
     };
     document.getElementById('header-title').textContent = titles[viewId] || 'Estimates';
@@ -11994,6 +12143,11 @@ function showView(viewId) {
   // Load production analysis when production view is shown
   if (viewId === 'production') {
     initProductionView();
+  }
+
+  // Load time review when time review view is shown
+  if (viewId === 'timeReview') {
+    initTimeReview();
   }
 
   // Render contacts list when contacts view is shown
@@ -12390,6 +12544,8 @@ function renderSettingsForm() {
   document.getElementById('setting-daily-capacity').value = bidSettings.dailyCrewCapacity;
   const kbEl = document.getElementById('setting-marvin-kb');
   if (kbEl) kbEl.value = bidSettings.marvinKnowledgeBase || '';
+  const alertEl = document.getElementById('setting-dayclock-alert-hours');
+  if (alertEl) alertEl.value = bidSettings.dayClockAlertHours || 10;
 }
 
 function renderTableBody() {
@@ -18857,7 +19013,8 @@ document.addEventListener('DOMContentLoaded', function() {
     'setting-travel-time': 'defaultTravelTime',
     'setting-mulch-depth': 'defaultMulchDepth',
     'setting-mulch-price': 'defaultMulchPricePerYard',
-    'setting-daily-capacity': 'dailyCrewCapacity'
+    'setting-daily-capacity': 'dailyCrewCapacity',
+    'setting-dayclock-alert-hours': 'dayClockAlertHours'
   };
 
   Object.keys(settingsMap).forEach(inputId => {
@@ -18895,7 +19052,8 @@ document.addEventListener('DOMContentLoaded', function() {
       defaultMulchDepth: bidSettings.defaultMulchDepth,
       defaultMulchPricePerYard: bidSettings.defaultMulchPricePerYard,
       marvinKnowledgeBase: bidSettings.marvinKnowledgeBase || '',
-      dailyCrewCapacity: bidSettings.dailyCrewCapacity
+      dailyCrewCapacity: bidSettings.dailyCrewCapacity,
+      dayClockAlertHours: bidSettings.dayClockAlertHours || 10
     };
 
     const result = await saveBidSettings(settings);
@@ -20784,6 +20942,1094 @@ function renderContractTable(contracts, tickets) {
 
   html += '</tbody></table>';
   return html;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  TIME REVIEW & PAYROLL EXPORT
+// ═══════════════════════════════════════════════════════════════
+
+/*
+ * ──────────────────────────────────────────────────────────────
+ * BACKEND ENDPOINT NEEDED: getTimeEntries
+ * ──────────────────────────────────────────────────────────────
+ * Add this handler to the doGet() router in your Apps Script:
+ *
+ * Request:
+ *   GET ?action=getTimeEntries
+ *       &startDate=2026-03-02
+ *       &endDate=2026-03-08
+ *       &crew=all           (or specific crew name)
+ *
+ * Response:
+ * {
+ *   success: true,
+ *   entries: [
+ *     {
+ *       entryId: "ENT-abc123",
+ *       crew: "Crew A",
+ *       date: "2026-03-02",
+ *       entryType: "job",
+ *       ticketId: "TKT-456",
+ *       propertyAddress: "123 Oak St, Orlando, FL",
+ *       serviceName: "",
+ *       durationType: "",
+ *       clockIn: "8:00 AM",
+ *       clockOut: "8:45 AM",
+ *       durationMinutes: 45,
+ *       crewMembers: '["Juan","Carlos"]',
+ *       memberCount: 2,
+ *       notes: ""
+ *     }
+ *   ]
+ * }
+ *
+ * Implementation: Read from the TimeEntries sheet, filter by
+ * date range and crew, return all matching rows as JSON.
+ * Include ALL entry types (day_clock, job, service, indirect)
+ * — the frontend handles filtering.
+ * ──────────────────────────────────────────────────────────────
+ */
+
+/*
+ * ──────────────────────────────────────────────────────────────
+ * BACKEND ENDPOINT NEEDED: getCrewMembers
+ * ──────────────────────────────────────────────────────────────
+ * The existing getCrewSchedule endpoint requires a crew leader's
+ * phone number (used by crew.html after login), but estimate.html
+ * doesn't have crew leader phones — getCrews only returns names.
+ *
+ * Add this handler to the doGet() router:
+ *
+ * Request:
+ *   GET ?action=getCrewMembers
+ *       &crew=all           (or specific crew name)
+ *
+ * Response:
+ * {
+ *   success: true,
+ *   crews: {
+ *     "Crew A": [
+ *       { name: "Juan Rodriguez", role: "Leader" },
+ *       { name: "Carlos Mendez", role: "Member" },
+ *       { name: "Mike Johnson", role: "Member" }
+ *     ],
+ *     "Crew B": [
+ *       { name: "Sam Thompson", role: "Leader" },
+ *       { name: "Dani Brooks", role: "Member" }
+ *     ]
+ *   }
+ * }
+ *
+ * Implementation: Read from the Crew Members sheet, group by
+ * "Default Crew" column, return name and role for each member.
+ * If crew param is not "all", filter to that crew only.
+ * Do NOT include PINs or emails in the response — those are
+ * sensitive and not needed by the frontend.
+ * ──────────────────────────────────────────────────────────────
+ */
+
+/*
+ * ══════════════════════════════════════════════════════════════
+ *  BACKEND: Day Clock Alert — Google Apps Script
+ * ══════════════════════════════════════════════════════════════
+ *
+ * SETUP:
+ * 1. Open the Apps Script editor for your project
+ * 2. Paste the checkOpenDayClocks function below
+ * 3. Go to Triggers (clock icon) → Add Trigger:
+ *    - Function: checkOpenDayClocks
+ *    - Event source: Time-driven
+ *    - Type: Minutes timer
+ *    - Interval: Every 30 minutes
+ * 4. Add an "Email" column to the Crew Members sheet.
+ *    Crew leaders need email addresses at minimum.
+ *
+ * TIMEZONE NOTE: This function uses the spreadsheet's timezone
+ * for consistent date handling. The dedup log stores Unix
+ * timestamps for reliable comparison in Apps Script's V8 runtime.
+ *
+ * REQUIRED SHEETS:
+ * - "TimeEntries" — Entry ID, Crew, Date, Entry Type,
+ *   Clock In, Clock Out
+ * - "Crew Members" — Name, Email, Role, Default Crew
+ * - "BidSettings" — must store dayClockAlertHours
+ *
+ * ─────────────────────────────────────────────────────────────
+ *
+ * function checkOpenDayClocks() {
+ *   var ss = SpreadsheetApp.getActiveSpreadsheet();
+ *   var tz = ss.getSpreadsheetTimeZone();
+ *
+ *   // 1. Read threshold from settings
+ *   var settingsSheet = ss.getSheetByName('BidSettings');
+ *   var threshold = 10;
+ *   if (settingsSheet) {
+ *     var sData = settingsSheet.getDataRange().getValues();
+ *     for (var i = 0; i < sData.length; i++) {
+ *       if (sData[i][0] === 'dayClockAlertHours') {
+ *         threshold = parseFloat(sData[i][1]) || 10;
+ *         break;
+ *       }
+ *     }
+ *   }
+ *   if (threshold <= 0) return; // Disabled
+ *
+ *   // 2. Find open day_clock entries for today
+ *   var teSheet = ss.getSheetByName('TimeEntries');
+ *   if (!teSheet) return;
+ *   var teData = teSheet.getDataRange().getValues();
+ *   var headers = teData[0];
+ *   var col = {};
+ *   headers.forEach(function(h, i) { col[h] = i; });
+ *
+ *   var now = new Date();
+ *   var today = Utilities.formatDate(now, tz, 'yyyy-MM-dd');
+ *
+ *   var openClocks = [];
+ *   for (var r = 1; r < teData.length; r++) {
+ *     var row = teData[r];
+ *     if (row[col['Entry Type']] !== 'day_clock') continue;
+ *     if (row[col['Clock Out']]) continue;
+ *
+ *     var rowDate = row[col['Date']];
+ *     if (rowDate instanceof Date) {
+ *       rowDate = Utilities.formatDate(rowDate, tz, 'yyyy-MM-dd');
+ *     }
+ *     if (String(rowDate) !== today) continue;
+ *
+ *     var clockIn = parseClockTime_(
+ *       row[col['Clock In']], row[col['Date']], tz);
+ *     if (!clockIn) continue;
+ *
+ *     var elapsed = (now - clockIn) / 3600000;
+ *     if (elapsed >= threshold) {
+ *       openClocks.push({
+ *         entryId: row[col['Entry ID']],
+ *         crew: row[col['Crew']],
+ *         clockIn: row[col['Clock In']],
+ *         hours: Math.round(elapsed * 10) / 10
+ *       });
+ *     }
+ *   }
+ *
+ *   if (openClocks.length === 0) return;
+ *
+ *   // 3. Look up crew leader emails
+ *   var cmSheet = ss.getSheetByName('Crew Members');
+ *   if (!cmSheet) return;
+ *   var cmData = cmSheet.getDataRange().getValues();
+ *   var cmH = cmData[0];
+ *   var cmC = {};
+ *   cmH.forEach(function(h, i) { cmC[h] = i; });
+ *
+ *   var leaderEmails = {};
+ *   for (var c = 1; c < cmData.length; c++) {
+ *     var m = cmData[c];
+ *     if (m[cmC['Role']] === 'Leader' && m[cmC['Email']]) {
+ *       leaderEmails[m[cmC['Default Crew']]] = m[cmC['Email']];
+ *     }
+ *   }
+ *
+ *   // 4. Dedup via PropertiesService
+ *   var props = PropertiesService.getScriptProperties();
+ *   var log = JSON.parse(
+ *     props.getProperty('dayClockAlerts') || '{}');
+ *
+ *   // 5. Send emails
+ *   openClocks.forEach(function(oc) {
+ *     if (log[oc.entryId]) return;
+ *     var email = leaderEmails[oc.crew];
+ *     if (!email) return;
+ *
+ *     MailApp.sendEmail({
+ *       to: email,
+ *       subject: 'Endurance — Day clock still running ('
+ *         + oc.crew + ')',
+ *       htmlBody:
+ *         '<p>Hi,</p>' +
+ *         '<p>The day clock for <strong>' + oc.crew +
+ *         '</strong> has been running for <strong>' +
+ *         oc.hours + ' hours</strong> (started at ' +
+ *         oc.clockIn + ').</p>' +
+ *         '<p>If the day is over, please open the Crew ' +
+ *         'app and tap "End Day" to clock everyone out.' +
+ *         '</p>' +
+ *         '<p style="color:#888;font-size:12px;">' +
+ *         '— Endurance Services</p>'
+ *     });
+ *
+ *     log[oc.entryId] = now.getTime();
+ *   });
+ *
+ *   // 6. Clean up old log entries (>48h)
+ *   var cutoff = now.getTime() - 172800000;
+ *   Object.keys(log).forEach(function(k) {
+ *     if (log[k] < cutoff) delete log[k];
+ *   });
+ *   props.setProperty('dayClockAlerts',
+ *     JSON.stringify(log));
+ * }
+ *
+ * // Helper: parse "8:00 AM" + date → Date object
+ * function parseClockTime_(timeStr, dateVal, tz) {
+ *   if (!timeStr) return null;
+ *   var m = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+ *   if (!m) return null;
+ *   var h = parseInt(m[1]), min = parseInt(m[2]);
+ *   var ap = m[3].toUpperCase();
+ *   if (ap === 'PM' && h !== 12) h += 12;
+ *   if (ap === 'AM' && h === 12) h = 0;
+ *   var d;
+ *   if (dateVal instanceof Date) {
+ *     d = new Date(dateVal);
+ *   } else {
+ *     var parts = String(dateVal).split('-');
+ *     d = new Date(parts[0], parts[1] - 1, parts[2]);
+ *   }
+ *   d.setHours(h, min, 0, 0);
+ *   return d;
+ * }
+ */
+
+let trData = null;
+let trWeekStart = null;
+let trCrewFilter = 'all';
+let trMemberFilter = 'all';
+let trEditingEntryId = null;
+let trCrewRoster = {};
+let trInitialized = false;
+
+// ── Time Parsing Helpers ──
+
+function trParseTime12(str) {
+  if (!str) return null;
+  const m = str.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  if (!m) return null;
+  let h = parseInt(m[1]), min = parseInt(m[2]);
+  const ap = m[3].toUpperCase();
+  if (ap === 'PM' && h !== 12) h += 12;
+  if (ap === 'AM' && h === 12) h = 0;
+  return h * 60 + min;
+}
+
+function trCalcDurationMinutes(clockInStr, clockOutStr) {
+  const inMin = trParseTime12(clockInStr);
+  const outMin = trParseTime12(clockOutStr);
+  if (inMin === null || outMin === null) return 0;
+  let diff = outMin - inMin;
+  if (diff < 0) diff += 24 * 60; // overnight
+  return diff;
+}
+
+function trFormatTime12(minutesSinceMidnight) {
+  let h = Math.floor(minutesSinceMidnight / 60);
+  const min = minutesSinceMidnight % 60;
+  const ap = h >= 12 ? 'PM' : 'AM';
+  if (h === 0) h = 12;
+  else if (h > 12) h -= 12;
+  return `${h}:${String(min).padStart(2, '0')} ${ap}`;
+}
+
+function trFormatDate(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  return `${days[d.getDay()]} ${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+function trFormatDateLong(date) {
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${days[date.getDay()]} ${months[date.getMonth()]} ${date.getDate()}`;
+}
+
+function trDateStr(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function trIsShop(ticketId) {
+  return ticketId === 'SHOP' || (ticketId && ticketId.startsWith('SHOP'));
+}
+
+// ── Init ──
+
+async function initTimeReview() {
+  if (!trWeekStart) {
+    // Default payroll week: previous week on Mon/Tue, current week otherwise
+    const now = new Date();
+    const day = now.getDay(); // 0=Sun, 1=Mon, 2=Tue
+    const mondayOffset = day === 0 ? -6 : 1 - day;
+    trWeekStart = new Date(now);
+    trWeekStart.setDate(now.getDate() + mondayOffset);
+    trWeekStart.setHours(0, 0, 0, 0);
+    if (day === 1 || day === 2) {
+      trWeekStart.setDate(trWeekStart.getDate() - 7);
+    }
+  }
+
+  if (!trInitialized) {
+    trInitialized = true;
+    // Populate crew filter
+    try {
+      const resp = await fetch(GOOGLE_SHEETS_URL + '?action=getCrews');
+      const data = await resp.json();
+      if (data.success && data.crews) {
+        const sel = document.getElementById('tr-crew-filter');
+        sel.innerHTML = '<option value="all">All Crews</option>';
+        data.crews.forEach(c => {
+          sel.innerHTML += `<option value="${c}">${c}</option>`;
+        });
+      }
+    } catch (e) {
+      console.warn('Failed to load crews for Time Review:', e);
+    }
+
+    // Fetch crew roster
+    try {
+      const resp = await fetch(GOOGLE_SHEETS_URL + '?action=getCrewMembers&crew=all');
+      const data = await resp.json();
+      if (data.success && data.crews) {
+        trCrewRoster = data.crews;
+      }
+    } catch (e) {
+      console.warn('getCrewMembers endpoint not available yet:', e);
+    }
+  }
+
+  trUpdateWeekLabel();
+  loadTimeReview();
+}
+
+function trUpdateWeekLabel() {
+  const end = new Date(trWeekStart);
+  end.setDate(end.getDate() + 6);
+  const label = document.getElementById('tr-week-label');
+  if (label) {
+    label.textContent = `${trFormatDateLong(trWeekStart)} — ${trFormatDateLong(end)}, ${end.getFullYear()}`;
+  }
+}
+
+function trSetWeek(offset) {
+  trWeekStart.setDate(trWeekStart.getDate() + offset * 7);
+  trUpdateWeekLabel();
+  loadTimeReview();
+}
+
+// ── Load Data ──
+
+async function loadTimeReview() {
+  const startDate = trDateStr(trWeekStart);
+  const end = new Date(trWeekStart);
+  end.setDate(end.getDate() + 6);
+  const endDate = trDateStr(end);
+  const crew = trCrewFilter === 'all' ? 'all' : encodeURIComponent(trCrewFilter);
+
+  try {
+    const resp = await fetch(GOOGLE_SHEETS_URL + `?action=getTimeEntries&startDate=${startDate}&endDate=${endDate}&crew=${crew}`);
+    const data = await resp.json();
+    if (data.success && data.entries) {
+      trData = data.entries;
+    } else {
+      trData = [];
+      document.getElementById('tr-entries-body').innerHTML = '';
+      document.getElementById('tr-empty-state').style.display = 'block';
+      document.getElementById('tr-empty-message').textContent = 'The getTimeEntries backend endpoint needs to be added. See the developer notes in the source for the expected API format.';
+      document.getElementById('tr-entries-table').style.display = 'none';
+      trUpdateSummaryCards([], []);
+      trUpdatePayrollBadge();
+      return;
+    }
+  } catch (e) {
+    console.warn('Failed to load time entries:', e);
+    trData = [];
+    document.getElementById('tr-entries-body').innerHTML = '';
+    document.getElementById('tr-empty-state').style.display = 'block';
+    document.getElementById('tr-empty-message').textContent = 'The getTimeEntries backend endpoint needs to be added. See the developer notes in the source for the expected API format.';
+    document.getElementById('tr-entries-table').style.display = 'none';
+    trUpdateSummaryCards([], []);
+    trUpdatePayrollBadge();
+    return;
+  }
+
+  // Populate member filter
+  trPopulateMemberFilter();
+  trUpdatePayrollBadge();
+  renderTimeReview();
+}
+
+function trPopulateMemberFilter() {
+  const sel = document.getElementById('tr-member-filter');
+  const current = trMemberFilter;
+  sel.innerHTML = '<option value="all">All Members</option>';
+
+  // Gather all names from entries + roster
+  const nameHours = {};
+
+  // From entries (skip day_clock)
+  if (trData) {
+    trData.forEach(e => {
+      if (e.entryType === 'day_clock') return;
+      const members = JSON.parse(e.crewMembers || '[]');
+      const hours = (e.durationMinutes || 0) / 60;
+      members.forEach(m => {
+        const name = (typeof m === 'string' ? m : m.name || '').trim();
+        if (!name) return;
+        if (trCrewFilter !== 'all' && e.crew !== trCrewFilter) return;
+        nameHours[name] = (nameHours[name] || 0) + hours;
+      });
+    });
+  }
+
+  // From roster
+  const rosterCrews = trCrewFilter === 'all' ? Object.keys(trCrewRoster) : [trCrewFilter];
+  rosterCrews.forEach(crew => {
+    if (trCrewRoster[crew]) {
+      trCrewRoster[crew].forEach(m => {
+        const name = m.name.trim();
+        if (!(name in nameHours)) nameHours[name] = 0;
+      });
+    }
+  });
+
+  // Sort and build options
+  const sorted = Object.keys(nameHours).sort();
+  sorted.forEach(name => {
+    const h = nameHours[name];
+    const label = h > 0 ? name : `${name} (0h)`;
+    sel.innerHTML += `<option value="${name}">${label}</option>`;
+  });
+
+  sel.value = sorted.includes(current) ? current : 'all';
+  trMemberFilter = sel.value;
+}
+
+function trUpdatePayrollBadge() {
+  const badge = document.getElementById('tr-payroll-badge');
+  if (!badge) return;
+
+  const now = new Date();
+  const end = new Date(trWeekStart);
+  end.setDate(end.getDate() + 6);
+
+  // Check if all non-day_clock entries have clock outs
+  const hasOpenEntries = trData && trData.some(e => e.entryType !== 'day_clock' && !e.clockOut);
+
+  if (now <= end) {
+    badge.className = 'tr-payroll-badge tr-payroll-pending';
+    badge.textContent = 'Submit by Wed';
+  } else if (hasOpenEntries) {
+    badge.className = 'tr-payroll-badge tr-payroll-pending';
+    badge.textContent = 'Open entries';
+  } else {
+    badge.className = 'tr-payroll-badge tr-payroll-ready';
+    badge.textContent = '\u2713 Ready to Export';
+  }
+}
+
+function trApplyFilters() {
+  trCrewFilter = document.getElementById('tr-crew-filter').value;
+  trMemberFilter = document.getElementById('tr-member-filter').value;
+  if (trCrewFilter !== 'all') {
+    trPopulateMemberFilter();
+  }
+  renderTimeReview();
+}
+
+// ── Render ──
+
+function renderTimeReview() {
+  if (!trData) return;
+
+  const tbody = document.getElementById('tr-entries-body');
+  const emptyState = document.getElementById('tr-empty-state');
+  const table = document.getElementById('tr-entries-table');
+
+  // Separate day_clock entries for the warning banner
+  const dayClocks = trData.filter(e => e.entryType === 'day_clock');
+  const entries = trData.filter(e => e.entryType !== 'day_clock');
+
+  // Check for open day clocks
+  trRenderOpenClockBanner(dayClocks);
+
+  // Filter and expand entries to per-member rows
+  let rows = [];
+  entries.forEach((e, idx) => {
+    if (trCrewFilter !== 'all' && e.crew !== trCrewFilter) return;
+
+    const members = JSON.parse(e.crewMembers || '[]').map(m => (typeof m === 'string' ? m : m.name || '').trim()).filter(Boolean);
+    const hours = (e.durationMinutes || 0) / 60;
+    const isShop = trIsShop(e.ticketId);
+    let type, typeClass;
+    if (e.entryType === 'indirect') { type = 'Travel'; typeClass = 'tr-badge-travel'; }
+    else if (isShop) { type = 'Shop'; typeClass = 'tr-badge-shop'; }
+    else { type = 'Direct'; typeClass = 'tr-badge-direct'; }
+
+    const property = e.propertyAddress ? e.propertyAddress.split(',')[0] : '';
+
+    // Detect split entries
+    let isSplit = false;
+    if (idx > 0) {
+      const prev = entries[idx - 1];
+      if (prev.ticketId && e.ticketId && prev.ticketId === e.ticketId) {
+        if (e.entryType === 'service' && prev.entryType === 'service' && e.serviceName === prev.serviceName) {
+          const prevOut = trParseTime12(prev.clockOut);
+          const curIn = trParseTime12(e.clockIn);
+          if (prevOut !== null && curIn !== null && Math.abs(curIn - prevOut) <= 1) {
+            isSplit = true;
+          }
+        } else if (e.entryType !== 'service' && prev.entryType !== 'service') {
+          const prevOut = trParseTime12(prev.clockOut);
+          const curIn = trParseTime12(e.clockIn);
+          if (prevOut !== null && curIn !== null && Math.abs(curIn - prevOut) <= 1) {
+            isSplit = true;
+          }
+        }
+      }
+    }
+
+    if (members.length === 0) {
+      // Entry with no members — show as single row
+      rows.push({ entry: e, member: '(no members)', hours, type, typeClass, property, isSplit, isFixed: e.durationType === 'fixed' });
+    } else {
+      members.forEach(member => {
+        if (trMemberFilter !== 'all' && member !== trMemberFilter) return;
+        rows.push({ entry: e, member, hours, type, typeClass, property, isSplit, isFixed: e.durationType === 'fixed' });
+      });
+    }
+  });
+
+  if (rows.length === 0) {
+    tbody.innerHTML = '';
+    table.style.display = 'none';
+    emptyState.style.display = 'block';
+    emptyState.querySelector('#tr-empty-message').textContent = 'No time entries found for this week.';
+    trUpdateSummaryCards(rows, entries);
+    return;
+  }
+
+  table.style.display = '';
+  emptyState.style.display = 'none';
+
+  // Group by date
+  const byDate = {};
+  rows.forEach(r => {
+    const d = r.entry.date;
+    if (!byDate[d]) byDate[d] = [];
+    byDate[d].push(r);
+  });
+
+  const dates = Object.keys(byDate).sort();
+  let html = '';
+
+  dates.forEach(date => {
+    const dayRows = byDate[date];
+    const dayLabel = trFormatDate(date);
+    const fullDay = new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long' });
+
+    // Day header
+    html += `<tr class="tr-day-header"><td colspan="11">${fullDay}, ${dayLabel}</td></tr>`;
+
+    dayRows.forEach(r => {
+      const e = r.entry;
+      const editing = trEditingEntryId === e.entryId;
+      const splitIcon = r.isSplit ? '<span class="tr-split-icon" title="Split entry - crew change continuation">&#8596;</span>' : '';
+      const fixedBadge = r.isFixed ? '<span class="tr-badge tr-badge-fixed">Fixed</span>' : '';
+      const serviceName = e.entryType === 'service' ? (e.serviceName || '') : '';
+      const notesTitle = e.notes ? e.notes.replace(/"/g, '&quot;') : '';
+      const notesTrunc = e.notes ? (e.notes.length > 30 ? e.notes.substring(0, 30) + '...' : e.notes) : '';
+
+      if (editing) {
+        html += `<tr>
+          <td>${dayLabel}</td>
+          <td>${e.crew}</td>
+          <td>${r.member}</td>
+          <td><span class="tr-badge ${r.typeClass}">${r.type}</span>${fixedBadge}</td>
+          <td>${r.property}</td>
+          <td>${serviceName}${splitIcon}</td>
+          <td><input type="text" class="tr-edit-input" id="tr-edit-in-${e.entryId}" value="${e.clockIn || ''}">
+            ${r.isFixed ? '<div class="tr-fixed-note">Fixed-duration service</div>' : ''}</td>
+          <td><input type="text" class="tr-edit-input" id="tr-edit-out-${e.entryId}" value="${e.clockOut || ''}"></td>
+          <td>${r.hours.toFixed(2)}</td>
+          <td title="${notesTitle}">${notesTrunc}</td>
+          <td>
+            <button class="tr-action-btn" onclick="trSaveEntry('${e.entryId}')" title="Save">&#10003;</button>
+            <button class="tr-action-btn" onclick="trCancelEdit()" title="Cancel">&#10007;</button>
+          </td>
+        </tr>`;
+      } else {
+        html += `<tr>
+          <td>${dayLabel}</td>
+          <td>${e.crew}</td>
+          <td>${r.member}</td>
+          <td><span class="tr-badge ${r.typeClass}">${r.type}</span>${fixedBadge}</td>
+          <td>${r.property}</td>
+          <td>${serviceName}${splitIcon}</td>
+          <td>${e.clockIn || ''}</td>
+          <td>${e.clockOut || ''}</td>
+          <td>${r.hours.toFixed(2)}</td>
+          <td title="${notesTitle}">${notesTrunc}</td>
+          <td>
+            <button class="tr-action-btn" onclick="trEditEntry('${e.entryId}')" title="Edit">&#9998;</button>
+            <button class="tr-action-btn delete" onclick="trDeleteEntry('${e.entryId}')" title="Delete">&#128465;</button>
+          </td>
+        </tr>`;
+      }
+    });
+
+    // Day subtotal
+    const dayTotal = dayRows.reduce((sum, r) => sum + r.hours, 0);
+    html += `<tr class="tr-day-subtotal"><td colspan="8" style="text-align: right;">Day Total:</td><td>${dayTotal.toFixed(2)}</td><td colspan="2"></td></tr>`;
+  });
+
+  tbody.innerHTML = html;
+  trUpdateSummaryCards(rows, entries);
+}
+
+function trUpdateSummaryCards(rows, entries) {
+  let totalHours = 0, directHours = 0, travelHours = 0, shopHours = 0;
+  const memberSet = new Set();
+
+  rows.forEach(r => {
+    totalHours += r.hours;
+    if (r.type === 'Direct') directHours += r.hours;
+    else if (r.type === 'Travel') travelHours += r.hours;
+    else if (r.type === 'Shop') shopHours += r.hours;
+    if (r.member !== '(no members)') memberSet.add(r.member);
+  });
+
+  document.getElementById('tr-total-hours').textContent = totalHours.toFixed(1);
+  document.getElementById('tr-direct-hours').textContent = directHours.toFixed(1);
+  document.getElementById('tr-travel-hours').textContent = travelHours.toFixed(1);
+  document.getElementById('tr-shop-hours').textContent = shopHours.toFixed(1);
+  document.getElementById('tr-member-count').textContent = memberSet.size;
+}
+
+// ── Open Day Clock Warning Banner ──
+
+function trRenderOpenClockBanner(dayClocks) {
+  const banner = document.getElementById('tr-open-clock-banner');
+  const openClocks = dayClocks.filter(e => !e.clockOut);
+
+  if (openClocks.length === 0) {
+    banner.style.display = 'none';
+    banner.innerHTML = '';
+    return;
+  }
+
+  let html = '<div class="tr-open-clock-banner"><div>';
+  html += '<strong>&#9888; Open Day Clocks</strong>';
+  openClocks.forEach(e => {
+    const inMin = trParseTime12(e.clockIn);
+    const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+    const elapsed = inMin !== null ? ((nowMin - inMin + 1440) % 1440 / 60).toFixed(1) : '?';
+    html += `<div style="margin-top: 4px;">${e.crew} — started ${e.clockIn} (${elapsed}h elapsed) `;
+    html += `<button class="tr-close-clock-btn" onclick="trCloseDayClock('${e.entryId}', '${e.clockIn}')">Close Clock</button></div>`;
+  });
+  html += '</div></div>';
+  banner.innerHTML = html;
+  banner.style.display = 'block';
+}
+
+async function trCloseDayClock(entryId, clockInStr) {
+  const clockOut = prompt('Enter clock-out time:', '5:00 PM');
+  if (!clockOut) return;
+
+  const outMin = trParseTime12(clockOut);
+  const inMin = trParseTime12(clockInStr);
+  if (outMin === null) {
+    showToast('Invalid time format. Use format like "5:00 PM"', 'error');
+    return;
+  }
+  if (inMin !== null && outMin <= inMin) {
+    showToast('Clock out must be after clock in (' + clockInStr + ')', 'error');
+    return;
+  }
+
+  const durationMinutes = trCalcDurationMinutes(clockInStr, clockOut);
+
+  try {
+    const resp = await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ updateTimeEntry: true, entryId, clockOut, durationMinutes })
+    });
+    const data = await resp.json();
+    if (data.success) {
+      showToast('Day clock closed', 'success');
+      loadTimeReview();
+    } else {
+      showToast('Failed to close day clock', 'error');
+    }
+  } catch (e) {
+    showToast('Error closing day clock', 'error');
+  }
+}
+
+// ── Edit Entry ──
+
+function trEditEntry(entryId) {
+  trEditingEntryId = entryId;
+  renderTimeReview();
+}
+
+function trCancelEdit() {
+  trEditingEntryId = null;
+  renderTimeReview();
+}
+
+async function trSaveEntry(entryId) {
+  const inEl = document.getElementById(`tr-edit-in-${entryId}`);
+  const outEl = document.getElementById(`tr-edit-out-${entryId}`);
+  if (!inEl || !outEl) return;
+
+  const clockIn = inEl.value.trim();
+  const clockOut = outEl.value.trim();
+
+  if (!clockIn || !clockOut) {
+    showToast('Both clock in and clock out are required', 'error');
+    return;
+  }
+
+  const inMin = trParseTime12(clockIn);
+  const outMin = trParseTime12(clockOut);
+  if (inMin === null || outMin === null) {
+    showToast('Invalid time format. Use format like "8:00 AM"', 'error');
+    return;
+  }
+  if (outMin <= inMin && (outMin + 1440 - inMin > 1440)) {
+    showToast('Clock out must be after clock in', 'error');
+    return;
+  }
+
+  const durationMinutes = trCalcDurationMinutes(clockIn, clockOut);
+
+  try {
+    const resp = await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ updateTimeEntry: true, entryId, clockIn, clockOut, durationMinutes })
+    });
+    const data = await resp.json();
+    if (data.success) {
+      showToast('Entry updated', 'success');
+      trEditingEntryId = null;
+      loadTimeReview();
+    } else {
+      showToast('Failed to update entry', 'error');
+    }
+  } catch (e) {
+    showToast('Error updating entry', 'error');
+  }
+}
+
+// ── Delete Entry ──
+
+async function trDeleteEntry(entryId) {
+  const entry = trData ? trData.find(e => e.entryId === entryId) : null;
+  let confirmMsg = 'Delete this entry?';
+  if (entry) {
+    const members = JSON.parse(entry.crewMembers || '[]').map(m => (typeof m === 'string' ? m : m.name || '').trim()).filter(Boolean);
+    const hours = ((entry.durationMinutes || 0) / 60).toFixed(2);
+    const property = entry.propertyAddress ? entry.propertyAddress.split(',')[0] : '';
+    const isShop = trIsShop(entry.ticketId);
+    const type = entry.entryType === 'indirect' ? 'Travel' : (isShop ? 'Shop' : 'Direct');
+    const dateLabel = trFormatDate(entry.date);
+    confirmMsg = `Delete entry?\n\n${dateLabel} \u00b7 ${entry.crew} \u00b7 ${members.join(', ')}\n${entry.clockIn || '?'} \u2013 ${entry.clockOut || '?'} (${hours}h)\n${property} \u00b7 ${type}`;
+  }
+
+  if (!confirm(confirmMsg)) return;
+
+  try {
+    const resp = await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deleteTimeEntry: true, entryId })
+    });
+    const data = await resp.json();
+    if (data.success) {
+      showToast('Entry deleted', 'success');
+      loadTimeReview();
+    } else {
+      showToast('Failed to delete entry', 'error');
+    }
+  } catch (e) {
+    showToast('Error deleting entry', 'error');
+  }
+}
+
+// ── Add Entry Modal ──
+
+function openTrAddModal() {
+  const modal = document.getElementById('tr-add-modal');
+  modal.style.display = 'flex';
+
+  // Populate crew dropdown
+  const crewSel = document.getElementById('tr-add-crew');
+  crewSel.innerHTML = '';
+  const filterSel = document.getElementById('tr-crew-filter');
+  Array.from(filterSel.options).forEach(opt => {
+    if (opt.value !== 'all') {
+      crewSel.innerHTML += `<option value="${opt.value}">${opt.text}</option>`;
+    }
+  });
+
+  // Set date to current week Monday
+  const dateInput = document.getElementById('tr-add-date');
+  dateInput.value = trDateStr(trWeekStart);
+  const end = new Date(trWeekStart);
+  end.setDate(end.getDate() + 6);
+  dateInput.min = trDateStr(trWeekStart);
+  dateInput.max = trDateStr(end);
+
+  // Reset fields
+  document.getElementById('tr-add-type').value = 'Direct';
+  document.getElementById('tr-add-property').value = '';
+  document.getElementById('tr-add-clock-in').value = '';
+  document.getElementById('tr-add-clock-out').value = '';
+  document.getElementById('tr-add-notes').value = '';
+
+  trAddCrewChanged();
+}
+
+function closeTrAddModal() {
+  document.getElementById('tr-add-modal').style.display = 'none';
+}
+
+function trAddCrewChanged() {
+  const crew = document.getElementById('tr-add-crew').value;
+  const container = document.getElementById('tr-add-members');
+
+  if (!crew || !trCrewRoster[crew]) {
+    container.innerHTML = '<span style="color: var(--gw-text-secondary, #5f6368); font-size: 12px;">No roster available for this crew</span>';
+    return;
+  }
+
+  let html = '';
+  trCrewRoster[crew].forEach(m => {
+    const name = m.name.trim();
+    const role = m.role || 'Member';
+    html += `<label style="display: flex; align-items: center; gap: 8px; padding: 4px 0; cursor: pointer;">
+      <input type="checkbox" class="tr-add-member-cb" value="${name}" checked>
+      <span style="font-size: 13px;">${name}</span>
+      <span style="font-size: 11px; color: var(--gw-text-secondary, #5f6368);">(${role})</span>
+    </label>`;
+  });
+  container.innerHTML = html || '<span style="color: var(--gw-text-secondary, #5f6368); font-size: 12px;">No members in roster</span>';
+}
+
+async function trSaveNewEntry() {
+  const crew = document.getElementById('tr-add-crew').value;
+  const date = document.getElementById('tr-add-date').value;
+  const type = document.getElementById('tr-add-type').value;
+  const property = document.getElementById('tr-add-property').value.trim();
+  const clockIn = document.getElementById('tr-add-clock-in').value.trim();
+  const clockOut = document.getElementById('tr-add-clock-out').value.trim();
+  const notes = document.getElementById('tr-add-notes').value.trim();
+
+  if (!crew || !date || !clockIn || !clockOut) {
+    showToast('Crew, date, clock in, and clock out are required', 'error');
+    return;
+  }
+
+  const inMin = trParseTime12(clockIn);
+  const outMin = trParseTime12(clockOut);
+  if (inMin === null || outMin === null) {
+    showToast('Invalid time format. Use format like "8:00 AM"', 'error');
+    return;
+  }
+  if (outMin <= inMin && trCalcDurationMinutes(clockIn, clockOut) > 1440) {
+    showToast('Clock out must be after clock in', 'error');
+    return;
+  }
+
+  const selectedMembers = Array.from(document.querySelectorAll('.tr-add-member-cb:checked')).map(cb => cb.value);
+  if (selectedMembers.length === 0) {
+    showToast('Select at least one member', 'error');
+    return;
+  }
+
+  const durationMinutes = trCalcDurationMinutes(clockIn, clockOut);
+  const entryType = type === 'Travel' ? 'indirect' : 'job';
+  const ticketId = type === 'Shop' ? 'SHOP' : (type === 'Travel' ? 'TRAVEL' : 'MANUAL');
+
+  try {
+    const resp = await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        saveTimeEntry: true,
+        crew,
+        date,
+        entryType,
+        ticketId,
+        propertyAddress: property,
+        clockIn,
+        clockOut,
+        durationMinutes,
+        crewMembers: selectedMembers,
+        memberCount: selectedMembers.length,
+        notes: notes ? 'Manual entry - ' + notes : 'Manual entry'
+      })
+    });
+    const data = await resp.json();
+    if (data.success) {
+      showToast('Entry added', 'success');
+      closeTrAddModal();
+      loadTimeReview();
+    } else {
+      showToast('Failed to add entry', 'error');
+    }
+  } catch (e) {
+    showToast('Error adding entry', 'error');
+  }
+}
+
+// ── Payroll Export (Inova CSV) ──
+
+function trExportPayroll() {
+  if (!trData || trData.length === 0) {
+    showToast('No time data to export', 'error');
+    return;
+  }
+
+  // Filter: skip day_clock and indirect (travel)
+  const billable = trData.filter(e => e.entryType !== 'day_clock' && e.entryType !== 'indirect');
+
+  // Expand to per-member rows, grouped by member+crew
+  const memberCrewHours = {}; // "member|||crew" → { hours, entries[] }
+  const memberTotalHours = {}; // member → total hours across all crews
+
+  billable.forEach(e => {
+    const members = JSON.parse(e.crewMembers || '[]').map(m => (typeof m === 'string' ? m : m.name || '').trim()).filter(Boolean);
+    const hours = (e.durationMinutes || 0) / 60;
+
+    members.forEach(member => {
+      const key = `${member}|||${e.crew}`;
+      if (!memberCrewHours[key]) memberCrewHours[key] = { hours: 0, member, crew: e.crew, entries: [] };
+      memberCrewHours[key].hours += hours;
+      memberCrewHours[key].entries.push(e);
+
+      memberTotalHours[member] = (memberTotalHours[member] || 0) + hours;
+    });
+  });
+
+  // Calculate OT per member across all crews
+  // OT attributed to the crew where the last hours were worked chronologically
+  const csvRows = [];
+
+  // Group by member to calculate OT
+  const memberGroups = {};
+  Object.values(memberCrewHours).forEach(mc => {
+    if (!memberGroups[mc.member]) memberGroups[mc.member] = [];
+    memberGroups[mc.member].push(mc);
+  });
+
+  // Pay date = Friday of selected week
+  const friday = new Date(trWeekStart);
+  friday.setDate(friday.getDate() + 4);
+  const payDate = `${String(friday.getMonth() + 1).padStart(2, '0')}/${String(friday.getDate()).padStart(2, '0')}/${friday.getFullYear()}`;
+
+  Object.keys(memberGroups).sort().forEach(member => {
+    const groups = memberGroups[member];
+    const totalHours = memberTotalHours[member];
+
+    if (totalHours <= 40) {
+      // All REG — output per crew
+      groups.forEach(mc => {
+        csvRows.push({ name: member, id: '', payDate, hours: mc.hours.toFixed(2), code: 'REG', dept: mc.crew, notes: '' });
+      });
+    } else {
+      // Has OT — sort crews by last entry date/time to determine where OT lands
+      groups.sort((a, b) => {
+        const lastA = a.entries[a.entries.length - 1];
+        const lastB = b.entries[b.entries.length - 1];
+        const dateComp = (lastA.date || '').localeCompare(lastB.date || '');
+        if (dateComp !== 0) return dateComp;
+        return (trParseTime12(lastA.clockOut) || 0) - (trParseTime12(lastB.clockOut) || 0);
+      });
+
+      let regRemaining = 40;
+      groups.forEach(mc => {
+        if (regRemaining >= mc.hours) {
+          // All REG for this crew
+          csvRows.push({ name: member, id: '', payDate, hours: mc.hours.toFixed(2), code: 'REG', dept: mc.crew, notes: '' });
+          regRemaining -= mc.hours;
+        } else if (regRemaining > 0) {
+          // Split: partial REG + OT
+          csvRows.push({ name: member, id: '', payDate, hours: regRemaining.toFixed(2), code: 'REG', dept: mc.crew, notes: '' });
+          csvRows.push({ name: member, id: '', payDate, hours: (mc.hours - regRemaining).toFixed(2), code: 'OT', dept: mc.crew, notes: '' });
+          regRemaining = 0;
+        } else {
+          // All OT
+          csvRows.push({ name: member, id: '', payDate, hours: mc.hours.toFixed(2), code: 'OT', dept: mc.crew, notes: '' });
+        }
+      });
+    }
+  });
+
+  // Build CSV
+  let csv = 'Employee Name,Employee ID,Pay Date,Hours Worked,Earnings Code,Department,Notes\n';
+  csvRows.forEach(r => {
+    csv += `${r.name},${r.id},${r.payDate},${r.hours},${r.code},${r.dept},${r.notes}\n`;
+  });
+
+  // Download
+  const startStr = trDateStr(trWeekStart);
+  const end = new Date(trWeekStart);
+  end.setDate(end.getDate() + 6);
+  const endStr = trDateStr(end);
+  trDownloadCSV(csv, `Endurance-Payroll-${startStr}-to-${endStr}.csv`);
+  showToast('Payroll CSV exported', 'success');
+}
+
+// ── Detail Export ──
+
+function trExportDetail() {
+  if (!trData || trData.length === 0) {
+    showToast('No time data to export', 'error');
+    return;
+  }
+
+  const entries = trData.filter(e => e.entryType !== 'day_clock');
+  let csv = 'Date,Day,Crew,Member,Type,Property,Service,Clock In,Clock Out,Hours,Notes\n';
+
+  entries.forEach(e => {
+    const members = JSON.parse(e.crewMembers || '[]').map(m => (typeof m === 'string' ? m : m.name || '').trim()).filter(Boolean);
+    const hours = ((e.durationMinutes || 0) / 60).toFixed(2);
+    const isShop = trIsShop(e.ticketId);
+    const type = e.entryType === 'indirect' ? 'Travel' : (isShop ? 'Shop' : 'Direct');
+    const property = (e.propertyAddress || '').replace(/,/g, ' ');
+    const service = (e.serviceName || '').replace(/,/g, ' ');
+    const notes = (e.notes || '').replace(/,/g, ' ').replace(/\n/g, ' ');
+    const d = new Date(e.date + 'T00:00:00');
+    const dayName = d.toLocaleDateString('en-US', { weekday: 'long' });
+
+    if (members.length === 0) {
+      csv += `${e.date},${dayName},${e.crew},(no members),${type},${property},${service},${e.clockIn || ''},${e.clockOut || ''},${hours},${notes}\n`;
+    } else {
+      members.forEach(member => {
+        csv += `${e.date},${dayName},${e.crew},${member},${type},${property},${service},${e.clockIn || ''},${e.clockOut || ''},${hours},${notes}\n`;
+      });
+    }
+  });
+
+  const startStr = trDateStr(trWeekStart);
+  const end = new Date(trWeekStart);
+  end.setDate(end.getDate() + 6);
+  const endStr = trDateStr(end);
+  trDownloadCSV(csv, `Endurance-TimeDetail-${startStr}-to-${endStr}.csv`);
+  showToast('Detail CSV exported', 'success');
+}
+
+function trDownloadCSV(csv, filename) {
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 // ═══════════════════════════════════════════════════════════════

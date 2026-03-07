@@ -7785,3 +7785,53 @@ body.marvin-identify-active .main-content {
   background: #fef7f7;
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   TIME REVIEW
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Table */
+.tr-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tr-table th { text-align: left; padding: 8px 12px; background: var(--gw-bg-secondary, #f8f9fa); font-weight: 500; color: var(--gw-text-secondary, #5f6368); border-bottom: 2px solid #e0e0e0; position: sticky; top: 0; z-index: 1; }
+.tr-table td { padding: 6px 12px; border-bottom: 1px solid #eee; vertical-align: middle; }
+.tr-table tr:hover { background: #f5f7ff; }
+
+/* Type badges */
+.tr-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+.tr-badge-direct { background: #e6f4ea; color: #1e7e34; }
+.tr-badge-travel { background: #fff3e0; color: #e65100; }
+.tr-badge-shop { background: #e3f2fd; color: #1565c0; }
+.tr-badge-fixed { background: #f3e5f5; color: #7b1fa2; font-size: 10px; padding: 1px 5px; margin-left: 4px; }
+
+/* Split entry indicator */
+.tr-split-icon { color: #9e9e9e; font-size: 11px; margin-left: 4px; cursor: help; }
+
+/* Day rows */
+.tr-day-header td { background: #f0f2f5; font-weight: 600; font-size: 13px; color: #333; }
+.tr-day-subtotal td { background: #fafafa; font-weight: 500; font-style: italic; color: #555; }
+
+/* Summary cards */
+.tr-summary-cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 16px; }
+.tr-summary-card { background: white; border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; text-align: center; }
+.tr-summary-card .tr-card-value { font-size: 24px; font-weight: 700; color: var(--gw-text-primary, #202124); }
+.tr-summary-card .tr-card-label { font-size: 12px; color: var(--gw-text-secondary, #5f6368); margin-top: 4px; }
+
+/* Inline editing */
+.tr-edit-input { width: 85px; padding: 3px 6px; font-size: 12px; border: 1px solid #1A73E8; border-radius: 4px; }
+.tr-fixed-note { font-size: 10px; color: #7b1fa2; font-style: italic; margin-top: 2px; }
+
+/* Payroll badge */
+.tr-payroll-badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; }
+.tr-payroll-pending { background: #fff3e0; color: #e65100; }
+.tr-payroll-ready { background: #e6f4ea; color: #1e7e34; }
+
+/* Open day clock warning */
+.tr-open-clock-banner { display: flex; align-items: flex-start; gap: 12px; padding: 12px 16px; background: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; margin-bottom: 16px; font-size: 13px; }
+.tr-open-clock-banner strong { display: block; margin-bottom: 4px; }
+.tr-close-clock-btn { background: none; border: 1px solid #e65100; color: #e65100; border-radius: 4px; padding: 2px 8px; font-size: 11px; cursor: pointer; margin-left: 8px; }
+.tr-close-clock-btn:hover { background: #fff3e0; }
+
+/* Action buttons */
+.tr-action-btn { background: none; border: none; cursor: pointer; padding: 4px; color: var(--gw-text-secondary, #5f6368); border-radius: 4px; }
+.tr-action-btn:hover { background: #f0f0f0; color: #202124; }
+.tr-action-btn.delete:hover { color: #d93025; background: #fce8e6; }
+

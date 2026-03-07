@@ -300,6 +300,45 @@ text-my-team/
 
   **CSS classes**: `.row-enh-section-header`, `.row-enh-material`, `.row-enh-sub`, `.row-enh-subtotal`, `.row-enh-add`, `.enh-section-label`, `.enh-material-name`, `.plant-link-badge`, `.milestone-phase-card`, `.plant-catalog-container`, `.plant-card`, `.plant-thumb`, `.plant-size-chip`
 
+- **Time Review, Payroll Export & Day Clock Alert** ✅ **BUILT** (Mar 2026): Three connected features for crew time management from estimate.html.
+
+  **Time Review View** (`data-view="timeReview"`):
+  - Sidebar nav item between Financials and Configuration sections
+  - Week navigator (Mon-Sun), crew filter, member filter (includes roster members with `(0h)` for zero-hours), refresh, payroll status badge
+  - Summary cards: Total Hours, Direct Hours, Travel Hours, Shop Hours, Members
+  - Per-member expanded time entries table with day grouping, subtotals, inline editing (clock in/out), delete with detailed confirmation
+  - Open Day Clock warning banner with "Close Clock" button per crew
+  - Add Entry modal: crew dropdown, date picker, type (Direct/Travel/Shop), property, clock in/out, member checkboxes from roster, notes
+  - Split entry detection: visual indicator (↔) for consecutive entries with adjacent clock times on same ticket
+  - Type badges: Direct (green), Travel (orange), Shop (blue), Fixed (purple sub-badge)
+  - Default week: previous week on Mon/Tue (for Wed payroll submission), current week otherwise
+
+  **Payroll Export (Inova CSV)** — `trExportPayroll()`:
+  - Skips day_clock and indirect (travel) entries
+  - Groups by member+crew, calculates OT across all crews (>40h/week, FLSA weekly)
+  - OT attributed chronologically to the crew where last hours were worked
+  - CSV: Employee Name, Employee ID, Pay Date, Hours Worked, Earnings Code (REG/OT), Department, Notes
+  - File: `Endurance-Payroll-YYYY-MM-DD-to-YYYY-MM-DD.csv`
+
+  **Detail Export** — `trExportDetail()`:
+  - One row per entry per member, includes travel
+  - CSV: Date, Day, Crew, Member, Type, Property, Service, Clock In, Clock Out, Hours, Notes
+  - File: `Endurance-TimeDetail-YYYY-MM-DD-to-YYYY-MM-DD.csv`
+
+  **Day Clock Alert** — server-side Google Apps Script trigger:
+  - Settings: `dayClockAlertHours` (default 10, configurable in Settings view)
+  - `checkOpenDayClocks()` runs every 30 min, finds open day_clock entries exceeding threshold
+  - Emails crew leader (requires Email column in Crew Members sheet)
+  - Dedup via PropertiesService with Unix timestamp log, 48h cleanup
+
+  **Backend endpoints needed**: `getTimeEntries` (GET), `getCrewMembers` (GET) — API contracts documented as comment blocks in source
+
+  **State variables**: `trData`, `trWeekStart`, `trCrewFilter`, `trMemberFilter`, `trEditingEntryId`, `trCrewRoster`, `trInitialized`
+
+  **Functions**: `initTimeReview()`, `trSetWeek()`, `loadTimeReview()`, `renderTimeReview()`, `trPopulateMemberFilter()`, `trUpdatePayrollBadge()`, `trApplyFilters()`, `trUpdateSummaryCards()`, `trRenderOpenClockBanner()`, `trCloseDayClock()`, `trEditEntry()`, `trCancelEdit()`, `trSaveEntry()`, `trDeleteEntry()`, `openTrAddModal()`, `closeTrAddModal()`, `trAddCrewChanged()`, `trSaveNewEntry()`, `trExportPayroll()`, `trExportDetail()`, `trDownloadCSV()`, `trParseTime12()`, `trCalcDurationMinutes()`, `trFormatTime12()`, `trFormatDate()`, `trFormatDateLong()`, `trDateStr()`, `trIsShop()`
+
+  **CSS classes** (all `tr-` prefixed): `.tr-table`, `.tr-badge`, `.tr-badge-direct`, `.tr-badge-travel`, `.tr-badge-shop`, `.tr-badge-fixed`, `.tr-split-icon`, `.tr-day-header`, `.tr-day-subtotal`, `.tr-summary-cards`, `.tr-summary-card`, `.tr-card-value`, `.tr-card-label`, `.tr-edit-input`, `.tr-fixed-note`, `.tr-payroll-badge`, `.tr-payroll-pending`, `.tr-payroll-ready`, `.tr-open-clock-banner`, `.tr-close-clock-btn`, `.tr-action-btn`
+
 - Two-panel Google Workspace + Vignelli design system layout (sidebar + main content). **Design system overhaul (Feb 2026)**: Complete CSS redesign following Massimo Vignelli structural principles + Google Workspace density. Design spec: `docs/design-spec-platform.md`. **Key design tokens**: `--rule-heavy: 2px solid #202124` (Vignelli heavy rule under headers/between sections), `--font-display: Google Sans` (page titles only, 22px), `--font-body: Roboto` (everything else), 14px body text, 13px table cells, 32px buttons/inputs, 28px bid builder rows, 48px header. **Sidebar**: 256px, Gmail-style pill nav items (`border-radius: 0 16px 16px 0`), grouped with 11px uppercase section labels (OPERATIONS, FINANCIALS, CONFIGURATION). **Color palette**: Google's exact blue (#1A73E8), semantic badge colors (green-light/red-light/yellow-light/blue-lighter backgrounds), Google's two-layer shadow system. **Spreadsheet-cell editing**: transparent inputs with blue-lighter hover hint, 2px solid blue border on focus (Google Sheets style). **CSS layout chain**: `.app-container` (flex row, 100vh) → `.sidebar` (fixed 256px) + `.main-content` (flex: 1, `display: flex; flex-direction: column`). `.main-header` (48px, `border-bottom: var(--rule-heavy)`, z-index: 2) sits at top. `.main-body` (`position: relative; flex: 1; overflow: hidden`) contains all `.view` panels as direct children. `.view.active` has `height: 100%; overflow-y: auto; padding: 16px` — each view fills main-body and scrolls independently. **Summary panel removed** (Feb 2026) — rate overrides (labor rate, labor markup, material markup, sub markup, travel %) integrated into the contract/project settings card as a collapsible `<details>` section, shared by both recurring and work ticket modes.
 - **Two-Tier Estimate Header** ✅ **BUILT** (Mar 2026): Replaced cluttered single-row header with a state-driven two-tier layout for the builder view:
   - **Top tier (context)**: Back arrow (`showView('estimates')`) + property address + bid/contract ID + status badges (Draft/Revision/Finalized + signing state)
@@ -463,7 +502,8 @@ text-my-team/
 | `getCrewSchedule` | Crew | Auth by phone → returns crew members, today's tickets (with travelHours, completedServices for partial), time entries, reminders (one-off for today), permanentReminders (every visit) |
 | `verifyPin` | Crew | Validates 4-digit PIN against Crew Members sheet, returns {success, name, role, crew} |
 | `getProductionAnalysis` | Estimating | Compares catalog production rates vs actual field data. Params: startDate, endDate, crew. Reads Scheduled Tickets (completed/partial) + Time Entries (service type), aggregates by service and item. Returns service-level efficiency (est vs actual man-hours) with per-ticket detail, and item-level field rates (measured from single-item services, inferred from multi-item services) compared to catalog rates |
-| `getCrewMembers` | Crew | Returns all crew members from Crew Members sheet |
+| `getCrewMembers` | Crew | Returns crew members grouped by crew name. Params: `crew` (specific name or `all`). Response: `{ crews: { "Crew A": [{ name, role }], ... } }`. Excludes PINs/emails. Used by Time Review for member filter dropdown and Add Entry modal |
+| `getTimeEntries` | Crew | Returns time entries filtered by date range and crew. Params: `startDate`, `endDate`, `crew` (specific name or `all`). Response: `{ entries: [{ entryId, crew, date, entryType, ticketId, propertyAddress, serviceName, durationType, clockIn, clockOut, durationMinutes, crewMembers, memberCount, notes }] }`. Includes all entry types (day_clock, job, service, indirect) — frontend handles filtering |
 | `getRouteOrder` | Crew | Returns stop order for a crew on a given date |
 | `getWeeklyReportData` | Estimating | Returns weekly property visit summaries for report emails |
 | `getServiceOffers` | Estimating | Loads offers for a property or report |

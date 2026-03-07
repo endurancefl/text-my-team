@@ -9,6 +9,7 @@
 - NEVER break existing functionality when making changes
 - This is a production app — test all 14 sidebar pages after any layout change
 - The app uses a single HTML file with ~18,000 lines. Be careful with closing tags.
+- **Always update `cloud-function/marvin-knowledge.md`** when adding features, changing calculations, adding items/services, or modifying business rules. This file is MARVIN's brain — it gets loaded into the AI system prompt at runtime. Redeploy Lambda after changes.
 
 ## CSS/Layout Bug Debugging Rules
 1. **Always check the actual DOM first** — run `parentElement.children.length` and log each child's className and clientHeight. The browser's HTML parser may restructure your DOM due to mismatched tags.
@@ -36,6 +37,7 @@
 | `index.html` | Customer service request portal | ~3,100 |
 | `estimate.html` | Bidding & estimating tool (MNT + ENH divisions) | ~21,516 |
 | `css/estimate.css` | All CSS for estimate.html | ~7,787 |
+| `sign.html` | Standalone contract e-signature page | ~686 |
 | `backend/combined-apps-script.js` | Google Apps Script backend | ~6,112 |
 | `docs/platform-architecture.md` | Living architecture doc (MUST update on every change) |
 
@@ -306,3 +308,25 @@ All times use H:MM format via `formatMinutes()` and `formatEstMin()`:
 - `crew.html?demo=true&lang=es` — test Spanish translations in demo mode (NOT YET IMPLEMENTED — use toggle)
 - Toggle language via pill button on login screen or dashboard header
 - Demo crew: Jake Miller/1111, Carlos Rivera/2222, Sam Thompson/3333, Dani Brooks/4444, Tyler Nguyen/5555
+
+---
+
+# Supplemental Instructions
+
+## Prompt Archiving
+When executing a feature implementation prompt, save the final version of the prompt to the `prompts/` folder before beginning work. Only archive prompts that are actually being implemented — not drafts reviewed for feedback. Create the `prompts/` directory if it doesn't already exist. Use a descriptive filename with the date, e.g., `prompts/2026-03-07-time-review.md`. This applies to any substantial prompt that drives a feature build — not quick one-off questions.
+
+## Architecture Rules
+- Both apps are single-file HTML with inline `<script>` blocks. No build step, no framework.
+- All new CSS classes should be namespaced with a short prefix to avoid collisions (e.g., `tr-` for time review, `fin-` for financials).
+- Views use `data-view="viewId"` on sidebar nav items. `showView(viewId)` handles switching. New views need: nav HTML, view HTML, title in the titles map, and a trigger block in `showView()`.
+- Settings persist via `bidSettings` object → `settingsMap` → `saveBidSettings()` → Google Sheets.
+- Backend actions use POST with `{ actionName: true, ...params }` for writes and GET with `?action=actionName&param=value` for reads.
+- `showToast(message, type)` for notifications. Type = 'success' | 'error' | 'info'.
+- Time entries use 12-hour clock strings ("8:00 AM"). Crew members stored as JSON string arrays.
+
+## Code Style
+- `let`/`const`, template literals, arrow functions mixed with `function` declarations
+- `async`/`await` for fetch calls
+- Section headers use: `// ═══════════════════════════════════════`
+- No modifications to existing functions unless explicitly required by the task
