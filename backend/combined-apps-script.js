@@ -80,6 +80,8 @@ function doGet(e) {
         return jsonResponse(getCrews());
       case 'getTimeEntries':
         return jsonResponse(getTimeEntries(e.parameter.startDate, e.parameter.endDate, e.parameter.crew));
+      case 'getPayrollExportStatus':
+        return jsonResponse(getPayrollExportStatus(e.parameter.weekStart));
       case 'getRouteOrder':
         return jsonResponse(getRouteOrder(e.parameter.crew, e.parameter.dayOfWeek));
       case 'getWeeklyReportData':
@@ -161,6 +163,9 @@ function doPost(e) {
     }
     if (data.updateTicketCrew) {
       return jsonResponse(updateTicketCrew(data));
+    }
+    if (data.savePayrollExport) {
+      return jsonResponse(savePayrollExport(data));
     }
     if (data.saveBid) {
       return jsonResponse(saveBid(data.bidData));
@@ -2811,6 +2816,38 @@ function getCrewSchedule(phone, dateStr) {
   var reminderResult;
   try { reminderResult = getRemindersForCrew(crewName, targetDate); } catch(re) { reminderResult = { scheduled: [], permanent: [] }; }
 
+  // ─── Check for auto-closed entries needing correction ───
+  var autoClosedEntries = [];
+  if (teSheet) {
+    var teData2 = teSheet.getDataRange().getValues();
+    var teH2 = teData2[0];
+    var acCol = {};
+    teH2.forEach(function(h, idx) { acCol[h] = idx; });
+
+    for (var ac = 1; ac < teData2.length; ac++) {
+      var acRow = teData2[ac];
+      var acCrew = String(acRow[acCol['Crew']] || '');
+      var acNotes = String(acRow[acCol['Notes']] || '');
+      if (acCrew === crewName && acNotes.indexOf('[AUTO-CLOSED]') !== -1) {
+        var acDate = acRow[acCol['Date']];
+        if (acDate instanceof Date) {
+          var acTz = ss.getSpreadsheetTimeZone();
+          acDate = Utilities.formatDate(acDate, acTz, 'yyyy-MM-dd');
+        }
+        autoClosedEntries.push({
+          entryId: acRow[acCol['Entry ID']] || '',
+          date: String(acDate),
+          entryType: acRow[acCol['Entry Type']] || '',
+          ticketId: acRow[acCol['Ticket ID']] || '',
+          propertyAddress: acRow[acCol['Property Address']] || '',
+          clockIn: acRow[acCol['Clock In']] || '',
+          clockOut: acRow[acCol['Clock Out']] || '',
+          notes: acNotes
+        });
+      }
+    }
+  }
+
   return {
     success: true,
     crewName: crewName,
@@ -2820,7 +2857,8 @@ function getCrewSchedule(phone, dateStr) {
     tickets: tickets,
     timeEntries: timeEntries,
     reminders: reminderResult.scheduled,
-    permanentReminders: reminderResult.permanent
+    permanentReminders: reminderResult.permanent,
+    autoClosedEntries: autoClosedEntries
   };
 }
 
@@ -2944,7 +2982,7 @@ function verifyPin(pin) {
  */
 function getTimeEntries(startDate, endDate, crewFilter) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName('TimeEntries');
+  var sheet = ss.getSheetByName('Time Entries');
   if (!sheet) return { success: true, entries: [] };
 
   var data = sheet.getDataRange().getValues();
@@ -6223,7 +6261,7 @@ function checkOpenDayClocks() {
   if (threshold <= 0) return;
 
   // 2. Find open day_clock entries for today
-  var teSheet = ss.getSheetByName('TimeEntries');
+  var teSheet = ss.getSheetByName('Time Entries');
   if (!teSheet) return;
   var teData = teSheet.getDataRange().getValues();
   var headers = teData[0];
@@ -6310,6 +6348,170 @@ function checkOpenDayClocks() {
     if (log[k] < cutoff) delete log[k];
   });
   props.setProperty('dayClockAlerts', JSON.stringify(log));
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MIDNIGHT AUTO-CLOSE — Time-driven trigger (daily 12:05 AM)
+// ═══════════════════════════════════════════════════════════════
+// SETUP: Triggers → Add Trigger:
+//   Function: autoCloseOpenEntries
+//   Event source: Time-driven
+//   Type: Day timer
+//   Time of day: Midnight to 1am
+
+function autoCloseOpenEntries() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var tz = ss.getSpreadsheetTimeZone();
+  var sheet = ss.getSheetByName('Time Entries');
+  if (!sheet) return;
+
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return;
+
+  var headers = data[0];
+  var col = {};
+  headers.forEach(function(h, i) { col[h] = i; });
+
+  var clockOutCol = col['Clock Out'];
+  var durationCol = col['Duration Minutes'];
+  var notesCol = col['Notes'];
+  var clockInCol = col['Clock In'];
+  var crewCol = col['Crew'];
+  var entryTypeCol = col['Entry Type'];
+  var dateCol = col['Date'];
+
+  if (clockOutCol === undefined || clockInCol === undefined) return;
+
+  var now = new Date();
+  var today = Utilities.formatDate(now, tz, 'yyyy-MM-dd');
+  var closedByCrew = {};
+
+  for (var r = 1; r < data.length; r++) {
+    var row = data[r];
+    // Skip if already has clock out
+    if (row[clockOutCol]) continue;
+
+    // Get entry date — skip entries from today (they might still be active)
+    var rowDate = row[dateCol];
+    if (rowDate instanceof Date) {
+      rowDate = Utilities.formatDate(rowDate, tz, 'yyyy-MM-dd');
+    } else {
+      rowDate = String(rowDate || '');
+    }
+    if (rowDate >= today) continue; // only close entries from PREVIOUS days
+
+    // Set clock out to 11:59 PM
+    var sheetRow = r + 1; // 1-based for sheet operations
+    sheet.getRange(sheetRow, clockOutCol + 1).setValue('11:59 PM');
+
+    // Calculate duration from clock in to 11:59 PM
+    var clockInStr = String(row[clockInCol] || '');
+    var inMin = parseClockTime12_(clockInStr);
+    if (inMin !== null && durationCol !== undefined) {
+      var duration = (23 * 60 + 59) - inMin; // minutes from clockIn to 11:59 PM
+      if (duration < 0) duration = 0;
+      sheet.getRange(sheetRow, durationCol + 1).setValue(duration);
+    }
+
+    // Prepend [AUTO-CLOSED] to notes
+    var existingNotes = String(row[notesCol] || '');
+    sheet.getRange(sheetRow, notesCol + 1).setValue('[AUTO-CLOSED] ' + existingNotes);
+
+    // Track for email notification
+    var crew = String(row[crewCol] || '');
+    if (crew) {
+      if (!closedByCrew[crew]) closedByCrew[crew] = [];
+      closedByCrew[crew].push({
+        date: rowDate,
+        entryType: String(row[entryTypeCol] || ''),
+        clockIn: clockInStr
+      });
+    }
+  }
+
+  // Send email notifications to crew leaders
+  var crews = Object.keys(closedByCrew);
+  if (crews.length === 0) return;
+
+  var cmSheet = ss.getSheetByName('Crew Members');
+  if (!cmSheet) return;
+  var cmData = cmSheet.getDataRange().getValues();
+  var cmH = cmData[0];
+  var cmC = {};
+  cmH.forEach(function(h, i) { cmC[h] = i; });
+
+  var leaderEmails = {};
+  for (var c = 1; c < cmData.length; c++) {
+    var m = cmData[c];
+    if (String(m[cmC['Role']] || '').toLowerCase() === 'leader' && m[cmC['Email']]) {
+      leaderEmails[String(m[cmC['Default Crew']] || m[cmC['Crew']] || '')] = m[cmC['Email']];
+    }
+  }
+
+  crews.forEach(function(crew) {
+    var email = leaderEmails[crew];
+    if (!email) return;
+
+    var entries = closedByCrew[crew];
+    var listHtml = entries.map(function(e) {
+      return '<li>' + e.date + ' — ' + e.entryType + ' (started ' + e.clockIn + ')</li>';
+    }).join('');
+
+    MailApp.sendEmail({
+      to: email,
+      subject: 'Endurance — ' + entries.length + ' time entr' + (entries.length === 1 ? 'y' : 'ies') + ' auto-closed (' + crew + ')',
+      htmlBody:
+        '<p>Hi,</p>' +
+        '<p>The following time entries for <strong>' + crew +
+        '</strong> were auto-closed at midnight because they had no clock-out time:</p>' +
+        '<ul>' + listHtml + '</ul>' +
+        '<p><strong>Please open the Crew app and correct the actual clock-out times before starting your next day.</strong></p>' +
+        '<p style="color:#888;font-size:12px;">— Endurance Services</p>'
+    });
+  });
+}
+
+// Helper: parse "8:00 AM" → minutes since midnight (no Date object needed)
+function parseClockTime12_(timeStr) {
+  if (!timeStr) return null;
+  var m = String(timeStr).match(/(\d+):(\d+)\s*(AM|PM)/i);
+  if (!m) return null;
+  var h = parseInt(m[1]), min = parseInt(m[2]);
+  var ap = m[3].toUpperCase();
+  if (ap === 'PM' && h !== 12) h += 12;
+  if (ap === 'AM' && h === 12) h = 0;
+  return h * 60 + min;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PAYROLL EXPORT TRACKING
+// ═══════════════════════════════════════════════════════════════
+
+function savePayrollExport(data) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('PayrollExports');
+  if (!sheet) {
+    sheet = ss.insertSheet('PayrollExports');
+    sheet.appendRow(['Week Start', 'Week End', 'Exported At']);
+  }
+
+  var now = new Date();
+  sheet.appendRow([data.weekStart, data.weekEnd, now.toISOString()]);
+  return { success: true, exportedAt: now.toISOString() };
+}
+
+function getPayrollExportStatus(weekStart) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('PayrollExports');
+  if (!sheet) return { success: true, exported: false };
+
+  var data = sheet.getDataRange().getValues();
+  for (var i = data.length - 1; i >= 1; i--) {
+    if (String(data[i][0]) === weekStart) {
+      return { success: true, exported: true, exportedAt: String(data[i][2]) };
+    }
+  }
+  return { success: true, exported: false };
 }
 
 function parseClockTime_(timeStr, dateVal, tz) {

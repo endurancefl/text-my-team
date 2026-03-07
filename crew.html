@@ -373,6 +373,26 @@
     </div>
   </div>
 
+  <!-- Auto-Close Correction Screen (blocking overlay) -->
+  <div id="correction-overlay" class="modal-overlay">
+    <div class="site-report-topbar">
+      <div style="width:44px;"></div>
+      <span class="sr-title" data-i18n="correctionRequired">Correction Required</span>
+      <div style="width:44px;"></div>
+    </div>
+    <div class="correction-screen">
+      <div class="correction-alert">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:32px;height:32px;color:#F59E0B;">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
+        </svg>
+        <p data-i18n="correctionDesc">The following time entries were auto-closed at midnight. Please enter the actual clock-out times before starting your day.</p>
+      </div>
+      <div id="correction-entries-list"></div>
+      <div class="correction-error" id="correction-error" style="display:none;"></div>
+      <button class="ios-btn ios-btn-primary correction-submit-btn" id="correction-submit-btn" onclick="submitCorrections()" data-i18n="correctionSubmit">Submit Corrections</button>
+    </div>
+  </div>
+
   <!-- Request Detail Modal -->
   <div id="modal-overlay" class="modal-overlay">
     <div class="site-report-topbar">
@@ -994,6 +1014,7 @@
     var permanentReminders = [];         // Permanent reminders (show every visit)
     var rosterVerified = [];             // Array of booleans tracking verified status per roster member
     var expandedPropertyGroups = {};     // Track which property groups are expanded (by address key)
+    var autoClosedEntries = [];          // Entries auto-closed at midnight needing correction
     var DEMO_MODE = new URLSearchParams(window.location.search).get('demo') === 'true';
 
     // ─── Offline Queue State ───
@@ -1196,7 +1217,17 @@
         reminderSubmitted: 'Reminder created!',
         permanentReminder: 'Permanent Reminder',
         reminder: 'Reminder',
-        selectAction: 'Select Action'
+        selectAction: 'Select Action',
+        // Auto-close corrections
+        correctionRequired: 'Correction Required',
+        correctionDesc: 'The following time entries were auto-closed at midnight. Please enter the actual clock-out times before starting your day.',
+        actualClockOut: 'Actual clock-out',
+        correctionSubmit: 'Submit Corrections',
+        correctionSaving: 'Saving...',
+        correctionSuccess: 'Corrections saved!',
+        correctionError: 'Failed to save corrections. Try again.',
+        correctionTimeError: 'Clock-out must be after clock-in for all entries.',
+        autoClosedLabel: 'Auto-Closed'
       },
       es: {
         langToggle: 'English',
@@ -1362,7 +1393,16 @@
         reminderSubmitted: '\u00a1Recordatorio creado!',
         permanentReminder: 'Recordatorio Permanente',
         reminder: 'Recordatorio',
-        selectAction: 'Seleccionar Acci\u00f3n'
+        selectAction: 'Seleccionar Acci\u00f3n',
+        correctionRequired: 'Correcci\u00f3n Requerida',
+        correctionDesc: 'Las siguientes entradas de tiempo se cerraron autom\u00e1ticamente a medianoche. Ingrese las horas reales de salida antes de iniciar su d\u00eda.',
+        actualClockOut: 'Hora real de salida',
+        correctionSubmit: 'Enviar Correcciones',
+        correctionSaving: 'Guardando...',
+        correctionSuccess: '\u00a1Correcciones guardadas!',
+        correctionError: 'Error al guardar. Intente de nuevo.',
+        correctionTimeError: 'La hora de salida debe ser posterior a la de entrada.',
+        autoClosedLabel: 'Cierre Autom\u00e1tico'
       }
     };
 
@@ -2145,6 +2185,12 @@
 
             renderStopCards();
             updateScheduleDaySummary();
+
+            // Check for auto-closed entries needing correction
+            autoClosedEntries = data.autoClosedEntries || [];
+            if (autoClosedEntries.length > 0 && !dayStarted) {
+              showCorrectionScreen();
+            }
           } else {
             document.getElementById('schedule-empty').style.display = 'block';
             document.getElementById('schedule-day-summary').textContent = '0 stops scheduled';
@@ -2155,6 +2201,145 @@
           document.getElementById('schedule-empty').style.display = 'block';
           document.getElementById('schedule-day-summary').textContent = 'Could not load schedule';
         });
+    }
+
+    // ═══════════════════════════════════════
+    // Auto-Close Correction Screen
+    // ═══════════════════════════════════════
+
+    function showCorrectionScreen() {
+      var overlay = document.getElementById('correction-overlay');
+      var list = document.getElementById('correction-entries-list');
+      document.getElementById('correction-error').style.display = 'none';
+
+      var html = '';
+      autoClosedEntries.forEach(function(entry, i) {
+        var entryType = entry.entryType || '';
+        var label = '';
+        if (entryType === 'day_clock') label = t('dayTimer');
+        else if (entryType === 'job') label = entry.propertyAddress || entry.ticketId || 'Job';
+        else if (entryType === 'indirect') label = 'Travel';
+        else label = entryType;
+
+        html += '<div class="correction-entry-card">';
+        html += '<div class="correction-entry-header">';
+        html += '<span class="correction-entry-badge">' + t('autoClosedLabel') + '</span>';
+        html += '<span class="correction-entry-date">' + escapeHtml(entry.date) + '</span>';
+        html += '</div>';
+        html += '<div class="correction-entry-label">' + escapeHtml(label) + '</div>';
+        html += '<div class="correction-entry-times">';
+        html += '<div class="correction-time-field">';
+        html += '<label>Clock In</label>';
+        html += '<div class="correction-time-value">' + escapeHtml(entry.clockIn) + '</div>';
+        html += '</div>';
+        html += '<div class="correction-time-field">';
+        html += '<label>' + t('actualClockOut') + '</label>';
+        html += '<input type="time" class="correction-time-input" id="correction-time-' + i + '" />';
+        html += '</div>';
+        html += '</div>';
+        html += '</div>';
+      });
+
+      list.innerHTML = html;
+      overlay.classList.add('active');
+    }
+
+    function closeCorrectionScreen() {
+      document.getElementById('correction-overlay').classList.remove('active');
+    }
+
+    async function submitCorrections() {
+      var btn = document.getElementById('correction-submit-btn');
+      var errorEl = document.getElementById('correction-error');
+      errorEl.style.display = 'none';
+
+      // Validate all entries have clock-out times
+      var corrections = [];
+      for (var i = 0; i < autoClosedEntries.length; i++) {
+        var input = document.getElementById('correction-time-' + i);
+        if (!input || !input.value) {
+          errorEl.textContent = t('correctionTimeError');
+          errorEl.style.display = 'block';
+          return;
+        }
+
+        // Convert 24h input to 12h format
+        var parts = input.value.split(':');
+        var h = parseInt(parts[0]);
+        var m = parts[1];
+        var ampm = h >= 12 ? 'PM' : 'AM';
+        if (h === 0) h = 12;
+        else if (h > 12) h -= 12;
+        var clockOut12 = h + ':' + m + ' ' + ampm;
+
+        // Validate clock-out is after clock-in
+        var clockInMin = parseClockTimeToMinutes(autoClosedEntries[i].clockIn);
+        var clockOutMin = parseInt(parts[0]) * 60 + parseInt(m);
+        if (clockOutMin <= clockInMin) {
+          errorEl.textContent = t('correctionTimeError');
+          errorEl.style.display = 'block';
+          return;
+        }
+
+        var durationMinutes = clockOutMin - clockInMin;
+
+        corrections.push({
+          entryId: autoClosedEntries[i].entryId,
+          clockOut: clockOut12,
+          durationMinutes: durationMinutes,
+          notes: autoClosedEntries[i].notes.replace('[AUTO-CLOSED] ', '').replace('[AUTO-CLOSED]', '')
+        });
+      }
+
+      btn.textContent = t('correctionSaving');
+      btn.disabled = true;
+
+      // Submit each correction
+      var allSuccess = true;
+      for (var j = 0; j < corrections.length; j++) {
+        try {
+          var resp = await fetch(GOOGLE_SHEETS_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              updateTimeEntry: true,
+              entryId: corrections[j].entryId,
+              clockOut: corrections[j].clockOut,
+              durationMinutes: corrections[j].durationMinutes,
+              notes: corrections[j].notes
+            })
+          });
+          var result = await resp.json();
+          if (!result.success) allSuccess = false;
+        } catch (err) {
+          allSuccess = false;
+        }
+      }
+
+      if (allSuccess) {
+        autoClosedEntries = [];
+        closeCorrectionScreen();
+        iosAlert(t('correctionSuccess'));
+      } else {
+        errorEl.textContent = t('correctionError');
+        errorEl.style.display = 'block';
+      }
+
+      btn.textContent = t('correctionSubmit');
+      btn.disabled = false;
+    }
+
+    // Helper: parse "8:30 AM" to minutes since midnight
+    function parseClockTimeToMinutes(timeStr) {
+      if (!timeStr) return 0;
+      var match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+      if (!match) return 0;
+      var h = parseInt(match[1]);
+      var m = parseInt(match[2]);
+      var ampm = match[3].toUpperCase();
+      if (ampm === 'PM' && h !== 12) h += 12;
+      if (ampm === 'AM' && h === 12) h = 0;
+      return h * 60 + m;
     }
 
     // ─── Render Stop Cards (property-grouped) ───
@@ -2738,6 +2923,12 @@
 
     // ─── Crew Check-In (PIN-based) ───
     function showCrewCheckIn() {
+      // Block start day if there are auto-closed entries needing correction
+      if (autoClosedEntries.length > 0) {
+        showCorrectionScreen();
+        return;
+      }
+
       var overlay = document.getElementById('checkin-overlay');
       overlay.classList.add('active');
 

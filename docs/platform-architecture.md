@@ -331,13 +331,37 @@ text-my-team/
   - Emails crew leader (requires Email column in Crew Members sheet)
   - Dedup via PropertiesService with Unix timestamp log, 48h cleanup
 
-  **Backend endpoints needed**: `getTimeEntries` (GET), `getCrewMembers` (GET) — API contracts documented as comment blocks in source
+  **Payroll Export Tracking** — `savePayrollExport` (POST) / `getPayrollExportStatus` (GET):
+  - Tracks which weeks have been exported via PayrollExports sheet (created automatically)
+  - "Exported [date]" green badge replaces "Ready to Export" after payroll download
+  - Confirmation dialog before export warns about open entries, auto-closed entries, or re-export
+  - `trCheckExportStatus()` fetches badge state from backend on view load and week change
 
-  **State variables**: `trData`, `trWeekStart`, `trCrewFilter`, `trMemberFilter`, `trEditingEntryId`, `trCrewRoster`, `trInitialized`
+  **Auto-Close Midnight Trigger** — `autoCloseOpenEntries()`:
+  - Daily midnight trigger closes all time entries with empty Clock Out from previous days
+  - Sets Clock Out to "11:59 PM", calculates duration, prepends `[AUTO-CLOSED]` to Notes
+  - Emails crew leaders listing affected entries
+  - Auto-closed badge (red) shown in Time Review table for entries with `[AUTO-CLOSED]` flag
+  - `getCrewSchedule` returns `autoClosedEntries` array for crew.html blocking screen
 
-  **Functions**: `initTimeReview()`, `trSetWeek()`, `loadTimeReview()`, `renderTimeReview()`, `trPopulateMemberFilter()`, `trUpdatePayrollBadge()`, `trApplyFilters()`, `trUpdateSummaryCards()`, `trRenderOpenClockBanner()`, `trCloseDayClock()`, `trEditEntry()`, `trCancelEdit()`, `trSaveEntry()`, `trDeleteEntry()`, `openTrAddModal()`, `closeTrAddModal()`, `trAddCrewChanged()`, `trSaveNewEntry()`, `trExportPayroll()`, `trExportDetail()`, `trDownloadCSV()`, `trParseTime12()`, `trCalcDurationMinutes()`, `trFormatTime12()`, `trFormatDate()`, `trFormatDateLong()`, `trDateStr()`, `trIsShop()`
+  **Crew Correction Screen** (crew.html):
+  - Full-screen blocking overlay shown after login if `autoClosedEntries` exist
+  - Lists each auto-closed entry with Clock In (read-only) and actual Clock Out (time input)
+  - Crew leader must submit real clock-out times before Start Day button becomes available
+  - Submits corrections via `updateTimeEntry` endpoint, removes `[AUTO-CLOSED]` flag from notes
+  - Translations: en + es for all correction screen strings
 
-  **CSS classes** (all `tr-` prefixed): `.tr-table`, `.tr-badge`, `.tr-badge-direct`, `.tr-badge-travel`, `.tr-badge-shop`, `.tr-badge-fixed`, `.tr-split-icon`, `.tr-day-header`, `.tr-day-subtotal`, `.tr-summary-cards`, `.tr-summary-card`, `.tr-card-value`, `.tr-card-label`, `.tr-edit-input`, `.tr-fixed-note`, `.tr-payroll-badge`, `.tr-payroll-pending`, `.tr-payroll-ready`, `.tr-open-clock-banner`, `.tr-close-clock-btn`, `.tr-action-btn`
+  **Backend endpoints**: `getTimeEntries` (GET), `getCrewMembers` (GET), `getPayrollExportStatus` (GET), `savePayrollExport` (POST) — API contracts documented as comment blocks in source
+
+  **State variables**: `trData`, `trWeekStart`, `trCrewFilter`, `trMemberFilter`, `trEditingEntryId`, `trCrewRoster`, `trInitialized`, `trExportedStatus`
+
+  **Functions**: `initTimeReview()`, `trSetWeek()`, `loadTimeReview()`, `renderTimeReview()`, `trPopulateMemberFilter()`, `trUpdatePayrollBadge()`, `trCheckExportStatus()`, `trSaveExportStatus()`, `trApplyFilters()`, `trUpdateSummaryCards()`, `trRenderOpenClockBanner()`, `trCloseDayClock()`, `trEditEntry()`, `trCancelEdit()`, `trSaveEntry()`, `trDeleteEntry()`, `openTrAddModal()`, `closeTrAddModal()`, `trAddCrewChanged()`, `trSaveNewEntry()`, `trExportPayroll()`, `trExportDetail()`, `trDownloadCSV()`, `trParseTime12()`, `trCalcDurationMinutes()`, `trFormatTime12()`, `trFormatDate()`, `trFormatDateLong()`, `trDateStr()`, `trIsShop()`
+
+  **CSS classes** (all `tr-` prefixed): `.tr-table`, `.tr-badge`, `.tr-badge-direct`, `.tr-badge-travel`, `.tr-badge-shop`, `.tr-badge-fixed`, `.tr-badge-autoclosed`, `.tr-split-icon`, `.tr-day-header`, `.tr-day-subtotal`, `.tr-summary-cards`, `.tr-summary-card`, `.tr-card-value`, `.tr-card-label`, `.tr-edit-input`, `.tr-fixed-note`, `.tr-payroll-badge`, `.tr-payroll-pending`, `.tr-payroll-ready`, `.tr-payroll-exported`, `.tr-open-clock-banner`, `.tr-close-clock-btn`, `.tr-action-btn`
+
+  **crew.html state/functions**: `autoClosedEntries` (state), `showCorrectionScreen()`, `closeCorrectionScreen()`, `submitCorrections()`, `parseClockTimeToMinutes()`
+
+  **crew.css classes**: `.correction-screen`, `.correction-alert`, `.correction-entry-card`, `.correction-entry-header`, `.correction-entry-badge`, `.correction-entry-date`, `.correction-entry-label`, `.correction-entry-times`, `.correction-time-field`, `.correction-time-value`, `.correction-time-input`, `.correction-error`, `.correction-submit-btn`
 
 - Two-panel Google Workspace + Vignelli design system layout (sidebar + main content). **Design system overhaul (Feb 2026)**: Complete CSS redesign following Massimo Vignelli structural principles + Google Workspace density. Design spec: `docs/design-spec-platform.md`. **Key design tokens**: `--rule-heavy: 2px solid #202124` (Vignelli heavy rule under headers/between sections), `--font-display: Google Sans` (page titles only, 22px), `--font-body: Roboto` (everything else), 14px body text, 13px table cells, 32px buttons/inputs, 28px bid builder rows, 48px header. **Sidebar**: 256px, Gmail-style pill nav items (`border-radius: 0 16px 16px 0`), grouped with 11px uppercase section labels (OPERATIONS, FINANCIALS, CONFIGURATION). **Color palette**: Google's exact blue (#1A73E8), semantic badge colors (green-light/red-light/yellow-light/blue-lighter backgrounds), Google's two-layer shadow system. **Spreadsheet-cell editing**: transparent inputs with blue-lighter hover hint, 2px solid blue border on focus (Google Sheets style). **CSS layout chain**: `.app-container` (flex row, 100vh) → `.sidebar` (fixed 256px) + `.main-content` (flex: 1, `display: flex; flex-direction: column`). `.main-header` (48px, `border-bottom: var(--rule-heavy)`, z-index: 2) sits at top. `.main-body` (`position: relative; flex: 1; overflow: hidden`) contains all `.view` panels as direct children. `.view.active` has `height: 100%; overflow-y: auto; padding: 16px` — each view fills main-body and scrolls independently. **Summary panel removed** (Feb 2026) — rate overrides (labor rate, labor markup, material markup, sub markup, travel %) integrated into the contract/project settings card as a collapsible `<details>` section, shared by both recurring and work ticket modes.
 - **Two-Tier Estimate Header** ✅ **BUILT** (Mar 2026): Replaced cluttered single-row header with a state-driven two-tier layout for the builder view:
@@ -499,7 +523,7 @@ text-my-team/
 | `getReportData` | Crew | Reads JSON report data from Drive by fileId |
 | `getPhotoBase64` | Crew | Reads photo from Drive, returns base64 |
 | `getReminders` | Reminders | Returns all reminders from the Reminders sheet (auto-creates sheet if missing) |
-| `getCrewSchedule` | Crew | Auth by phone → returns crew members, today's tickets (with travelHours, completedServices for partial), time entries, reminders (one-off for today), permanentReminders (every visit) |
+| `getCrewSchedule` | Crew | Auth by phone → returns crew members, today's tickets (with travelHours, completedServices for partial), time entries, reminders (one-off for today), permanentReminders (every visit), autoClosedEntries (entries with [AUTO-CLOSED] flag needing correction) |
 | `verifyPin` | Crew | Validates 4-digit PIN against Crew Members sheet, returns {success, name, role, crew} |
 | `getProductionAnalysis` | Estimating | Compares catalog production rates vs actual field data. Params: startDate, endDate, crew. Reads Scheduled Tickets (completed/partial) + Time Entries (service type), aggregates by service and item. Returns service-level efficiency (est vs actual man-hours) with per-ticket detail, and item-level field rates (measured from single-item services, inferred from multi-item services) compared to catalog rates |
 | `getCrewMembers` | Crew | Returns crew members grouped by crew name. Params: `crew` (specific name or `all`). Response: `{ crews: { "Crew A": [{ name, role }], ... } }`. Excludes PINs/emails. Used by Time Review for member filter dropdown and Add Entry modal |
@@ -510,6 +534,7 @@ text-my-team/
 | `getInvoices` | Invoicing | Returns all invoices, optional filters (status, contractId). Auto-creates Invoices sheet if missing |
 | `getPayments` | Invoicing | Returns payments for a specific invoiceId. Auto-creates Payments sheet if missing |
 | `getContractForSigning` | Signing | Takes `token` param, returns customer-safe contract data (no markups/margins). Verifies PDF integrity: reads stored `pdfHash`, fetches PDF from Drive via `PDF File ID`, computes SHA-256, compares — returns `hashMismatch: true` if tampered. Used by `sign.html` |
+| `getPayrollExportStatus` | Time Review | Checks if a payroll week has been exported. Params: `weekStart`. Response: `{ exported: bool, weekStart, weekEnd, exportedAt }`. Reads PayrollExports sheet |
 
 `getInitData` bulk response also includes `reminders: getReminders()` so estimate.html gets all reminders on load.
 
@@ -555,6 +580,7 @@ text-my-team/
 | `saveTimeEntry` | Crew | Creates time entry (day_clock, job, indirect, service). Accepts optional `estimatedHours` for service entries (auto-upgrades Estimated Hours column) |
 | `updateTimeEntry` | Crew | Updates existing time entry (fills in clockOut/duration/crewMembers/memberCount). Supports clearing clockOut (empty string) for undo operations. Finds by entryId or by crew+date+type fallback |
 | `deleteTimeEntry` | Crew | Deletes a time entry row by entryId. Used by cancel-ticket and undo flows |
+| `savePayrollExport` | Time Review | Records a payroll export to PayrollExports sheet (auto-created). Fields: weekStart, weekEnd, exportedAt timestamp |
 | `completeJob` | Crew | Marks ticket completed/partial + updates time entry. Supports `partial: true` with `completedServices` array for partial carry-over |
 | `reopenTicketService` | Crew | Removes a service from the Completed Services JSON column on a ticket. Optionally reverts ticket status from `completed` to `partial` when `revertStatus: true` |
 | `uploadPhoto` | Crew | General photo upload to Drive |

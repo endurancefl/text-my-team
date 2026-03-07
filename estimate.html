@@ -21198,6 +21198,7 @@ let trMemberFilter = 'all';
 let trEditingEntryId = null;
 let trCrewRoster = {};
 let trInitialized = false;
+let trExportedStatus = null;  // { weekStart, weekEnd, exportedAt } or null
 
 // ── Time Parsing Helpers ──
 
@@ -21310,6 +21311,7 @@ function trUpdateWeekLabel() {
 
 function trSetWeek(offset) {
   trWeekStart.setDate(trWeekStart.getDate() + offset * 7);
+  trExportedStatus = null;
   trUpdateWeekLabel();
   loadTimeReview();
 }
@@ -21406,6 +21408,9 @@ function trUpdatePayrollBadge() {
   const badge = document.getElementById('tr-payroll-badge');
   if (!badge) return;
 
+  // Check exported status from backend
+  trCheckExportStatus();
+
   const now = new Date();
   const end = new Date(trWeekStart);
   end.setDate(end.getDate() + 6);
@@ -21413,7 +21418,12 @@ function trUpdatePayrollBadge() {
   // Check if all non-day_clock entries have clock outs
   const hasOpenEntries = trData && trData.some(e => e.entryType !== 'day_clock' && !e.clockOut);
 
-  if (now <= end) {
+  if (trExportedStatus) {
+    badge.className = 'tr-payroll-badge tr-payroll-exported';
+    const expDate = new Date(trExportedStatus.exportedAt);
+    const expStr = expDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    badge.textContent = '\u2713 Exported ' + expStr;
+  } else if (now <= end) {
     badge.className = 'tr-payroll-badge tr-payroll-pending';
     badge.textContent = 'Submit by Wed';
   } else if (hasOpenEntries) {
@@ -21422,6 +21432,28 @@ function trUpdatePayrollBadge() {
   } else {
     badge.className = 'tr-payroll-badge tr-payroll-ready';
     badge.textContent = '\u2713 Ready to Export';
+  }
+}
+
+async function trCheckExportStatus() {
+  const weekStr = trDateStr(trWeekStart);
+  try {
+    const resp = await fetch(GOOGLE_SHEETS_URL + '?action=getPayrollExportStatus&weekStart=' + weekStr);
+    const data = await resp.json();
+    if (data.exported) {
+      trExportedStatus = { weekStart: data.weekStart, weekEnd: data.weekEnd, exportedAt: data.exportedAt };
+      const badge = document.getElementById('tr-payroll-badge');
+      if (badge) {
+        badge.className = 'tr-payroll-badge tr-payroll-exported';
+        const expDate = new Date(data.exportedAt);
+        const expStr = expDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        badge.textContent = '\u2713 Exported ' + expStr;
+      }
+    } else {
+      trExportedStatus = null;
+    }
+  } catch (e) {
+    // Silently fail — badge will show default state
   }
 }
 
@@ -21534,15 +21566,18 @@ function renderTimeReview() {
       const splitIcon = r.isSplit ? '<span class="tr-split-icon" title="Split entry - crew change continuation">&#8596;</span>' : '';
       const fixedBadge = r.isFixed ? '<span class="tr-badge tr-badge-fixed">Fixed</span>' : '';
       const serviceName = e.entryType === 'service' ? (e.serviceName || '') : '';
-      const notesTitle = e.notes ? e.notes.replace(/"/g, '&quot;') : '';
-      const notesTrunc = e.notes ? (e.notes.length > 30 ? e.notes.substring(0, 30) + '...' : e.notes) : '';
+      const isAutoClosed = (e.notes || '').indexOf('[AUTO-CLOSED]') !== -1;
+      const autoClosedBadge = isAutoClosed ? '<span class="tr-badge tr-badge-autoclosed">Auto-Closed</span>' : '';
+      const cleanNotes = (e.notes || '').replace('[AUTO-CLOSED] ', '').replace('[AUTO-CLOSED]', '').trim();
+      const notesTitle = cleanNotes ? cleanNotes.replace(/"/g, '&quot;') : '';
+      const notesTrunc = cleanNotes ? (cleanNotes.length > 30 ? cleanNotes.substring(0, 30) + '...' : cleanNotes) : '';
 
       if (editing) {
         html += `<tr>
           <td>${dayLabel}</td>
           <td>${e.crew}</td>
           <td>${r.member}</td>
-          <td><span class="tr-badge ${r.typeClass}">${r.type}</span>${fixedBadge}</td>
+          <td><span class="tr-badge ${r.typeClass}">${r.type}</span>${fixedBadge}${autoClosedBadge}</td>
           <td>${r.property}</td>
           <td>${serviceName}${splitIcon}</td>
           <td><input type="text" class="tr-edit-input" id="tr-edit-in-${e.entryId}" value="${e.clockIn || ''}">
@@ -21560,7 +21595,7 @@ function renderTimeReview() {
           <td>${dayLabel}</td>
           <td>${e.crew}</td>
           <td>${r.member}</td>
-          <td><span class="tr-badge ${r.typeClass}">${r.type}</span>${fixedBadge}</td>
+          <td><span class="tr-badge ${r.typeClass}">${r.type}</span>${fixedBadge}${autoClosedBadge}</td>
           <td>${r.property}</td>
           <td>${serviceName}${splitIcon}</td>
           <td>${e.clockIn || ''}</td>
@@ -21891,6 +21926,21 @@ function trExportPayroll() {
     return;
   }
 
+  // Show confirmation dialog
+  const end = new Date(trWeekStart);
+  end.setDate(end.getDate() + 6);
+  const weekLabel = trFormatDate(trDateStr(trWeekStart)) + ' – ' + trFormatDate(trDateStr(end));
+  const hasOpenEntries = trData.some(e => e.entryType !== 'day_clock' && !e.clockOut);
+  const hasAutoClosed = trData.some(e => (e.notes || '').indexOf('[AUTO-CLOSED]') !== -1);
+
+  let warnings = '';
+  if (hasOpenEntries) warnings += '\n⚠ There are entries with missing clock-out times.';
+  if (hasAutoClosed) warnings += '\n⚠ There are auto-closed entries that may need correction.';
+  if (trExportedStatus) warnings += '\n⚠ This week was already exported on ' + new Date(trExportedStatus.exportedAt).toLocaleDateString() + '.';
+
+  const msg = 'Export payroll for ' + weekLabel + '?' + warnings + '\n\nThis will download a CSV file.';
+  if (!confirm(msg)) return;
+
   // Filter: skip day_clock and indirect (travel)
   const billable = trData.filter(e => e.entryType !== 'day_clock' && e.entryType !== 'indirect');
 
@@ -21979,6 +22029,27 @@ function trExportPayroll() {
   const endStr = trDateStr(end);
   trDownloadCSV(csv, `Endurance-Payroll-${startStr}-to-${endStr}.csv`);
   showToast('Payroll CSV exported', 'success');
+
+  // Save export status to backend
+  trSaveExportStatus(startStr, endStr);
+}
+
+async function trSaveExportStatus(startStr, endStr) {
+  try {
+    await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        savePayrollExport: true,
+        weekStart: startStr,
+        weekEnd: endStr
+      })
+    });
+    trExportedStatus = { weekStart: startStr, weekEnd: endStr, exportedAt: new Date().toISOString() };
+    trUpdatePayrollBadge();
+  } catch (e) {
+    // Non-critical — export already downloaded
+  }
 }
 
 // ── Detail Export ──
