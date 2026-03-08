@@ -262,8 +262,12 @@ text-my-team/
   - Mulch Installation (SVC-ENH-001), Seasonal Color Install (SVC-ENH-002), Planting/Bed Install (SVC-ENH-003), Landscape Renovation (SVC-ENH-004)
 
   **ENH Material Line Items** — per-line material rows within services (distinct from MNT aggregate `calcServiceMaterialCost()`):
-  - Schema: `{ materialRowId, description, quantity, unit, unitCost, markup (default 20%), billedPrice, plantCatalogId? }`
+  - Schema: `{ materialRowId, description, quantity, unit, unitCost, markup, billedPrice, plantCatalogId?, plantSize? }`
+  - `markup` default now uses estimate-level `getEffectiveRates().materialMarkup` (converted from percentage to decimal), falls back to 0.20
+  - `plantSize` field stores which size was selected from the plant catalog (e.g., "15 gal")
   - Functions: `addENHMaterial()`, `removeENHMaterial()`, `calcENHMaterialsBilled()`, `calcENHMaterialsCost()`
+  - Each material row has a `local_florist` icon button to open the Plant Picker modal
+  - "P" badge displays when `plantCatalogId` is set (linked to Plant Catalog)
   - Renders as sub-section below labor line items in service table
 
   **ENH Subcontractor Line Items** — per-line sub rows within services (distinct from `isSubcontractor: true` whole-service model):
@@ -284,6 +288,14 @@ text-my-team/
   - Functions: `getPlantCategories()`, `refreshPlantCategoryDropdowns()`, `handlePlantCategorySelect()`, `handlePlantCategoryFilterSelect()`, `buildFullSettingsPayload()`, `loadAndRenderPlantCatalog()`, `renderPlantCatalog()`, `filterPlantCatalog()`, `showPlantForm()`, `savePlantEntry()`, `deletePlant()`, `showPlantImportModal()`, `parsePlantImportCSV()`, `confirmPlantImport()`
   - Backend endpoints: `getPlantCatalog` (GET), `savePlantEntry` (POST), `deletePlantEntry` (POST), `uploadPlantPhoto` (POST)
   - **Plant Photo Search** *(future)*: Auto-search the web for plant photos by botanical/common name when adding or viewing catalog entries. Would populate thumbnail automatically if no manual photo upload exists.
+
+  **Plant Picker** — modal UI to select plants from catalog and auto-fill ENH material rows:
+  - Two-step flow: Step 1 (search/select plant) → Step 2 (select size)
+  - Modal: `#pp-modal` with search input, plant cards with thumbnails, size list with supplier costs
+  - Functions: `openPlantPicker(sIdx, mIdx)`, `closePlantPicker()`, `renderPlantPickerResults()`, `selectPlantForPicker(plantId)`, `renderPlantPickerSizes()`, `plantPickerBack()`, `applyPlantPick(sizeIndex)`
+  - State: `ppServiceIdx`, `ppMaterialIdx`, `ppSelectedPlant`
+  - `applyPlantPick()` sets: `description` = "{commonName} — {size}", `unitCost` = supplierCost, `markup` = estimate-level materialMarkup, `unit` = "each", `plantCatalogId`, `plantSize`
+  - CSS classes: `.pp-pick-btn`, `.pp-plant-item`, `.pp-plant-thumb`, `.pp-plant-thumb-placeholder`, `.pp-size-item` (in `css/estimate.css`)
 
   **ENH Bid Calculation** — extends `calculateBidTotals()` with guarded `division === 'ENH'` branch:
   - ENH total = labor billed + ENH materials billed + ENH subcontractors billed

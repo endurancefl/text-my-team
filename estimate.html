@@ -2832,6 +2832,34 @@
     </div>
   </div>
 
+  <!-- Plant Picker Modal -->
+  <div class="modal-overlay" id="pp-modal">
+    <div class="modal" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3>Select Plant</h3>
+        <button class="modal-close" onclick="closePlantPicker()">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 16px 24px;">
+        <!-- Step 1: Search & select plant -->
+        <div id="pp-step-plant">
+          <input type="text" class="form-input" id="pp-search"
+            placeholder="Search plants..." oninput="renderPlantPickerResults()">
+          <div id="pp-results" style="margin-top: 12px; max-height: 300px; overflow-y: auto;"></div>
+        </div>
+        <!-- Step 2: Select size (shown after plant selected) -->
+        <div id="pp-step-size" style="display: none;">
+          <div id="pp-selected-plant-info"></div>
+          <div id="pp-size-list" style="margin-top: 12px;"></div>
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; padding: 16px 24px; border-top: 1px solid var(--gw-divider);">
+        <button class="btn btn-secondary" id="pp-back-btn"
+          onclick="plantPickerBack()" style="display:none;">Back</button>
+        <button class="btn btn-secondary" onclick="closePlantPicker()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Add Time Entry Modal -->
   <div class="modal-overlay" id="tr-add-modal" style="display: none;">
     <div class="modal" style="max-width: 520px;">
@@ -7099,7 +7127,8 @@ function buildMarvinContext() {
           unitCost: m.unitCost || 0,
           markup: m.markup || 0,
           billedPrice: (m.quantity || 0) * (m.unitCost || 0) * (1 + (m.markup || 0.20)),
-          plantCatalogId: m.plantCatalogId || null
+          plantCatalogId: m.plantCatalogId || null,
+          plantSize: m.plantSize || null
         }));
       }
       // ENH per-line subcontractor rows (distinct from isSubcontractor:true whole-service model)
@@ -14645,6 +14674,9 @@ function renderTableBody() {
           <tr class="row-enh-material ${isCollapsed ? 'row-hidden' : ''}" data-service="${sIdx}" data-mat="${mIdx}">
             <td>
               <div class="enh-material-name">
+                <button class="pp-pick-btn" onclick="openPlantPicker(${sIdx}, ${mIdx})" title="Pick from Plant Catalog">
+                  <span class="material-icons-outlined" style="font-size:16px;">local_florist</span>
+                </button>
                 ${mat.plantCatalogId ? '<span class="plant-link-badge" title="Linked to Plant Catalog">P</span>' : ''}
                 <input type="text" class="table-input enh-mat-desc" value="${(mat.description || '').replace(/"/g, '&quot;')}"
                   data-service="${sIdx}" data-mat="${mIdx}" placeholder="Description">
@@ -18351,14 +18383,17 @@ function addENHMaterial(sIdx) {
   const service = currentEstimate.services[sIdx];
   if (!service) return;
   if (!service.materials) service.materials = [];
+  const rates = getEffectiveRates();
+  const defaultMarkup = rates.materialMarkup != null ? rates.materialMarkup / 100 : 0.20;
   service.materials.push({
     description: '',
     quantity: 0,
     unit: 'each',
     unitCost: 0,
-    markup: 0.20,
+    markup: defaultMarkup,
     billedPrice: 0,
-    plantCatalogId: null
+    plantCatalogId: null,
+    plantSize: null
   });
   renderTableBody();
   markEstimateDirty();
@@ -18370,6 +18405,142 @@ function removeENHMaterial(sIdx, mIdx) {
   service.materials.splice(mIdx, 1);
   renderTableBody();
   markEstimateDirty();
+}
+
+// ─── Plant Picker for ENH Material Rows ───
+let ppServiceIdx = null;
+let ppMaterialIdx = null;
+let ppSelectedPlant = null;
+
+async function openPlantPicker(sIdx, mIdx) {
+  ppServiceIdx = sIdx;
+  ppMaterialIdx = mIdx;
+  ppSelectedPlant = null;
+  // Ensure plant catalog is loaded
+  if (!plantCatalog || plantCatalog.length === 0) {
+    if (typeof loadAndRenderPlantCatalog === 'function') {
+      await loadAndRenderPlantCatalog();
+    }
+    if (!plantCatalog || plantCatalog.length === 0) {
+      showToast('Plant catalog is empty. Add plants first.', 'error');
+      return;
+    }
+  }
+  // Reset to step 1
+  document.getElementById('pp-search').value = '';
+  document.getElementById('pp-step-plant').style.display = '';
+  document.getElementById('pp-step-size').style.display = 'none';
+  document.getElementById('pp-back-btn').style.display = 'none';
+  renderPlantPickerResults();
+  document.getElementById('pp-modal').style.display = 'flex';
+}
+
+function closePlantPicker() {
+  document.getElementById('pp-modal').style.display = 'none';
+  ppServiceIdx = null;
+  ppMaterialIdx = null;
+  ppSelectedPlant = null;
+}
+
+function renderPlantPickerResults() {
+  const query = (document.getElementById('pp-search').value || '').toLowerCase().trim();
+  const container = document.getElementById('pp-results');
+  const filtered = plantCatalog.filter(p => {
+    if (!query) return true;
+    const searchStr = ((p.commonName || '') + ' ' + (p.botanicalName || '') + ' ' + (p.category || '')).toLowerCase();
+    return searchStr.includes(query);
+  });
+  if (filtered.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-secondary);">No plants match your search.</div>';
+    return;
+  }
+  container.innerHTML = filtered.map(p => {
+    const sizeCount = (p.sizes || []).length;
+    const thumb = p.photoFileId
+      ? `<img class="pp-plant-thumb" src="https://drive.google.com/uc?export=view&id=${p.photoFileId}" alt="">`
+      : `<div class="pp-plant-thumb-placeholder"><span class="material-icons-outlined" style="font-size:20px;">eco</span></div>`;
+    return `
+      <div class="pp-plant-item" onclick="selectPlantForPicker('${p.plantId}')">
+        ${thumb}
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:600;font-size:13px;">${p.commonName || 'Unnamed'}</div>
+          ${p.botanicalName ? `<div style="font-size:11px;color:var(--text-secondary);font-style:italic;">${p.botanicalName}</div>` : ''}
+          <div style="font-size:11px;color:var(--text-muted);">${p.category || 'Uncategorized'} · ${sizeCount} size${sizeCount !== 1 ? 's' : ''}</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function selectPlantForPicker(plantId) {
+  const plant = plantCatalog.find(p => p.plantId === plantId);
+  if (!plant) return;
+  ppSelectedPlant = plant;
+  // Switch to step 2
+  document.getElementById('pp-step-plant').style.display = 'none';
+  document.getElementById('pp-step-size').style.display = '';
+  document.getElementById('pp-back-btn').style.display = '';
+  renderPlantPickerSizes();
+}
+
+function renderPlantPickerSizes() {
+  if (!ppSelectedPlant) return;
+  const plant = ppSelectedPlant;
+  const thumb = plant.photoFileId
+    ? `<img class="pp-plant-thumb" src="https://drive.google.com/uc?export=view&id=${plant.photoFileId}" alt="" style="width:40px;height:40px;">`
+    : `<div class="pp-plant-thumb-placeholder" style="width:40px;height:40px;"><span class="material-icons-outlined" style="font-size:18px;">eco</span></div>`;
+  document.getElementById('pp-selected-plant-info').innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;padding-bottom:12px;border-bottom:1px solid var(--gw-divider);">
+      ${thumb}
+      <div>
+        <div style="font-weight:600;font-size:14px;">${plant.commonName || 'Unnamed'}</div>
+        ${plant.botanicalName ? `<div style="font-size:12px;color:var(--text-secondary);font-style:italic;">${plant.botanicalName}</div>` : ''}
+      </div>
+    </div>`;
+  const sizes = plant.sizes || [];
+  const sizeList = document.getElementById('pp-size-list');
+  if (sizes.length === 0) {
+    sizeList.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-secondary);">No sizes configured for this plant.</div>';
+    return;
+  }
+  sizeList.innerHTML = sizes.map((s, i) => `
+    <div class="pp-size-item" onclick="applyPlantPick(${i})">
+      <div>
+        <div style="font-weight:600;font-size:13px;">${s.size || 'Unknown size'}</div>
+        ${s.supplier ? `<div style="font-size:11px;color:var(--text-secondary);">${s.supplier}</div>` : ''}
+      </div>
+      <div style="font-weight:600;font-size:13px;color:var(--primary);">$${(s.supplierCost || 0).toFixed(2)}</div>
+    </div>`).join('');
+}
+
+function plantPickerBack() {
+  document.getElementById('pp-step-plant').style.display = '';
+  document.getElementById('pp-step-size').style.display = 'none';
+  document.getElementById('pp-back-btn').style.display = 'none';
+  ppSelectedPlant = null;
+}
+
+function applyPlantPick(sizeIndex) {
+  if (!ppSelectedPlant || ppServiceIdx == null || ppMaterialIdx == null) return;
+  const plant = ppSelectedPlant;
+  const size = (plant.sizes || [])[sizeIndex];
+  if (!size) return;
+  const service = currentEstimate.services[ppServiceIdx];
+  if (!service || !service.materials) return;
+  const mat = service.materials[ppMaterialIdx];
+  if (!mat) return;
+  const rates = getEffectiveRates();
+  const defaultMarkup = rates.materialMarkup != null ? rates.materialMarkup / 100 : 0.20;
+  mat.description = `${plant.commonName || 'Plant'} — ${size.size || ''}`;
+  mat.unitCost = size.supplierCost || 0;
+  mat.markup = defaultMarkup;
+  mat.unit = 'each';
+  mat.plantCatalogId = plant.plantId;
+  mat.plantSize = size.size || null;
+  mat.billedPrice = (mat.quantity || 0) * mat.unitCost * (1 + mat.markup);
+  renderTableBody();
+  markEstimateDirty();
+  closePlantPicker();
+  showToast(`Added ${plant.commonName || 'Plant'} — ${size.size || ''}`, 'success');
 }
 
 function addENHSubcontractor(sIdx) {
