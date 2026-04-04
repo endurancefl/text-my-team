@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Payment Successful</title>
+<title>Payment - Endurance Services</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -37,19 +37,7 @@
   .icon svg { color: #1e8e3e; }
   h1 { font-size: 24px; color: #1a2e24; margin-bottom: 8px; }
   p { font-size: 15px; color: #666; line-height: 1.5; margin-bottom: 16px; }
-  .status { font-size: 14px; color: #999; margin-top: 16px; }
-  .spinner {
-    width: 20px;
-    height: 20px;
-    border: 2px solid #ddd;
-    border-top-color: #1a73e8;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    display: inline-block;
-    vertical-align: middle;
-    margin-right: 6px;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
+  .note { font-size: 13px; color: #999; margin-top: 12px; }
 </style>
 </head>
 <body>
@@ -59,42 +47,9 @@
       <polyline points="20 6 9 17 4 12"/>
     </svg>
   </div>
-  <h1 id="title">Payment Successful</h1>
-  <p id="message">Your payment has been received. Thank you!</p>
-  <div class="status" id="status"></div>
+  <h1>Thank You</h1>
+  <p>Your payment has been submitted. You will receive a confirmation email from Stripe once the payment is processed.</p>
+  <p class="note">If you did not complete the payment, no charge was made. You can use the link in your invoice to try again.</p>
 </div>
-
-<script>
-(function() {
-  var params = new URLSearchParams(window.location.search);
-  var sessionId = params.get('session_id');
-  var isSetup = params.get('setup') === 'true';
-
-  if (isSetup) {
-    var method = params.get('method');
-    var methodLabel = method === 'ach' ? 'Bank Transfer' : method === 'card' ? 'Credit Card' : '';
-    document.getElementById('title').textContent = 'Auto-Pay Setup Complete' + (methodLabel ? ' — ' + methodLabel : '');
-    var msg = 'Your payment method has been saved securely. Future invoices will be charged automatically.';
-    if (method === 'card') {
-      msg += '<br><br><span style="font-size:13px;color:#999;">A 2.9% convenience fee will be applied to each monthly charge.</span>';
-    }
-    document.getElementById('message').innerHTML = msg;
-    return;
-  }
-
-  if (!sessionId) {
-    document.getElementById('status').textContent = 'No session ID found.';
-    return;
-  }
-
-  document.getElementById('status').innerHTML = '<span class="spinner"></span> Confirming payment...';
-
-  // The backend will auto-record the payment when polled via checkStripePayment
-  // This page is purely informational — the crew/admin app handles the actual recording
-  setTimeout(function() {
-    document.getElementById('status').textContent = 'Payment confirmed. You may close this page.';
-  }, 2000);
-})();
-</script>
 </body>
 </html>
